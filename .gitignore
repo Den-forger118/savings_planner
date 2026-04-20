@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Environment variables — NEVER commit this
+.env
+.env.local
+.env.production
+
+# Build output
+/build
+/dist
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Editor files
+.vscode/settings.json
