@@ -21,3 +21,7 @@ logs/
 
 # Editor files
 .vscode/settings.json
+
+
+backend/package-lock.json
+frontend/package-lock.json
