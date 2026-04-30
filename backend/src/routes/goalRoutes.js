@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const goalModel = require('../models/goalModel');
+const calculationModel = require('../models/calculationModel');
 
-// GET /api/goals?userId=1 — fetch all goals for a user
+// GET /api/goals?userId=1 — fetch all goals with calculations
 router.get('/', async (req, res) => {
   try {
     const { userId } = req.query;
@@ -12,7 +13,16 @@ router.get('/', async (req, res) => {
     }
     
     const goals = await goalModel.getGoalsByUserId(userId);
-    res.json({ goals });
+    
+    // Enrich each goal with calculations
+    const goalsWithCalculations = goals.map(goal => 
+      calculationModel.getGoalBreakdown(goal)
+    );
+    
+    res.json({ 
+      count: goalsWithCalculations.length,
+      goals: goalsWithCalculations 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -39,13 +49,19 @@ router.post('/', async (req, res) => {
       priority
     );
     
-    res.status(201).json({ message: 'Goal created successfully', goal });
+    // Return with calculations
+    const goalWithCalculations = calculationModel.getGoalBreakdown(goal);
+    
+    res.status(201).json({ 
+      message: 'Goal created successfully', 
+      goal: goalWithCalculations 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/goals/:id — fetch a single goal
+// GET /api/goals/:id — fetch a single goal with calculations
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -55,7 +71,9 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Goal not found' });
     }
     
-    res.json({ goal });
+    const goalWithCalculations = calculationModel.getGoalBreakdown(goal);
+    
+    res.json({ goal: goalWithCalculations });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -79,7 +97,12 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Goal not found' });
     }
     
-    res.json({ message: 'Goal updated successfully', goal });
+    const goalWithCalculations = calculationModel.getGoalBreakdown(goal);
+    
+    res.json({ 
+      message: 'Goal updated successfully', 
+      goal: goalWithCalculations 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -95,7 +118,10 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Goal not found' });
     }
     
-    res.json({ message: 'Goal deleted successfully', goal_id: deletedGoal.goal_id });
+    res.json({ 
+      message: 'Goal deleted successfully', 
+      goal_id: deletedGoal.goal_id 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

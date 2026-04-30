@@ -4,6 +4,7 @@ const cors = require('cors');
 require('dotenv').config();
 const goalRoutes = require('./routes/goalRoutes');
 const pool = require('./dbcon');
+const suggestionsRoute = require('./routes/suggestionsRoute');
 
 // app setup
 const app = express();
@@ -26,7 +27,7 @@ pool.query('SELECT NOW()', (err, res) => {
 
 //mount routes
 app.use('/api/goals', goalRoutes);
-
+app.use('/api/suggestions', suggestionsRoute);
 // health check route
 app.get('/', (request, response) => {
   response.json({'message': 'Savings Planner API is running!'});
