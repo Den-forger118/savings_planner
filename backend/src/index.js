@@ -6,12 +6,16 @@ const goalRoutes = require('./routes/goalRoutes');
 const pool = require('./dbcon');
 const suggestionsRoute = require('./routes/suggestionsRoute');
 const userRoutes = require('./routes/userRoutes');
+const transactionRoute = require('./routes/transactionRoutes');
 
 // app setup
 const app = express();
 
 // middleware
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000', // Adjust this to match your frontend URL
+  credentials: true, // Allow cookies to be sent
+}));
 app.use(express.json());
 
 // test database connection
@@ -30,6 +34,7 @@ pool.query('SELECT NOW()', (err, res) => {
 app.use('/api/goals', goalRoutes);
 app.use('/api/suggestions', suggestionsRoute);
 app.use('/api/users', userRoutes);
+app.use('/api/transactions', transactionRoute);
 // health check route
 app.get('/', (request, response) => {
   response.json({'message': 'Savings Planner API is running!'});

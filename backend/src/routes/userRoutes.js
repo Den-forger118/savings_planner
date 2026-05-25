@@ -3,6 +3,25 @@ const router = express.Router();
 const userModel = require('../models/userModel');
 const goalModel = require('../models/goalModel');
 const calculationModel = require('../models/calculationModel');
+const pool = require('../dbcon');
+
+// Get user details by ID
+router.get('/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await userModel.getUserById(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 
 router.get('/:userId/budget-allocation', async (req, res) => {
   try {
@@ -53,6 +72,30 @@ router.get('/:userId/budget-allocation', async (req, res) => {
       total_allocation_sum: totalAllocationSum,
       any_goals_underfunded: goalBreakdown.some((goal) => !goal.is_feasible),
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update user's monthly budget
+
+router.put('/:userId/budget', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { monthly_budget } = req.body;
+    
+    if (!monthly_budget || monthly_budget < 0) {
+      return res.status(400).json({ error: 'Please provide a valid monthly_budget' });
+    }
+    
+    const query = 'UPDATE users SET monthly_budget = $2 WHERE user_id = $1 RETURNING user_id, first_name, last_name, email, monthly_budget, created_at';
+    const result = await pool.query(query, [userId, monthly_budget]);
+    
+    if (!result.rows[0]) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ message: 'Budget updated successfully', user: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
