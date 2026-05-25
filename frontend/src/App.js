@@ -5,6 +5,8 @@ import CreateGoalForm from './components/CreateGoalForm';
 import OdometerNumber from './components/OdometerNumber';
 import TransactionForm from './components/TransactionForm';
 import TransactionHistory from './components/TransacrionHistory';
+import Dashboard from './components/Dashboard';
+import GoalActions from './components/GoalActions';
 
 function App() {
   const [userId] = useState(1);
@@ -92,6 +94,15 @@ function App() {
           userId={userId}
           onGoalCreated={handleGoalCreated}
         />
+
+        {/* Dashboard Overview */}
+{goals.length > 0 && monthlyBudget && (
+  <Dashboard 
+    userId={userId}
+    monthlyBudget={monthlyBudget}
+    goals={goals}
+  />
+)}
 
         {/* Stats Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
@@ -240,6 +251,15 @@ function App() {
             ));
           }}
         />
+
+      <GoalActions 
+  goalId={goal.goal_id}
+  onGoalDeleted={(deletedGoalId) => {
+    setGoals(goals.filter(g => g.goal_id !== deletedGoalId));
+  }}
+/>
+
+
         <TransactionHistory goalId={goal.goal_id} />
       </div>
     </div>
