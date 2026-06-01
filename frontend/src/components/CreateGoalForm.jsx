@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 function CreateGoalForm({ userId, onGoalCreated }) {
   // Form state
@@ -41,8 +41,8 @@ function CreateGoalForm({ userId, onGoalCreated }) {
     setLoading(true);
 
     try {
-      const response = await axios.post(
-        'http://localhost:5001/api/goals',
+      const response = await api.post(
+        '/goals',
         {
           userId,
           name: formData.name,

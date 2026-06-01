@@ -1,0 +1,76 @@
+
+
+services:
+
+  # ─── PostgreSQL Database ───────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: savings_planner_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: yourpassword
+      POSTGRES_DB: quant
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - savings_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Express Backend ───────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: savings_planner_backend
+    environment:
+      PORT: 5001
+      NODE_ENV: production
+      DB_USERNAME: postgres
+      DB_PASSWORD: yourpassword
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: quant
+      JWT_SECRET: your_super_secret_jwt_key_change_in_production
+      JWT_EXPIRES_IN: 24h
+    ports:
+      - "5001:5001"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - savings_network
+    restart: unless-stopped
+
+  # ─── React Frontend ────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: savings_planner_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - savings_network
+    restart: unless-stopped
+    environment:
+      FRONTEND_URL: http://localhost:8080
+
+# ─── Volumes ──────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    # This persists database data even when containers restart
+
+# ─── Networks ─────────────────────────────────────────────────
+networks:
+  savings_network:
+    driver: bridge

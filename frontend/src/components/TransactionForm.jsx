@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 function TransactionForm({ goalId, userId, goalName, onTransactionAdded }) {
   const [amount, setAmount] = useState('');
@@ -22,16 +22,13 @@ function TransactionForm({ goalId, userId, goalName, onTransactionAdded }) {
     setLoading(true);
 
     try {
-      const response = await axios.post(
-        'http://localhost:5001/api/transactions',
-        {
-          userId,
-          goalId,
-          amount: parseFloat(amount),
-          type,
-          note
-        }
-      );
+      const response = await api.post('/transactions', {
+        userId,
+        goalId,
+        amount: parseFloat(amount),
+        type,
+        note
+      });
 
       setSuccess(true);
       onTransactionAdded(response.data.updated_goal);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 function TransactionHistory({ goalId }) {
   const [transactions, setTransactions] = useState([]);
@@ -11,9 +11,7 @@ function TransactionHistory({ goalId }) {
 
   const fetchTransactions = async () => {
     try {
-      const response = await axios.get(
-        `http://localhost:5001/api/transactions?goalId=${goalId}`
-      );
+      const response = await api.get(`/transactions?goalId=${goalId}`);
       setTransactions(response.data.transactions);
       setLoading(false);
     } catch (err) {

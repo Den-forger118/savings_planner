@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 function GoalActions({ goalId, onGoalUpdated, onGoalDeleted }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -15,7 +15,7 @@ function GoalActions({ goalId, onGoalUpdated, onGoalDeleted }) {
     setError(null);
 
     try {
-      await axios.delete(`http://localhost:5001/api/goals/${goalId}`);
+      await api.delete(`/goals/${goalId}`);
       onGoalDeleted(goalId);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to delete goal');

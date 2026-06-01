@@ -40,9 +40,21 @@ const sendError = (res, err) => {
 };
 
 const handleUserGoalsRequest = async (userId, res) => {
-  const monthlyBudget = await getUserBudgetOrThrow(userId);
+  const user = await userModel.getUserMonthlyBudgetById(userId);
+
+  if (!user) {
+    const error = new Error('User not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
   const goals = await goalModel.getGoalsByUserId(userId);
-  const allocatedGoals = calculationModel.calculateAutoAllocations(goals, monthlyBudget);
+  const hasMonthlyBudget = user.monthly_budget !== null && user.monthly_budget !== undefined;
+  const monthlyBudget = hasMonthlyBudget
+    ? calculationModel.roundToTwo(user.monthly_budget)
+    : null;
+  const allocationBudget = monthlyBudget ?? 0;
+  const allocatedGoals = calculationModel.calculateAutoAllocations(goals, allocationBudget);
   const goalsWithCalculations = goals.map((goal) => buildGoalResponse(goal, allocatedGoals));
 
   res.json({

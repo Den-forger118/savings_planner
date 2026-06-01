@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import axios from 'axios';
+import api from '../services/api';  
 
 function BudgetSetup({userId, currentBudget, onBudgetSet}) { 
     // State to hold the new budget input
@@ -22,8 +22,8 @@ function BudgetSetup({userId, currentBudget, onBudgetSet}) {
 
         try {
             //update the user's monthly budget via API
-            await axios.put(
-                `http://localhost:5001/api/users/${userId}/budget`,
+            await api.put(
+                `/users/${userId}/budget`,
                 { monthly_budget: parseFloat(monthlyBudget) }
             );
 
