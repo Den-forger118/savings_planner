@@ -31,7 +31,7 @@ function TransactionForm({ goalId, userId, goalName, onTransactionAdded }) {
       });
 
       setSuccess(true);
-      onTransactionAdded(response.data.updated_goal);
+      onTransactionAdded(response.data.updated_goal, response.data);
       
       // Reset form
       setAmount('');
@@ -81,7 +81,7 @@ function TransactionForm({ goalId, userId, goalName, onTransactionAdded }) {
 
         {/* Amount Input */}
         <div className="flex items-center gap-2">
-          <span className="text-lg font-serif text-gold">$</span>
+          <span className="text-lg font-money text-gold">$</span>
           <input
             type="number"
             value={amount}

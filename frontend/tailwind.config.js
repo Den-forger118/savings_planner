@@ -9,14 +9,21 @@ module.exports = {
         // Your custom palette
         'primary-dark': '#1A2340',
         'primary-dark-alt': '#243054',
-        'cream': '#F4EAD5',
+        'cream': '#FAFAF8',
         'gold': '#D4A574',
         'gold-light': '#E8C77A',
         'taupe': '#4E4B46',
       },
       fontFamily: {
-        'serif': ['Cormorant Garamond', 'serif'],
-        'sans': ['Inter', 'sans-serif'],
+        // High finance / luxury serif — headings, titles, heritage tone
+        'serif': ['"Playfair Display"', 'Georgia', 'serif'],
+        // Bold marketing sans — UI, labels, body, CTAs
+        'sans': ['Montserrat', 'Helvetica', 'sans-serif'],
+        // Tabular / monospace — financial figures, ledgers, alignment
+        'mono': ['"IBM Plex Mono"', 'Consolas', 'monospace'],
+        'money': ['"IBM Plex Mono"', 'Consolas', 'monospace'],
+        // Banknote / engraved — brand wordmarks (Trajan-like)
+        'engraved': ['Cinzel', 'Trajan Pro', 'serif'],
       },
       fontSize: {
         'xs': ['0.75rem', '1rem'],

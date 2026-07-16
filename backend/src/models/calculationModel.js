@@ -1,4 +1,5 @@
 const AVERAGE_DAYS_PER_MONTH = 30.44;
+const DAYS_IN_YEAR = 365.25;
 const MAGNITUDE_WEIGHT = 0.5;
 const URGENCY_WEIGHT = 0.5;
 
@@ -8,6 +9,8 @@ const toNumber = (value) => {
 };
 
 const roundToTwo = (value) => Number(toNumber(value).toFixed(2));
+
+const isActiveForAllocation = (goal) => !goal.is_complete && !goal.is_paused;
 
 // Calculate days between two dates
 const getDaysBetween = (startDate, endDate) => {
@@ -42,8 +45,16 @@ const calculateMonthlySavings = (remainingAmount, daysRemaining) => {
 
 // Calculate annual savings needed
 const calculateAnnualSavings = (remainingAmount, daysRemaining) => {
-  const years = Math.max(daysRemaining, 1) / 365.25;
+  const years = Math.max(daysRemaining, 1) / DAYS_IN_YEAR;
   return roundToTwo(toNumber(remainingAmount) / years);
+};
+
+const resolveAnnualSavingsNeeded = (remainingAmount, daysRemaining, daysTotal) => {
+  if (daysTotal < DAYS_IN_YEAR) {
+    return 0;
+  }
+
+  return calculateAnnualSavings(remainingAmount, daysRemaining);
 };
 
 // Determine if goal is on track
@@ -138,6 +149,8 @@ const distributeRoundedAllocations = (goalsWithScores, userMonthlyBudget) => {
 const calculateAutoAllocations = (goals, userMonthlyBudget, currentDate = new Date()) => {
   const monthlyBudget = roundToTwo(userMonthlyBudget);
   const baseGoals = Array.isArray(goals) ? goals : [];
+  const activeGoals = baseGoals.filter(isActiveForAllocation);
+  const inactiveGoals = baseGoals.filter((goal) => !isActiveForAllocation(goal));
 
   if (baseGoals.length === 0) {
     return [];
@@ -155,7 +168,19 @@ const calculateAutoAllocations = (goals, userMonthlyBudget, currentDate = new Da
     }));
   }
 
-  const goalMetrics = baseGoals.map((goal) => {
+  if (activeGoals.length === 0) {
+    return baseGoals.map((goal) => ({
+      ...goal,
+      allocated_monthly_amount: 0,
+      allocation_percentage: 0,
+      score: 0,
+      weight_magnitude: 0,
+      weight_urgency: 0,
+      days_remaining: buildGoalTiming(goal, currentDate).daysRemaining,
+    }));
+  }
+
+  const goalMetrics = activeGoals.map((goal) => {
     const timing = buildGoalTiming(goal, currentDate);
 
     return {
@@ -200,19 +225,36 @@ const calculateAutoAllocations = (goals, userMonthlyBudget, currentDate = new Da
     };
   });
 
-  return distributeRoundedAllocations(withRawAllocations, monthlyBudget).map((goal) => ({
+  const activeAllocations = distributeRoundedAllocations(withRawAllocations, monthlyBudget).map((goal) => ({
     ...goal,
     allocation_percentage: monthlyBudget > 0
       ? roundToTwo((goal.allocated_monthly_amount / monthlyBudget) * 100)
       : 0,
   }));
+
+  const inactiveAllocations = inactiveGoals.map((goal) => ({
+    ...goal,
+    allocated_monthly_amount: 0,
+    allocation_percentage: 0,
+    score: 0,
+    weight_magnitude: 0,
+    weight_urgency: 0,
+    days_remaining: buildGoalTiming(goal, currentDate).daysRemaining,
+  }));
+
+  return [...activeAllocations, ...inactiveAllocations];
 };
 
 // Get full breakdown for a goal
 const getGoalBreakdown = (goal, allocatedMonthlyAmount = 0, currentDate = new Date()) => {
   const timing = buildGoalTiming(goal, currentDate);
   const monthlySavings = calculateMonthlySavings(timing.remainingAmount, timing.daysRemaining);
+  const dailySavings = calculateDailySavings(timing.remainingAmount, timing.daysRemaining);
   const allocatedAmount = roundToTwo(allocatedMonthlyAmount);
+  const expectedSaved = (timing.daysTotal > 0)
+    ? (getDaysBetween(timing.created, timing.today) / timing.daysTotal) * timing.targetAmount
+    : timing.targetAmount;
+  const surplusOrDeficit = timing.savedAmount - expectedSaved;
   const percentageComplete = timing.targetAmount > 0
     ? roundToTwo((timing.savedAmount / timing.targetAmount) * 100)
     : 100;
@@ -223,6 +265,19 @@ const getGoalBreakdown = (goal, allocatedMonthlyAmount = 0, currentDate = new Da
     timing.daysTotal
   );
 
+  const savingsNeeded = goal.is_paused
+    ? { daily: 0, weekly: 0, monthly: 0, annual: 0 }
+    : {
+      daily: dailySavings,
+      weekly: calculateWeeklySavings(timing.remainingAmount, timing.daysRemaining),
+      monthly: monthlySavings,
+      annual: resolveAnnualSavingsNeeded(
+        timing.remainingAmount,
+        timing.daysRemaining,
+        timing.daysTotal
+      ),
+    };
+
   return {
     goal_id: goal.goal_id,
     user_id: goal.user_id,
@@ -232,15 +287,23 @@ const getGoalBreakdown = (goal, allocatedMonthlyAmount = 0, currentDate = new Da
     remaining_amount: roundToTwo(timing.remainingAmount),
     deadline: goal.deadline,
     created_at: goal.created_at,
+    is_complete: Boolean(goal.is_complete),
+    completed_at: goal.completed_at,
+    is_paused: Boolean(goal.is_paused),
+    paused_at: goal.paused_at,
     days_remaining: timing.daysRemaining,
     percentage_complete: percentageComplete,
     on_track: onTrack,
-    savings_needed: {
-      daily: calculateDailySavings(timing.remainingAmount, timing.daysRemaining),
-      weekly: calculateWeeklySavings(timing.remainingAmount, timing.daysRemaining),
-      monthly: monthlySavings,
-      annual: calculateAnnualSavings(timing.remainingAmount, timing.daysRemaining),
-    },
+    savings_needed: savingsNeeded,
+    expected_saved_by_now: roundToTwo(expectedSaved),
+    surplus_deficit: roundToTwo(surplusOrDeficit),
+    is_surplus: surplusOrDeficit >= 0,
+    days_can_skip: surplusOrDeficit > 0 && dailySavings > 0
+      ? parseFloat((surplusOrDeficit / dailySavings).toFixed(1))
+      : 0,
+    extra_per_day_to_catch_up: surplusOrDeficit < 0
+      ? parseFloat((Math.abs(surplusOrDeficit) / Math.max(timing.daysRemaining, 1)).toFixed(2))
+      : 0,
     allocated_monthly_amount: allocatedAmount,
     is_feasible: allocatedAmount >= monthlySavings,
   };
@@ -253,8 +316,11 @@ module.exports = {
   calculateWeeklySavings,
   calculateMonthlySavings,
   calculateAnnualSavings,
+  resolveAnnualSavingsNeeded,
   isOnTrack,
+  isActiveForAllocation,
   calculateAutoAllocations,
   getGoalBreakdown,
   roundToTwo,
+  DAYS_IN_YEAR,
 };

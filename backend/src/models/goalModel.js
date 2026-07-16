@@ -1,33 +1,62 @@
 const pool = require('../dbcon');
 
+const throwValidationError = (message) => {
+  const error = new Error(message);
+  error.statusCode = 400;
+  throw error;
+};
+
+const toDateOnly = (value) => {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+};
+
 const normalizeGoalInput = ({ name, targetAmount, deadline, priority }) => {
   if (!name || !String(name).trim()) {
-    throw new Error('Goal name is required');
+    throwValidationError('Goal name is required');
   }
 
   if (targetAmount === undefined || targetAmount === null || Number.parseFloat(targetAmount) <= 0) {
-    throw new Error('A valid target_amount is required');
+    throwValidationError('A valid target_amount is required');
   }
 
-  if (!deadline || Number.isNaN(new Date(deadline).getTime())) {
-    throw new Error('A valid deadline is required');
+  const deadlineDate = toDateOnly(deadline);
+
+  if (!deadlineDate) {
+    throwValidationError('A valid deadline is required');
+  }
+
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+  if (deadlineDate < today) {
+    throwValidationError('Deadline cannot be in the past');
   }
 
   return {
     normalizedName: String(name).trim(),
     normalizedTargetAmount: Number.parseFloat(targetAmount),
-    normalizedDeadline: deadline,
+    normalizedDeadline: deadlineDate.toISOString().slice(0, 10),
     normalizedPriority: priority ?? 1,
   };
 };
 
-// Get all goals for a user
+const GOAL_FIELDS = `
+  goal_id, user_id, name, target_amount, saved_amount,
+  deadline, priority, created_at, is_complete, completed_at, is_paused, paused_at, deleted_at
+`;
+
 const getGoalsByUserId = async (userId) => {
   const query = `
-    SELECT goal_id, user_id, name, target_amount, saved_amount,
-           deadline, priority, created_at
+    SELECT ${GOAL_FIELDS}
     FROM saving_goals
     WHERE user_id = $1
+      AND deleted_at IS NULL
     ORDER BY created_at DESC, goal_id DESC
   `;
 
@@ -39,13 +68,29 @@ const getGoalsByUserId = async (userId) => {
   }
 };
 
-// Get a single goal by ID
-const getGoalById = async (goalId) => {
+const getDeletedGoalsByUserId = async (userId) => {
   const query = `
-    SELECT goal_id, user_id, name, target_amount, saved_amount,
-           deadline, priority, created_at
+    SELECT ${GOAL_FIELDS}
+    FROM saving_goals
+    WHERE user_id = $1
+      AND deleted_at IS NOT NULL
+    ORDER BY deleted_at DESC, goal_id DESC
+  `;
+
+  try {
+    const result = await pool.query(query, [userId]);
+    return result.rows;
+  } catch (err) {
+    throw new Error(`Error fetching deleted goals: ${err.message}`);
+  }
+};
+
+const getGoalById = async (goalId, { includeDeleted = false } = {}) => {
+  const query = `
+    SELECT ${GOAL_FIELDS}
     FROM saving_goals
     WHERE goal_id = $1
+      ${includeDeleted ? '' : 'AND deleted_at IS NULL'}
   `;
 
   try {
@@ -56,7 +101,6 @@ const getGoalById = async (goalId) => {
   }
 };
 
-// Create a new goal
 const createGoal = async (userId, name, targetAmount, deadline, priority = 1) => {
   const {
     normalizedName,
@@ -68,7 +112,7 @@ const createGoal = async (userId, name, targetAmount, deadline, priority = 1) =>
   const query = `
     INSERT INTO saving_goals (user_id, name, target_amount, deadline, priority)
     VALUES ($1, $2, $3, $4, $5)
-    RETURNING goal_id, user_id, name, target_amount, saved_amount, deadline, priority, created_at
+    RETURNING ${GOAL_FIELDS}
   `;
 
   try {
@@ -85,7 +129,6 @@ const createGoal = async (userId, name, targetAmount, deadline, priority = 1) =>
   }
 };
 
-// Update a goal
 const updateGoal = async (goalId, name, targetAmount, deadline, priority) => {
   const {
     normalizedName,
@@ -98,7 +141,8 @@ const updateGoal = async (goalId, name, targetAmount, deadline, priority) => {
     UPDATE saving_goals
     SET name = $2, target_amount = $3, deadline = $4, priority = $5
     WHERE goal_id = $1
-    RETURNING goal_id, user_id, name, target_amount, saved_amount, deadline, priority, created_at
+      AND deleted_at IS NULL
+    RETURNING ${GOAL_FIELDS}
   `;
 
   try {
@@ -115,9 +159,47 @@ const updateGoal = async (goalId, name, targetAmount, deadline, priority) => {
   }
 };
 
-// Delete a goal
+const setGoalPaused = async (goalId, isPaused) => {
+  const existingGoal = await getGoalById(goalId);
+
+  if (!existingGoal) {
+    return null;
+  }
+
+  if (existingGoal.is_complete) {
+    throwValidationError('Completed goals cannot be paused');
+  }
+
+  const query = `
+    UPDATE saving_goals
+    SET
+      is_paused = $2,
+      paused_at = CASE WHEN $2 THEN NOW() ELSE NULL END
+    WHERE goal_id = $1
+      AND deleted_at IS NULL
+    RETURNING ${GOAL_FIELDS}
+  `;
+
+  try {
+    const result = await pool.query(query, [goalId, isPaused]);
+    return result.rows[0];
+  } catch (err) {
+    if (err.statusCode) {
+      throw err;
+    }
+    throw new Error(`Error updating goal pause state: ${err.message}`);
+  }
+};
+
+/** Soft-delete: move goal to trash (keeps transactions until permanently deleted). */
 const deleteGoal = async (goalId) => {
-  const query = 'DELETE FROM saving_goals WHERE goal_id = $1 RETURNING goal_id';
+  const query = `
+    UPDATE saving_goals
+    SET deleted_at = NOW()
+    WHERE goal_id = $1
+      AND deleted_at IS NULL
+    RETURNING ${GOAL_FIELDS}
+  `;
 
   try {
     const result = await pool.query(query, [goalId]);
@@ -127,10 +209,66 @@ const deleteGoal = async (goalId) => {
   }
 };
 
+const restoreGoal = async (goalId, userId) => {
+  const query = `
+    UPDATE saving_goals
+    SET deleted_at = NULL
+    WHERE goal_id = $1
+      AND user_id = $2
+      AND deleted_at IS NOT NULL
+    RETURNING ${GOAL_FIELDS}
+  `;
+
+  try {
+    const result = await pool.query(query, [goalId, userId]);
+    return result.rows[0];
+  } catch (err) {
+    throw new Error(`Error restoring goal: ${err.message}`);
+  }
+};
+
+const permanentlyDeleteGoal = async (goalId, userId) => {
+  const query = `
+    DELETE FROM saving_goals
+    WHERE goal_id = $1
+      AND user_id = $2
+      AND deleted_at IS NOT NULL
+    RETURNING goal_id, name
+  `;
+
+  try {
+    const result = await pool.query(query, [goalId, userId]);
+    return result.rows[0];
+  } catch (err) {
+    throw new Error(`Error permanently deleting goal: ${err.message}`);
+  }
+};
+
+const emptyTrash = async (userId) => {
+  const query = `
+    DELETE FROM saving_goals
+    WHERE user_id = $1
+      AND deleted_at IS NOT NULL
+    RETURNING goal_id
+  `;
+
+  try {
+    const result = await pool.query(query, [userId]);
+    return result.rows;
+  } catch (err) {
+    throw new Error(`Error emptying trash: ${err.message}`);
+  }
+};
+
 module.exports = {
   getGoalsByUserId,
+  getDeletedGoalsByUserId,
   getGoalById,
   createGoal,
   updateGoal,
+  setGoalPaused,
   deleteGoal,
+  restoreGoal,
+  permanentlyDeleteGoal,
+  emptyTrash,
 };

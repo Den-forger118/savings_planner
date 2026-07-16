@@ -98,3 +98,89 @@ test('goal breakdown uses allocated monthly amount for feasibility', () => {
   assert.equal(breakdown.savings_needed.monthly, 507.33);
   assert.equal(breakdown.is_feasible, false);
 });
+
+test('paused goals are excluded from automatic allocation', () => {
+  const goals = [
+    {
+      goal_id: 1,
+      user_id: 10,
+      name: 'Active Goal',
+      target_amount: 5000,
+      saved_amount: 0,
+      deadline: '2025-12-31',
+      created_at: '2025-01-01T00:00:00.000Z',
+      is_paused: false,
+    },
+    {
+      goal_id: 2,
+      user_id: 10,
+      name: 'Paused Goal',
+      target_amount: 10000,
+      saved_amount: 0,
+      deadline: '2025-12-31',
+      created_at: '2025-01-01T00:00:00.000Z',
+      is_paused: true,
+    },
+  ];
+
+  const allocations = calculateAutoAllocations(goals, 500, referenceDate)
+    .sort((a, b) => a.goal_id - b.goal_id);
+
+  assert.equal(allocations[0].allocated_monthly_amount, 500);
+  assert.equal(allocations[1].allocated_monthly_amount, 0);
+});
+
+test('yearly savings is zero for goals shorter than one year', () => {
+  const goal = {
+    goal_id: 4,
+    user_id: 7,
+    name: 'Short Trip',
+    target_amount: 1200,
+    saved_amount: 0,
+    deadline: '2025-08-01',
+    created_at: '2025-04-01T00:00:00.000Z',
+  };
+
+  const breakdown = getGoalBreakdown(goal, 0, referenceDate);
+
+  assert.equal(breakdown.savings_needed.annual, 0);
+  assert.ok(breakdown.savings_needed.monthly > 0);
+  assert.ok(breakdown.savings_needed.weekly > 0);
+  assert.ok(breakdown.savings_needed.daily > 0);
+});
+
+test('yearly savings is calculated for goals spanning at least one year', () => {
+  const goal = {
+    goal_id: 5,
+    user_id: 7,
+    name: 'House Deposit',
+    target_amount: 12000,
+    saved_amount: 0,
+    deadline: '2026-06-01',
+    created_at: '2025-04-01T00:00:00.000Z',
+  };
+
+  const breakdown = getGoalBreakdown(goal, 0, referenceDate);
+
+  assert.ok(breakdown.savings_needed.annual > 0);
+});
+
+test('paused goals report zero payment frequencies', () => {
+  const goal = {
+    goal_id: 6,
+    user_id: 7,
+    name: 'Paused Laptop',
+    target_amount: 2000,
+    saved_amount: 200,
+    deadline: '2026-06-01',
+    created_at: '2025-04-01T00:00:00.000Z',
+    is_paused: true,
+  };
+
+  const breakdown = getGoalBreakdown(goal, 0, referenceDate);
+
+  assert.equal(breakdown.savings_needed.annual, 0);
+  assert.equal(breakdown.savings_needed.monthly, 0);
+  assert.equal(breakdown.savings_needed.weekly, 0);
+  assert.equal(breakdown.savings_needed.daily, 0);
+});

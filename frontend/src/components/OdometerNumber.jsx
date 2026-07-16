@@ -7,7 +7,7 @@ function formatAmount(value) {
   return Number.isFinite(number) ? number.toFixed(2) : '0.00';
 }
 
-function OdometerNumber({ value, prefix = '', className = '' }) {
+function OdometerNumber({ value, prefix = '', className = 'font-money' }) {
   const displayValue = useMemo(() => formatAmount(value), [value]);
   const previousValue = useRef(displayValue);
   const [fromValue, setFromValue] = useState(displayValue);

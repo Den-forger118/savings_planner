@@ -3,24 +3,7 @@ const router = express.Router();
 const goalModel = require('../models/goalModel');
 const userModel = require('../models/userModel');
 const calculationModel = require('../models/calculationModel');
-
-const getUserBudgetOrThrow = async (userId) => {
-  const user = await userModel.getUserMonthlyBudgetById(userId);
-
-  if (!user) {
-    const error = new Error('User not found');
-    error.statusCode = 404;
-    throw error;
-  }
-
-  if (user.monthly_budget === null || user.monthly_budget === undefined) {
-    const error = new Error('Please set your monthly budget first');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  return calculationModel.roundToTwo(user.monthly_budget);
-};
+const { getUserBudgetContext } = require('../utils/budgetContext');
 
 router.get('/', async (req, res) => {
   try {
@@ -30,8 +13,54 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: 'userId query parameter is required' });
     }
 
-    const monthlyBudget = await getUserBudgetOrThrow(userId);
+    const budgetContext = await getUserBudgetContext(userId);
     const goals = await goalModel.getGoalsByUserId(userId);
+
+    if (budgetContext.mode !== 'earner') {
+      const goalBreakdowns = goals.map((goal) => {
+        const breakdown = calculationModel.getGoalBreakdown(goal, 0);
+
+        return {
+          goal_id: goal.goal_id,
+          goal_name: goal.name,
+          target_amount: breakdown.target_amount,
+          remaining_amount: breakdown.remaining_amount,
+          deadline: breakdown.deadline,
+          days_remaining: breakdown.days_remaining,
+          monthly_needed: breakdown.savings_needed.monthly,
+          allocated_monthly_amount: null,
+          shortfall: null,
+          surplus: null,
+          is_feasible: null,
+          on_track: breakdown.on_track,
+          issues: breakdown.on_track ? [] : ['Current saved progress is behind the pace required for the deadline.'],
+          recommendations: [
+            `Save about $${breakdown.savings_needed.monthly.toFixed(2)}/month to reach this goal on time.`,
+          ],
+        };
+      });
+
+      return res.json({
+        user_id: Number.parseInt(userId, 10),
+        mode: budgetContext.mode,
+        monthly_budget: null,
+        total_monthly_allocation: null,
+        total_monthly_needed: calculationModel.roundToTwo(
+          goalBreakdowns.reduce((sum, goal) => sum + goal.monthly_needed, 0)
+        ),
+        over_allocated: false,
+        any_goals_underfunded: false,
+        warnings: [],
+        recommendations: ['Enable Earner mode in Settings to unlock budget allocation suggestions.'],
+        goals: goalBreakdowns,
+      });
+    }
+
+    if (budgetContext.monthlyBudget === null) {
+      return res.status(400).json({ error: 'Please set your monthly budget first' });
+    }
+
+    const monthlyBudget = budgetContext.monthlyBudget;
     const allocatedGoals = calculationModel.calculateAutoAllocations(goals, monthlyBudget);
     const goalBreakdowns = goals.map((goal) => {
       const allocation = allocatedGoals.find((item) => item.goal_id === goal.goal_id);
@@ -111,6 +140,7 @@ router.get('/', async (req, res) => {
 
     res.json({
       user_id: Number.parseInt(userId, 10),
+      mode: budgetContext.mode,
       monthly_budget: monthlyBudget,
       total_monthly_allocation: totalAllocation,
       total_monthly_needed: totalMonthlyNeeded,

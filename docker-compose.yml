@@ -1,5 +1,3 @@
-
-
 services:
 
   # ─── PostgreSQL Database ───────────────────────────────────
@@ -12,6 +10,7 @@ services:
       POSTGRES_DB: quant
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/init:/docker-entrypoint-initdb.d:ro
     ports:
       - "5432:5432"
     networks:
@@ -30,7 +29,7 @@ services:
     container_name: savings_planner_backend
     environment:
       PORT: 5001
-      NODE_ENV: production
+      NODE_ENV: development
       DB_USERNAME: postgres
       DB_PASSWORD: yourpassword
       DB_HOST: db
@@ -38,6 +37,8 @@ services:
       DB_NAME: quant
       JWT_SECRET: your_super_secret_jwt_key_change_in_production
       JWT_EXPIRES_IN: 24h
+      FRONTEND_URL: http://localhost:8080
+      ADMIN_PROMOTE_EMAIL: Securetester2@gmail.com
     ports:
       - "5001:5001"
     env_file:
@@ -62,8 +63,6 @@ services:
     networks:
       - savings_network
     restart: unless-stopped
-    environment:
-      FRONTEND_URL: http://localhost:8080
 
 # ─── Volumes ──────────────────────────────────────────────────
 volumes:

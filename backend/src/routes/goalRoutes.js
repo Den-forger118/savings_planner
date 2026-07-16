@@ -1,72 +1,147 @@
 const express = require('express');
+
 const router = express.Router();
+
 const goalModel = require('../models/goalModel');
-const userModel = require('../models/userModel');
+
 const calculationModel = require('../models/calculationModel');
 
-const getUserBudgetOrThrow = async (userId) => {
-  const user = await userModel.getUserMonthlyBudgetById(userId);
+const { getUserBudgetContext, buildGoalResponse } = require('../utils/budgetContext');
 
-  if (!user) {
-    const error = new Error('User not found');
-    error.statusCode = 404;
-    throw error;
-  }
+const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 
-  if (user.monthly_budget === null || user.monthly_budget === undefined) {
-    const error = new Error('Please set your monthly budget first');
-    error.statusCode = 400;
-    throw error;
-  }
 
-  return calculationModel.roundToTwo(user.monthly_budget);
-};
 
-const buildGoalResponse = (goal, allocatedGoals) => {
-  const allocatedGoal = allocatedGoals.find((item) => item.goal_id === goal.goal_id);
-  const allocatedAmount = allocatedGoal?.allocated_monthly_amount ?? 0;
-
-  return {
-    ...calculationModel.getGoalBreakdown(goal, allocatedAmount),
-    allocation_percentage: allocatedGoal?.allocation_percentage ?? 0,
-    weight_magnitude: allocatedGoal?.weight_magnitude ?? 0,
-    weight_urgency: allocatedGoal?.weight_urgency ?? 0,
-    score: allocatedGoal?.score ?? 0,
+const sortGoalsDisplayOrder = (goals) => goals.sort((a, b) => {
+  const rank = (goal) => {
+    if (goal.is_complete) return 2;
+    if (goal.is_paused) return 1;
+    return 0;
   };
-};
+
+  return rank(a) - rank(b);
+});
+
+
 
 const sendError = (res, err) => {
+
   res.status(err.statusCode || 500).json({ error: err.message });
+
 };
 
-const handleUserGoalsRequest = async (userId, res) => {
-  const user = await userModel.getUserMonthlyBudgetById(userId);
 
-  if (!user) {
-    const error = new Error('User not found');
-    error.statusCode = 404;
-    throw error;
-  }
+
+const handleUserGoalsRequest = async (userId, res, query = {}) => {
+
+  const budgetContext = await getUserBudgetContext(userId);
 
   const goals = await goalModel.getGoalsByUserId(userId);
-  const hasMonthlyBudget = user.monthly_budget !== null && user.monthly_budget !== undefined;
-  const monthlyBudget = hasMonthlyBudget
-    ? calculationModel.roundToTwo(user.monthly_budget)
-    : null;
-  const allocationBudget = monthlyBudget ?? 0;
-  const allocatedGoals = calculationModel.calculateAutoAllocations(goals, allocationBudget);
-  const goalsWithCalculations = goals.map((goal) => buildGoalResponse(goal, allocatedGoals));
+
+  const allocatedGoals = budgetContext.mode === 'earner'
+
+    ? calculationModel.calculateAutoAllocations(goals, budgetContext.allocationBudget)
+
+    : [];
+
+  const goalsWithCalculations = sortGoalsDisplayOrder(
+
+    goals.map((goal) => buildGoalResponse(goal, allocatedGoals, budgetContext.mode))
+
+  );
+
+
+
+  const usePagination = query.page !== undefined || query.limit !== undefined;
+
+  let goalsResponse = goalsWithCalculations;
+
+  let pagination = null;
+
+
+
+  if (usePagination) {
+
+    const { page, limit, offset } = parsePagination(query);
+
+    pagination = buildPaginationMeta(goalsWithCalculations.length, page, limit);
+
+    goalsResponse = goalsWithCalculations.slice(offset, offset + limit);
+
+  }
+
+
 
   res.json({
+
     user_id: Number.parseInt(userId, 10),
-    monthly_budget: monthlyBudget,
+
+    monthly_budget: budgetContext.monthlyBudget,
+
+    mode: budgetContext.mode,
+
+    is_earner: budgetContext.isEarner,
+
     count: goalsWithCalculations.length,
-    goals: goalsWithCalculations,
+
+    goals: goalsResponse,
+
+    pagination,
+
   });
+
 };
 
+
+
 // GET /api/goals?userId=1 - fetch all goals with automatic allocations
+
 router.get('/', async (req, res) => {
+
+  try {
+
+    const { userId } = req.query;
+
+
+
+    if (!userId) {
+
+      return res.status(400).json({ error: 'userId query parameter is required' });
+
+    }
+
+
+
+    await handleUserGoalsRequest(userId, res, req.query);
+
+  } catch (err) {
+
+    sendError(res, err);
+
+  }
+
+});
+
+
+
+// GET /api/goals/user/:userId - alias for fetching all goals by user id
+
+router.get('/user/:userId', async (req, res) => {
+
+  try {
+
+    await handleUserGoalsRequest(req.params.userId, res, req.query);
+
+  } catch (err) {
+
+    sendError(res, err);
+
+  }
+
+});
+
+// GET /api/goals/trash?userId=1 - list soft-deleted goals
+router.get('/trash', async (req, res) => {
   try {
     const { userId } = req.query;
 
@@ -74,114 +149,414 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: 'userId query parameter is required' });
     }
 
-    await handleUserGoalsRequest(userId, res);
+    const goals = await goalModel.getDeletedGoalsByUserId(userId);
+
+    res.json({
+      user_id: Number.parseInt(userId, 10),
+      count: goals.length,
+      goals,
+    });
   } catch (err) {
     sendError(res, err);
   }
 });
 
-// GET /api/goals/user/:userId - alias for fetching all goals by user id
-router.get('/user/:userId', async (req, res) => {
+// DELETE /api/goals/trash?userId=1 - empty trash
+router.delete('/trash', async (req, res) => {
   try {
-    await handleUserGoalsRequest(req.params.userId, res);
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId query parameter is required' });
+    }
+
+    const removed = await goalModel.emptyTrash(userId);
+
+    res.json({
+      message: 'Trash emptied',
+      deleted_count: removed.length,
+      trash: [],
+    });
   } catch (err) {
     sendError(res, err);
   }
 });
 
 // POST /api/goals - create a new goal and return its allocation
+
 router.post('/', async (req, res) => {
+
   try {
+
     const { userId, name, targetAmount, deadline, priority } = req.body;
 
+
+
     if (!userId || !name || targetAmount === undefined || !deadline) {
+
       return res.status(400).json({
+
         error: 'Please provide userId, name, targetAmount, and deadline',
+
       });
+
     }
 
-    const monthlyBudget = await getUserBudgetOrThrow(userId);
+
+
+    const budgetContext = await getUserBudgetContext(userId);
+
     const goal = await goalModel.createGoal(userId, name, targetAmount, deadline, priority);
+
     const userGoals = await goalModel.getGoalsByUserId(userId);
-    const allocatedGoals = calculationModel.calculateAutoAllocations(userGoals, monthlyBudget);
-    const goalWithCalculations = buildGoalResponse(goal, allocatedGoals);
+
+    const allocatedGoals = budgetContext.mode === 'earner'
+
+      ? calculationModel.calculateAutoAllocations(userGoals, budgetContext.allocationBudget)
+
+      : [];
+
+    const goalWithCalculations = buildGoalResponse(goal, allocatedGoals, budgetContext.mode);
+
+
 
     res.status(201).json({
+
       message: 'Goal created successfully',
+
       goal: goalWithCalculations,
+
     });
+
   } catch (err) {
+
     sendError(res, err);
+
   }
+
 });
 
-// GET /api/goals/:id - fetch a single goal with automatic allocation
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const goal = await goalModel.getGoalById(id);
 
-    if (!goal) {
-      return res.status(404).json({ error: 'Goal not found' });
+
+// PATCH /api/goals/:id/pause - pause or resume a goal and recalculate allocations
+
+router.patch('/:id/pause', async (req, res) => {
+
+  try {
+
+    const { id } = req.params;
+
+    const { is_paused: isPaused } = req.body;
+
+
+
+    if (typeof isPaused !== 'boolean') {
+
+      return res.status(400).json({ error: 'is_paused must be a boolean' });
+
     }
 
-    const monthlyBudget = await getUserBudgetOrThrow(goal.user_id);
-    const userGoals = await goalModel.getGoalsByUserId(goal.user_id);
-    const allocatedGoals = calculationModel.calculateAutoAllocations(userGoals, monthlyBudget);
-    const goalWithCalculations = buildGoalResponse(goal, allocatedGoals);
 
-    res.json({ goal: goalWithCalculations });
-  } catch (err) {
-    sendError(res, err);
-  }
-});
-
-// PUT /api/goals/:id - update a goal
-router.put('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, targetAmount, deadline, priority } = req.body;
-
-    if (!name || targetAmount === undefined || !deadline) {
-      return res.status(400).json({
-        error: 'Please provide name, targetAmount, and deadline',
-      });
-    }
 
     const existingGoal = await goalModel.getGoalById(id);
 
+
+
     if (!existingGoal) {
+
       return res.status(404).json({ error: 'Goal not found' });
+
     }
 
-    const monthlyBudget = await getUserBudgetOrThrow(existingGoal.user_id);
-    const goal = await goalModel.updateGoal(id, name, targetAmount, deadline, priority);
+
+
+    const goal = await goalModel.setGoalPaused(id, isPaused);
+
+    const budgetContext = await getUserBudgetContext(existingGoal.user_id);
+
     const userGoals = await goalModel.getGoalsByUserId(existingGoal.user_id);
-    const allocatedGoals = calculationModel.calculateAutoAllocations(userGoals, monthlyBudget);
-    const goalWithCalculations = buildGoalResponse(goal, allocatedGoals);
+
+    const allocatedGoals = budgetContext.mode === 'earner'
+
+      ? calculationModel.calculateAutoAllocations(userGoals, budgetContext.allocationBudget)
+
+      : [];
+
+    const goalWithCalculations = buildGoalResponse(goal, allocatedGoals, budgetContext.mode);
+
+    const goalsWithCalculations = sortGoalsDisplayOrder(
+
+      userGoals.map((userGoal) => buildGoalResponse(userGoal, allocatedGoals, budgetContext.mode))
+
+    );
+
+
 
     res.json({
-      message: 'Goal updated successfully',
+
+      message: isPaused ? 'Goal placed on hold' : 'Goal resumed',
+
       goal: goalWithCalculations,
+
+      goals: goalsWithCalculations,
+
+    });
+
+  } catch (err) {
+
+    sendError(res, err);
+
+  }
+
+});
+
+
+
+// GET /api/goals/:id - fetch a single goal with automatic allocation
+
+router.get('/:id', async (req, res) => {
+
+  try {
+
+    const { id } = req.params;
+
+    const goal = await goalModel.getGoalById(id);
+
+
+
+    if (!goal) {
+
+      return res.status(404).json({ error: 'Goal not found' });
+
+    }
+
+
+
+    const budgetContext = await getUserBudgetContext(goal.user_id);
+
+    const userGoals = await goalModel.getGoalsByUserId(goal.user_id);
+
+    const allocatedGoals = budgetContext.mode === 'earner'
+
+      ? calculationModel.calculateAutoAllocations(userGoals, budgetContext.allocationBudget)
+
+      : [];
+
+    const goalWithCalculations = buildGoalResponse(goal, allocatedGoals, budgetContext.mode);
+
+
+
+    res.json({ goal: goalWithCalculations });
+
+  } catch (err) {
+
+    sendError(res, err);
+
+  }
+
+});
+
+
+
+// PUT /api/goals/:id - update a goal
+
+router.put('/:id', async (req, res) => {
+
+  try {
+
+    const { id } = req.params;
+
+    const { name, targetAmount, deadline, priority } = req.body;
+
+
+
+    if (!name || targetAmount === undefined || !deadline) {
+
+      return res.status(400).json({
+
+        error: 'Please provide name, targetAmount, and deadline',
+
+      });
+
+    }
+
+
+
+    const existingGoal = await goalModel.getGoalById(id);
+
+
+
+    if (!existingGoal) {
+
+      return res.status(404).json({ error: 'Goal not found' });
+
+    }
+
+
+
+    const budgetContext = await getUserBudgetContext(existingGoal.user_id);
+
+    const goal = await goalModel.updateGoal(id, name, targetAmount, deadline, priority);
+
+    const userGoals = await goalModel.getGoalsByUserId(existingGoal.user_id);
+
+    const allocatedGoals = budgetContext.mode === 'earner'
+
+      ? calculationModel.calculateAutoAllocations(userGoals, budgetContext.allocationBudget)
+
+      : [];
+
+    const goalWithCalculations = buildGoalResponse(goal, allocatedGoals, budgetContext.mode);
+
+    const goalsWithCalculations = sortGoalsDisplayOrder(
+
+      userGoals.map((userGoal) => buildGoalResponse(userGoal, allocatedGoals, budgetContext.mode))
+
+    );
+
+
+
+    res.json({
+
+      message: 'Goal updated successfully',
+
+      goal: goalWithCalculations,
+
+      goals: goalsWithCalculations,
+
+    });
+
+  } catch (err) {
+
+    sendError(res, err);
+
+  }
+
+});
+
+
+
+// DELETE /api/goals/:id - soft-delete a goal (move to trash)
+
+router.delete('/:id', async (req, res) => {
+
+  try {
+
+    const { id } = req.params;
+
+    const existingGoal = await goalModel.getGoalById(id);
+
+
+
+    if (!existingGoal) {
+
+      return res.status(404).json({ error: 'Goal not found' });
+
+    }
+
+
+
+    const deletedGoal = await goalModel.deleteGoal(id);
+
+    const budgetContext = await getUserBudgetContext(existingGoal.user_id);
+
+    const userGoals = await goalModel.getGoalsByUserId(existingGoal.user_id);
+
+    const allocatedGoals = budgetContext.mode === 'earner'
+
+      ? calculationModel.calculateAutoAllocations(userGoals, budgetContext.allocationBudget)
+
+      : [];
+
+    const goalsWithCalculations = sortGoalsDisplayOrder(
+
+      userGoals.map((userGoal) => buildGoalResponse(userGoal, allocatedGoals, budgetContext.mode))
+
+    );
+
+
+
+    res.json({
+
+      message: 'Goal moved to trash',
+
+      goal_id: deletedGoal.goal_id,
+
+      goals: goalsWithCalculations,
+
+    });
+
+  } catch (err) {
+
+    sendError(res, err);
+
+  }
+
+});
+
+
+
+// POST /api/goals/:id/restore - restore a goal from trash
+
+router.post('/:id/restore', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const restored = await goalModel.restoreGoal(id, userId);
+
+    if (!restored) {
+      return res.status(404).json({ error: 'Deleted goal not found' });
+    }
+
+    const budgetContext = await getUserBudgetContext(userId);
+    const userGoals = await goalModel.getGoalsByUserId(userId);
+    const allocatedGoals = budgetContext.mode === 'earner'
+      ? calculationModel.calculateAutoAllocations(userGoals, budgetContext.allocationBudget)
+      : [];
+    const goalsWithCalculations = sortGoalsDisplayOrder(
+      userGoals.map((userGoal) => buildGoalResponse(userGoal, allocatedGoals, budgetContext.mode))
+    );
+    const trash = await goalModel.getDeletedGoalsByUserId(userId);
+
+    res.json({
+      message: 'Goal restored successfully',
+      goal: buildGoalResponse(restored, allocatedGoals, budgetContext.mode),
+      goals: goalsWithCalculations,
+      trash,
     });
   } catch (err) {
     sendError(res, err);
   }
 });
 
-// DELETE /api/goals/:id - delete a goal
-router.delete('/:id', async (req, res) => {
+// DELETE /api/goals/:id/permanent - permanently delete a trashed goal
+
+router.delete('/:id/permanent', async (req, res) => {
   try {
     const { id } = req.params;
-    const deletedGoal = await goalModel.deleteGoal(id);
+    const userId = req.query.userId || req.body?.userId;
 
-    if (!deletedGoal) {
-      return res.status(404).json({ error: 'Goal not found' });
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
     }
 
+    const deleted = await goalModel.permanentlyDeleteGoal(id, userId);
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Deleted goal not found in trash' });
+    }
+
+    const trash = await goalModel.getDeletedGoalsByUserId(userId);
+
     res.json({
-      message: 'Goal deleted successfully',
-      goal_id: deletedGoal.goal_id,
+      message: 'Goal permanently deleted',
+      goal_id: deleted.goal_id,
+      trash,
     });
   } catch (err) {
     sendError(res, err);
@@ -189,3 +564,4 @@ router.delete('/:id', async (req, res) => {
 });
 
 module.exports = router;
+

@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../dbcon');
+const { formatAuthUser } = require('../utils/authUser');
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
@@ -42,7 +43,8 @@ router.post('/register', async (req, res) => {
     const result = await pool.query(
       `INSERT INTO users (first_name, last_name, email, password_hash)
        VALUES ($1, $2, $3, $4)
-       RETURNING user_id, first_name, last_name, email, monthly_budget, created_at`,
+       RETURNING user_id, first_name, last_name, email, monthly_budget, monthly_income,
+         is_earner, is_admin, currency, currency_symbol, onboarding_complete, created_at`,
       [first_name, last_name, email, password_hash]
     );
 
@@ -70,13 +72,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       message: 'Account created successfully',
-      user: {
-        user_id: user.user_id,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        email: user.email,
-        monthly_budget: user.monthly_budget
-      },
+      user: formatAuthUser(user),
       token
     });
   } catch (err) {
@@ -120,6 +116,12 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    if (user.is_active === false) {
+      return res.status(403).json({
+        error: 'Account deactivated. Contact support.',
+      });
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.user_id, email: user.email },
@@ -129,13 +131,7 @@ router.post('/login', async (req, res) => {
 
     res.json({
       message: 'Login successful',
-      user: {
-        user_id: user.user_id,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        email: user.email,
-        monthly_budget: user.monthly_budget
-      },
+      user: formatAuthUser(user),
       token
     });
   } catch (err) {

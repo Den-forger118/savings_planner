@@ -2,10 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  body {
+    font-family: Montserrat, Helvetica, sans-serif;
+    font-feature-settings: 'kern' 1;
+  }
+}
+
+@layer utilities {
+  .font-money {
+    font-family: 'IBM Plex Mono', Consolas, monospace;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: 'tnum' 1, 'lnum' 1;
+  }
+
+  .font-engraved {
+    font-family: Cinzel, 'Trajan Pro', serif;
+    letter-spacing: 0.08em;
+  }
+}
+
 .odometer-number {
   display: inline-flex;
   align-items: baseline;
-  font-variant-numeric: tabular-nums;
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
   line-height: 1;
 }
 
@@ -40,4 +62,39 @@
   .odometer-digit-strip {
     transition: none;
   }
+}
+
+html.theme-midnight,
+html.theme-midnight body {
+  background-color: #0b0f1a;
+}
+
+html.theme-midnight .bg-cream {
+  background-color: #121828 !important;
+}
+
+html.theme-midnight .text-primary-dark {
+  color: #f4ead5 !important;
+}
+
+html.theme-midnight .text-taupe {
+  color: #a8a29e !important;
+}
+
+html.theme-midnight .settings-panel,
+html.theme-midnight .border-cream,
+html.theme-midnight .border-cream\/80 {
+  border-color: rgba(212, 165, 116, 0.2) !important;
+}
+
+html.theme-midnight .settings-panel {
+  background-color: #1a2340 !important;
+}
+
+html.theme-midnight .bg-white {
+  background-color: #1a2340 !important;
+}
+
+html.theme-midnight .shadow-sm {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }

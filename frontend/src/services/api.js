@@ -19,9 +19,18 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 403) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/';
+      const message = error.response?.data?.error || '';
+      const isAuthAttempt = /\/auth\/(login|register)/.test(error.config?.url || '');
+
+      if (message.includes('Admin access') || isAuthAttempt) {
+        return Promise.reject(error);
+      }
+
+      if (localStorage.getItem('token')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/';
+      }
     }
     return Promise.reject(error);
   }
