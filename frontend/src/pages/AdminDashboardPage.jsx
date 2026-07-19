@@ -11,6 +11,8 @@ import {
 } from 'recharts';
 import api from '../services/api';
 import { formatMoney } from '../utils/currency';
+import { getFriendlyError } from '../utils/friendlyError';
+import ErrorBanner from '../components/ErrorBanner';
 
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
@@ -36,10 +38,10 @@ const CategoryTooltip = ({ active, payload }) => {
 
   return (
     <div className="rounded bg-primary-dark px-4 py-3 shadow-lg">
-      <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-gold">
+      <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
         {name}
       </p>
-      <p className="mt-1 font-money text-2xl font-bold text-white">
+      <p className="mt-1 font-money text-2xl font-light tracking-[0.02em] text-white">
         {expense_count} expense{expense_count === 1 ? '' : 's'}
       </p>
       <p className="mt-1 font-money text-xs text-blue-200">
@@ -62,7 +64,7 @@ function AdminDashboardPage() {
       const response = await api.get('/admin/stats');
       setStats(response.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load platform statistics');
+      setError(getFriendlyError(err, 'We couldn’t load platform statistics. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -87,8 +89,11 @@ function AdminDashboardPage() {
 
   if (error || !stats) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-sans text-sm text-red-700">
-        {error || 'Statistics unavailable'}
+      <div className="space-y-4">
+        <ErrorBanner message={error || 'Statistics are unavailable right now.'} />
+        <button type="button" onClick={fetchStats} className="btn-navy">
+          Try again
+        </button>
       </div>
     );
   }
@@ -108,10 +113,10 @@ function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       <section>
-        <p className="font-sans text-xs font-bold uppercase tracking-widest text-gold">
+        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
           Admin Console
         </p>
-        <h2 className="mt-2 font-serif text-4xl font-bold text-primary-dark md:text-5xl">
+        <h2 className="mt-2 font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark md:text-5xl">
           Platform Overview
         </h2>
         <p className="mt-3 max-w-2xl font-sans text-base text-taupe">
@@ -127,10 +132,10 @@ function AdminDashboardPage() {
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+                <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
                   {card.label}
                 </p>
-                <p className="mt-2 font-money text-3xl font-bold text-primary-dark">
+                <p className="mt-2 font-money text-3xl font-light tracking-[0.02em] text-primary-dark">
                   {card.value}
                 </p>
               </div>
@@ -145,7 +150,7 @@ function AdminDashboardPage() {
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-lg border border-cream bg-white shadow-sm">
           <div className="border-b border-cream px-5 py-4">
-            <h3 className="font-serif text-2xl font-bold text-primary-dark">
+            <h3 className="font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">
               Popular Expense Categories
             </h3>
             <p className="mt-1 font-sans text-sm text-taupe">
@@ -164,7 +169,7 @@ function AdminDashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#E8E0D4" vertical={false} />
                   <XAxis
                     dataKey="name"
-                    tick={{ fill: '#4E4B46', fontSize: 11, fontFamily: 'Montserrat, Helvetica, sans-serif' }}
+                    tick={{ fill: '#4E4B46', fontSize: 11, fontFamily: 'Manrope, Helvetica, sans-serif' }}
                     angle={-30}
                     textAnchor="end"
                     height={60}
@@ -191,7 +196,7 @@ function AdminDashboardPage() {
 
         <div className="rounded-lg border border-cream bg-white shadow-sm">
           <div className="border-b border-cream px-5 py-4">
-            <h3 className="font-serif text-2xl font-bold text-primary-dark">
+            <h3 className="font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">
               Category Breakdown
             </h3>
             <p className="mt-1 font-sans text-sm text-taupe">
@@ -213,10 +218,10 @@ function AdminDashboardPage() {
                   <div key={category.name} className="px-5 py-4">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <span className="font-sans text-xs font-bold text-taupe">
+                        <span className="font-sans text-xs font-medium text-taupe">
                           {index + 1}
                         </span>
-                        <p className="font-sans text-sm font-semibold text-primary-dark">
+                        <p className="font-sans text-sm font-normal text-primary-dark">
                           {category.name}
                         </p>
                       </div>

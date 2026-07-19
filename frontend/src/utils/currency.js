@@ -21,8 +21,6 @@ export const ONBOARDING_CURRENCIES = [
   { code: 'SAR', symbol: '﷼', name: 'Saudi Riyal', locale: 'ar-SA' },
 ];
 
-export const CURRENCIES = ONBOARDING_CURRENCIES;
-
 export const FISCAL_MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -39,22 +37,6 @@ export const formatMoney = (value, currencyCode = 'USD', currencySymbol = null) 
   const decimals = currency.code === 'JPY' ? 0 : 2;
 
   return `${symbol}${safeAmount.toFixed(decimals)}`;
-};
-
-/** Tailwind class stack for currency / ledger figures (tabular mono). */
-export const MONEY_TYPE = 'font-money tabular-nums';
-
-export const formatCurrency = (value, currencyCode = 'USD') => {
-  const amount = Number.parseFloat(value);
-  const safeAmount = Number.isFinite(amount) ? amount : 0;
-  const currency = getCurrencyByCode(currencyCode);
-
-  return new Intl.NumberFormat(currency.locale, {
-    style: 'currency',
-    currency: currency.code,
-    minimumFractionDigits: currency.code === 'JPY' ? 0 : 2,
-    maximumFractionDigits: currency.code === 'JPY' ? 0 : 2,
-  }).format(safeAmount);
 };
 
 export const defaultAlertPreferences = () => ({

@@ -84,13 +84,13 @@ const GUIDE_SECTIONS = [
         badge: 'Dashboard',
         page: 'dashboard',
         what: 'A histogram of spending by category for the selected month, with totals and month-over-month change.',
-        why: 'Understand where money is going so you can protect your savings plan.',
+        why: 'Understand where your money is going, category by category.',
         where: 'Dashboard → Where Your Money Goes.',
-        who: 'Anyone logging expenses — budget comparison appears in Earner mode.',
+        who: 'Anyone logging expenses.',
         how: [
           'Log expenses from the Expense Tracker.',
           'Return to Dashboard and pick a month from the chart controls.',
-          'Compare total spend to your budget cap when in Earner mode.',
+          'Review total spend, top category, and month-over-month change.',
         ],
       },
       {
@@ -275,7 +275,7 @@ const GUIDE_SECTIONS = [
     id: 'expenses',
     title: 'Expense Tracker',
     icon: 'receipt_long',
-    intro: 'Log day-to-day spending and see how it lines up with your savings plan.',
+    intro: 'A simple ledger to log day-to-day spending and keep track of what you have spent.',
     features: [
       {
         id: 'log-expense',
@@ -284,7 +284,7 @@ const GUIDE_SECTIONS = [
         badge: 'Expense Tracker',
         page: 'expenses',
         what: 'A form to record spending amount, category, date, and optional note.',
-        why: 'Builds the spending picture used in charts and budget comparisons.',
+        why: 'Builds the spending picture used in your ledger totals and category charts.',
         where: 'Expense Tracker → Log Expense button.',
         who: 'All members tracking personal spending.',
         how: [
@@ -299,10 +299,10 @@ const GUIDE_SECTIONS = [
         icon: 'summarize',
         badge: 'Expense Tracker',
         page: 'expenses',
-        what: 'Current-month totals, category breakdown, transaction list, and spending-vs-budget ratio.',
-        why: 'See patterns and whether spending is eating into your savings mandate.',
+        what: 'Current-month total spent, transaction count, average per transaction, and a category breakdown.',
+        why: 'See how much you have spent so far and spot your spending patterns.',
         where: 'Expense Tracker main page.',
-        who: 'Everyone. Budget comparison cards appear in Earner mode with a budget set.',
+        who: 'Everyone tracking personal spending.',
         how: [
           'Open Expense Tracker.',
           'Review totals, category bars, and the expense list for the current month.',
@@ -317,7 +317,7 @@ function DocField({ label, icon, children }) {
     <div className="rounded-lg border border-cream bg-white/60 px-4 py-3">
       <div className="mb-1.5 flex items-center gap-2">
         <Icon name={icon} className="text-base text-gold" />
-        <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-gold">
+        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
           {label}
         </p>
       </div>
@@ -344,12 +344,12 @@ function FeatureDoc({ feature, onNavigate, isEarnerMode }) {
           </span>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-serif text-xl font-bold text-primary-dark">{feature.title}</h3>
-              <span className="rounded-full bg-primary-dark/10 px-2.5 py-0.5 font-sans text-[10px] font-bold uppercase tracking-widest text-primary-dark">
+              <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">{feature.title}</h3>
+              <span className="rounded-full bg-primary-dark/10 px-2.5 py-0.5 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark">
                 {feature.badge}
               </span>
               {isEarnerOnly && (
-                <span className="rounded-full bg-gold/20 px-2.5 py-0.5 font-sans text-[10px] font-bold uppercase tracking-widest text-gold">
+                <span className="rounded-full bg-gold/20 px-2.5 py-0.5 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
                   Earner mode
                 </span>
               )}
@@ -365,7 +365,7 @@ function FeatureDoc({ feature, onNavigate, isEarnerMode }) {
           <button
             type="button"
             onClick={() => onNavigate(feature.page)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border-2 border-gold px-4 py-2 font-sans text-[10px] font-bold uppercase tracking-widest text-gold transition-colors hover:bg-gold hover:text-primary-dark"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border-2 border-primary-dark px-4 py-2 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark transition-colors hover:bg-primary-dark hover:text-cream"
           >
             Open
             <Icon name="arrow_forward" className="text-sm" />
@@ -403,10 +403,10 @@ function FeatureGuide({ isEarnerMode = false, onNavigate, embedded = false }) {
   return (
     <div className="space-y-8">
       <section>
-        <p className="font-sans text-xs font-bold uppercase tracking-widest text-gold">
+        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
           {embedded ? 'Help' : 'Guide'}
         </p>
-        <h2 className="mt-2 font-serif text-4xl font-bold text-primary-dark md:text-5xl">
+        <h2 className="mt-2 font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark md:text-5xl">
           How to Use QUANT
         </h2>
         <p className="mt-3 max-w-3xl font-sans text-base leading-relaxed text-taupe">
@@ -414,49 +414,49 @@ function FeatureGuide({ isEarnerMode = false, onNavigate, embedded = false }) {
           where to find it, who it is for, and how to use it step by step.
         </p>
         <div className="mt-4 inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-white px-4 py-2">
-          <span className="font-sans text-xs font-bold uppercase tracking-widest text-taupe">
+          <span className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
             Your mode
           </span>
-          <span className="rounded-full bg-gold/20 px-2.5 py-0.5 font-sans text-xs font-bold text-primary-dark">
+          <span className="rounded-full bg-gold/20 px-2.5 py-0.5 font-sans text-xs font-medium text-primary-dark">
             {isEarnerMode ? 'Earner' : 'Non-Earner'}
           </span>
         </div>
       </section>
 
-      <section className="rounded-lg border-l-4 border-gold bg-white p-6 shadow-sm">
-        <p className="font-sans text-xs font-bold uppercase tracking-widest text-gold">
+      <section className="rounded-lg border border-primary-dark/[0.08] bg-white p-6 shadow-soft">
+        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
           Quick start
         </p>
-        <h3 className="mt-1 font-serif text-2xl font-bold text-primary-dark">
+        <h3 className="mt-1 font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">
           Recommended first steps
         </h3>
         <ol className="mt-4 space-y-3 font-sans text-sm leading-relaxed text-primary-dark">
           <li className="flex gap-3">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-bold text-gold">1</span>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-medium text-gold">1</span>
             <span>
               <strong>Create a goal</strong> — Savings Goals → New Goal. Give it a name, target, and deadline.
             </span>
           </li>
           <li className="flex gap-3">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-bold text-gold">2</span>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-medium text-gold">2</span>
             <span>
               <strong>Record a deposit</strong> — open the goal menu → Record Transaction when you save money.
             </span>
           </li>
           <li className="flex gap-3">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-bold text-gold">3</span>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-medium text-gold">3</span>
             <span>
               <strong>Log expenses</strong> — Expense Tracker → Log Expense to track spending by category.
             </span>
           </li>
           <li className="flex gap-3">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-bold text-gold">4</span>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-medium text-gold">4</span>
             <span>
               <strong>Choose your mode</strong> — Settings → toggle Earner if you have a monthly budget to allocate.
             </span>
           </li>
           <li className="flex gap-3">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-bold text-gold">5</span>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-medium text-gold">5</span>
             <span>
               <strong>Check Dashboard</strong> — review progress charts, spending, and recent activity in one view.
             </span>
@@ -466,7 +466,7 @@ function FeatureGuide({ isEarnerMode = false, onNavigate, embedded = false }) {
 
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-[240px_minmax(0,1fr)]">
         <nav className="xl:sticky xl:top-24 xl:self-start">
-          <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+          <p className="mb-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
             On this page
           </p>
           <ul className="space-y-1 rounded-lg border border-cream bg-white p-2 shadow-sm">
@@ -495,7 +495,7 @@ function FeatureGuide({ isEarnerMode = false, onNavigate, embedded = false }) {
               <div className="border-b border-cream pb-4">
                 <div className="flex items-center gap-2">
                   <Icon name={section.icon} className="text-2xl text-gold" />
-                  <h3 className="font-serif text-3xl font-bold text-primary-dark">
+                  <h3 className="font-serif text-3xl font-light tracking-[-0.02em] text-primary-dark">
                     {section.title}
                   </h3>
                 </div>

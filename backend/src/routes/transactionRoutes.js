@@ -38,7 +38,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const transaction = await transactionModel.createTransaction(
+    const { transaction } = await transactionModel.recordTransaction(
       userId,
       goalId,
       parseFloat(amount),
@@ -46,7 +46,6 @@ router.post('/', async (req, res) => {
       note || ''
     );
 
-    await transactionModel.updateGoalSavedAmount(goalId);
     const completedGoal = await transactionModel.checkAndMarkComplete(goalId);
 
     const updatedGoal = await goalModel.getGoalById(goalId);
@@ -60,7 +59,8 @@ router.post('/', async (req, res) => {
       completed_goal_name: completedGoal ? completedGoal.name : null,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = err.statusCode || 500;
+    res.status(status).json({ error: err.message });
   }
 });
 

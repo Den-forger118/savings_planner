@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '../services/api';
 import { formatMoney } from '../utils/currency';
+import { getFriendlyError } from '../utils/friendlyError';
+import ConfirmDialog from '../components/ConfirmDialog';
+import ErrorBanner from '../components/ErrorBanner';
 
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
@@ -17,6 +20,7 @@ function AdminUserDetail({ userId, onBack }) {
   const [error, setError] = useState(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [statusError, setStatusError] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   const fetchDetail = useCallback(async () => {
     setLoading(true);
@@ -26,7 +30,7 @@ function AdminUserDetail({ userId, onBack }) {
       const response = await api.get(`/admin/users/${userId}`);
       setData(response.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load user details');
+      setError(getFriendlyError(err, 'We couldn’t load this member’s details. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -36,26 +40,40 @@ function AdminUserDetail({ userId, onBack }) {
     fetchDetail();
   }, [fetchDetail]);
 
-  const handleStatusChange = async (nextActive) => {
+  const handleStatusChange = (nextActive) => {
     if (!data?.user) return;
 
-    const action = nextActive ? 'reactivate' : 'deactivate';
-    const confirmed = window.confirm(
-      nextActive
-        ? `Reactivate ${data.user.full_name}'s account? They will be able to log in again.`
-        : `Deactivate ${data.user.full_name}'s account? They will not be able to log in, but their data will be preserved.`
-    );
+    setConfirmDialog({
+      nextActive,
+      title: nextActive
+        ? `Reactivate ${data.user.full_name}?`
+        : `Deactivate ${data.user.full_name}?`,
+      message: nextActive
+        ? 'They will be able to log in again.'
+        : 'They will not be able to log in, but their data will be preserved.',
+      confirmLabel: nextActive ? 'Reactivate' : 'Deactivate',
+      tone: nextActive ? 'warning' : 'danger',
+    });
+  };
 
-    if (!confirmed) return;
+  const executeStatusChange = async () => {
+    if (!confirmDialog) return;
+
+    const { nextActive } = confirmDialog;
+    const action = nextActive ? 'reactivate' : 'deactivate';
 
     setStatusUpdating(true);
     setStatusError(null);
 
     try {
       await api.patch(`/admin/users/${userId}/status`, { is_active: nextActive });
+      setConfirmDialog(null);
       await fetchDetail();
     } catch (err) {
-      setStatusError(err.response?.data?.error || `Failed to ${action} account`);
+      setStatusError(
+        getFriendlyError(err, `We couldn’t ${action} that account. Please try again.`)
+      );
+      setConfirmDialog(null);
     } finally {
       setStatusUpdating(false);
     }
@@ -79,9 +97,7 @@ function AdminUserDetail({ userId, onBack }) {
         >
           ← Back to members
         </button>
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-sans text-sm text-red-700">
-          {error || 'User not found'}
-        </div>
+        <ErrorBanner message={error || 'We couldn’t find that member.'} />
       </div>
     );
   }
@@ -102,21 +118,21 @@ function AdminUserDetail({ userId, onBack }) {
           >
             ← Back to members
           </button>
-          <p className="font-sans text-xs font-bold uppercase tracking-widest text-gold">
+          <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
             Member Support View
           </p>
-          <h2 className="mt-2 font-serif text-4xl font-bold text-primary-dark">
+          <h2 className="mt-2 font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark">
             {user.full_name}
           </h2>
           <p className="mt-2 font-sans text-sm text-taupe">{user.email}</p>
         </div>
         <div className="flex flex-col items-start gap-3 sm:items-end">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-cream bg-cream/50 px-3 py-1.5 font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-cream bg-cream/50 px-3 py-1.5 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
             <Icon name="visibility" className="text-sm" />
             Read-only
           </span>
           <span
-            className={`inline-flex rounded-full px-3 py-1.5 font-sans text-[10px] font-bold uppercase tracking-widest ${
+            className={`inline-flex rounded-full px-3 py-1.5 font-sans text-[10px] font-normal uppercase tracking-[0.14em] ${
               user.is_active === false
                 ? 'bg-red-100 text-red-700'
                 : 'bg-emerald-100 text-emerald-800'
@@ -130,7 +146,7 @@ function AdminUserDetail({ userId, onBack }) {
               type="button"
               disabled={statusUpdating}
               onClick={() => handleStatusChange(user.is_active === false)}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 font-sans text-[10px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 font-sans text-[10px] font-normal uppercase tracking-[0.14em] transition-colors disabled:opacity-50 ${
                 user.is_active === false
                   ? 'border-emerald-300 text-emerald-800 hover:bg-emerald-50'
                   : 'border-red-300 text-red-700 hover:bg-red-50'
@@ -150,11 +166,7 @@ function AdminUserDetail({ userId, onBack }) {
         </div>
       </div>
 
-      {statusError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-sans text-sm text-red-700">
-          {statusError}
-        </div>
-      )}
+      {statusError && <ErrorBanner message={statusError} />}
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
@@ -164,22 +176,22 @@ function AdminUserDetail({ userId, onBack }) {
           ['Joined', formatDate(user.created_at)],
         ].map(([label, value]) => (
           <div key={label} className="rounded-lg border border-cream bg-white p-4 shadow-sm">
-            <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">{label}</p>
-            <p className="mt-1 font-sans text-sm font-semibold text-primary-dark">{value}</p>
+            <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">{label}</p>
+            <p className="mt-1 font-sans text-sm font-normal text-primary-dark">{value}</p>
           </div>
         ))}
       </section>
 
       <section className="rounded-lg border border-cream bg-white shadow-sm">
         <div className="border-b border-cream px-5 py-4">
-          <h3 className="font-serif text-2xl font-bold text-primary-dark">Goals ({counts.goals})</h3>
+          <h3 className="font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">Goals ({counts.goals})</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left">
             <thead>
               <tr className="border-b border-cream bg-cream/30">
                 {['Name', 'Target', 'Saved', 'Progress', 'Deadline', 'Status'].map((label) => (
-                  <th key={label} className="px-4 py-3 font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+                  <th key={label} className="px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
                     {label}
                   </th>
                 ))}
@@ -195,7 +207,7 @@ function AdminUserDetail({ userId, onBack }) {
               )}
               {goals.map((goal) => (
                 <tr key={goal.goal_id} className="border-b border-cream/70">
-                  <td className="px-4 py-3 font-sans text-sm font-semibold text-primary-dark">{goal.name}</td>
+                  <td className="px-4 py-3 font-sans text-sm font-normal text-primary-dark">{goal.name}</td>
                   <td className="px-4 py-3 font-money text-sm text-primary-dark">{money(goal.target_amount)}</td>
                   <td className="px-4 py-3 font-money text-sm text-primary-dark">{money(goal.saved_amount)}</td>
                   <td className="px-4 py-3 font-money text-sm text-primary-dark">
@@ -216,14 +228,14 @@ function AdminUserDetail({ userId, onBack }) {
 
       <section className="rounded-lg border border-cream bg-white shadow-sm">
         <div className="border-b border-cream px-5 py-4">
-          <h3 className="font-serif text-2xl font-bold text-primary-dark">Transactions ({counts.transactions})</h3>
+          <h3 className="font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">Transactions ({counts.transactions})</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left">
             <thead>
               <tr className="border-b border-cream bg-cream/30">
                 {['Date', 'Goal', 'Type', 'Amount', 'Note'].map((label) => (
-                  <th key={label} className="px-4 py-3 font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+                  <th key={label} className="px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
                     {label}
                   </th>
                 ))}
@@ -242,7 +254,7 @@ function AdminUserDetail({ userId, onBack }) {
                   <td className="px-4 py-3 font-sans text-sm text-taupe">{formatDate(tx.created_at)}</td>
                   <td className="px-4 py-3 font-sans text-sm text-primary-dark">{tx.goal_name || '—'}</td>
                   <td className="px-4 py-3 font-sans text-sm capitalize text-primary-dark">{tx.type}</td>
-                  <td className={`px-4 py-3 font-money text-sm font-semibold ${tx.type === 'withdrawal' ? 'text-red-700' : 'text-primary-dark'}`}>
+                  <td className={`px-4 py-3 font-money text-sm font-light ${tx.type === 'withdrawal' ? 'text-red-700' : 'text-primary-dark'}`}>
                     {tx.type === 'withdrawal' ? '−' : '+'}{money(tx.amount)}
                   </td>
                   <td className="px-4 py-3 font-sans text-sm text-taupe">{tx.note || '—'}</td>
@@ -255,14 +267,14 @@ function AdminUserDetail({ userId, onBack }) {
 
       <section className="rounded-lg border border-cream bg-white shadow-sm">
         <div className="border-b border-cream px-5 py-4">
-          <h3 className="font-serif text-2xl font-bold text-primary-dark">Expenses ({counts.expenses})</h3>
+          <h3 className="font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">Expenses ({counts.expenses})</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left">
             <thead>
               <tr className="border-b border-cream bg-cream/30">
                 {['Date', 'Category', 'Amount', 'Note'].map((label) => (
-                  <th key={label} className="px-4 py-3 font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+                  <th key={label} className="px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
                     {label}
                   </th>
                 ))}
@@ -284,7 +296,7 @@ function AdminUserDetail({ userId, onBack }) {
                   <td className="px-4 py-3 font-sans text-sm text-primary-dark">
                     {expense.category_name || 'Uncategorized'}
                   </td>
-                  <td className="px-4 py-3 font-money text-sm font-semibold text-primary-dark">
+                  <td className="px-4 py-3 font-money text-sm font-normal text-primary-dark">
                     {money(expense.amount)}
                   </td>
                   <td className="px-4 py-3 font-sans text-sm text-taupe">{expense.note || '—'}</td>
@@ -294,6 +306,19 @@ function AdminUserDetail({ userId, onBack }) {
           </table>
         </div>
       </section>
+
+      <ConfirmDialog
+        open={Boolean(confirmDialog)}
+        title={confirmDialog?.title || ''}
+        message={confirmDialog?.message || ''}
+        confirmLabel={confirmDialog?.confirmLabel || 'Confirm'}
+        tone={confirmDialog?.tone || 'danger'}
+        loading={statusUpdating}
+        onConfirm={executeStatusChange}
+        onCancel={() => {
+          if (!statusUpdating) setConfirmDialog(null);
+        }}
+      />
     </div>
   );
 }

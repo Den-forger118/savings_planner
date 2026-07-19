@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '../services/api';
 import { formatMoney } from '../utils/currency';
+import { getFriendlyError } from '../utils/friendlyError';
 import AdminUserDetail from './AdminUserDetail';
+import ConfirmDialog from '../components/ConfirmDialog';
+import ErrorBanner from '../components/ErrorBanner';
 
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
@@ -27,6 +30,7 @@ function AdminUsersPage() {
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState(null);
   const [statusError, setStatusError] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -38,7 +42,7 @@ function AdminUsersPage() {
       });
       setUsers(response.data.users || []);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load users');
+      setError(getFriendlyError(err, 'We couldn’t load members right now. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -63,17 +67,28 @@ function AdminUsersPage() {
     return order === 'asc' ? 'arrow_upward' : 'arrow_downward';
   };
 
-  const handleStatusChange = async (member, nextActive, event) => {
+  const handleStatusChange = (member, nextActive, event) => {
     event.stopPropagation();
 
-    const action = nextActive ? 'reactivate' : 'deactivate';
-    const confirmed = window.confirm(
-      nextActive
-        ? `Reactivate ${member.full_name}'s account? They will be able to log in again.`
-        : `Deactivate ${member.full_name}'s account? They will not be able to log in, but their data will be preserved.`
-    );
+    setConfirmDialog({
+      member,
+      nextActive,
+      title: nextActive
+        ? `Reactivate ${member.full_name}?`
+        : `Deactivate ${member.full_name}?`,
+      message: nextActive
+        ? 'They will be able to log in again.'
+        : 'They will not be able to log in, but their data will be preserved.',
+      confirmLabel: nextActive ? 'Reactivate' : 'Deactivate',
+      tone: nextActive ? 'warning' : 'danger',
+    });
+  };
 
-    if (!confirmed) return;
+  const executeStatusChange = async () => {
+    if (!confirmDialog) return;
+
+    const { member, nextActive } = confirmDialog;
+    const action = nextActive ? 'reactivate' : 'deactivate';
 
     setStatusUpdatingId(member.user_id);
     setStatusError(null);
@@ -82,9 +97,13 @@ function AdminUsersPage() {
       await api.patch(`/admin/users/${member.user_id}/status`, {
         is_active: nextActive,
       });
+      setConfirmDialog(null);
       await fetchUsers();
     } catch (err) {
-      setStatusError(err.response?.data?.error || `Failed to ${action} account`);
+      setStatusError(
+        getFriendlyError(err, `We couldn’t ${action} that account. Please try again.`)
+      );
+      setConfirmDialog(null);
     } finally {
       setStatusUpdatingId(null);
     }
@@ -102,10 +121,10 @@ function AdminUsersPage() {
   return (
     <div className="space-y-8">
       <section>
-        <p className="font-sans text-xs font-bold uppercase tracking-widest text-gold">
+        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
           Admin Console
         </p>
-        <h2 className="mt-2 font-serif text-4xl font-bold text-primary-dark md:text-5xl">
+        <h2 className="mt-2 font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark md:text-5xl">
           Platform Members
         </h2>
         <p className="mt-3 max-w-2xl font-sans text-base text-taupe">
@@ -135,14 +154,14 @@ function AdminUsersPage() {
         </div>
 
         {error && (
-          <div className="border-b border-cream px-5 py-4 font-sans text-sm text-red-700">
-            {error}
+          <div className="border-b border-cream px-5 py-4">
+            <ErrorBanner message={error} />
           </div>
         )}
 
         {statusError && (
-          <div className="border-b border-cream px-5 py-4 font-sans text-sm text-red-700">
-            {statusError}
+          <div className="border-b border-cream px-5 py-4">
+            <ErrorBanner message={statusError} />
           </div>
         )}
 
@@ -155,14 +174,14 @@ function AdminUsersPage() {
                     <button
                       type="button"
                       onClick={() => handleSort(column.key)}
-                      className="flex items-center gap-1 font-sans text-[10px] font-bold uppercase tracking-widest text-taupe transition-colors hover:text-primary-dark"
+                      className="flex items-center gap-1 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe transition-colors hover:text-primary-dark"
                     >
                       {column.label}
                       <Icon name={sortIcon(column.key)} className="text-sm" />
                     </button>
                   </th>
                 ))}
-                <th className="px-4 py-3 font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+                <th className="px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
                   Actions
                 </th>
               </tr>
@@ -181,14 +200,14 @@ function AdminUsersPage() {
                   className={`cursor-pointer border-b border-cream/70 transition-colors hover:bg-cream/30 ${member.is_active === false ? 'opacity-70' : ''}`}
                   onClick={() => setSelectedUserId(member.user_id)}
                 >
-                  <td className="px-4 py-3 font-sans text-sm font-semibold text-primary-dark">
+                  <td className="px-4 py-3 font-sans text-sm font-normal text-primary-dark">
                     {member.user_id}
                   </td>
                   <td className="px-4 py-3 font-sans text-sm text-primary-dark">
                     <div className="flex items-center gap-2">
                       {member.full_name}
                       {member.is_admin && (
-                        <span className="rounded-full bg-primary-dark px-2 py-0.5 font-sans text-[9px] font-bold uppercase tracking-widest text-cream">
+                        <span className="rounded-full bg-primary-dark px-2 py-0.5 font-sans text-[9px] font-normal uppercase tracking-[0.14em] text-cream">
                           Admin
                         </span>
                       )}
@@ -199,7 +218,7 @@ function AdminUsersPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex rounded-full px-2.5 py-1 font-sans text-[10px] font-bold uppercase tracking-widest ${
+                      className={`inline-flex rounded-full px-2.5 py-1 font-sans text-[10px] font-normal uppercase tracking-[0.14em] ${
                         member.is_active === false
                           ? 'bg-red-100 text-red-700'
                           : 'bg-emerald-100 text-emerald-800'
@@ -208,7 +227,7 @@ function AdminUsersPage() {
                       {member.is_active === false ? 'Deactivated' : 'Active'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-sans text-sm font-semibold text-primary-dark">
+                  <td className="px-4 py-3 font-sans text-sm font-normal text-primary-dark">
                     {member.monthly_budget != null
                       ? formatMoney(member.monthly_budget, 'USD', '$')
                       : '—'}
@@ -227,7 +246,7 @@ function AdminUsersPage() {
                           event.stopPropagation();
                           setSelectedUserId(member.user_id);
                         }}
-                        className="inline-flex items-center gap-1 rounded-lg border border-gold/40 px-2.5 py-1 font-sans text-[10px] font-bold uppercase tracking-widest text-gold transition-colors hover:bg-gold hover:text-primary-dark"
+                        className="inline-flex items-center gap-1 rounded-lg border border-gold/40 px-2.5 py-1 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold transition-colors hover:bg-gold hover:text-primary-dark"
                       >
                         <Icon name="visibility" className="text-sm" />
                         View
@@ -237,7 +256,7 @@ function AdminUsersPage() {
                           type="button"
                           disabled={statusUpdatingId === member.user_id}
                           onClick={(event) => handleStatusChange(member, member.is_active === false, event)}
-                          className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 font-sans text-[10px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
+                          className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 font-sans text-[10px] font-normal uppercase tracking-[0.14em] transition-colors disabled:opacity-50 ${
                             member.is_active === false
                               ? 'border-emerald-300 text-emerald-800 hover:bg-emerald-50'
                               : 'border-red-300 text-red-700 hover:bg-red-50'
@@ -262,6 +281,19 @@ function AdminUsersPage() {
           </table>
         </div>
       </section>
+
+      <ConfirmDialog
+        open={Boolean(confirmDialog)}
+        title={confirmDialog?.title || ''}
+        message={confirmDialog?.message || ''}
+        confirmLabel={confirmDialog?.confirmLabel || 'Confirm'}
+        tone={confirmDialog?.tone || 'danger'}
+        loading={Boolean(statusUpdatingId)}
+        onConfirm={executeStatusChange}
+        onCancel={() => {
+          if (!statusUpdatingId) setConfirmDialog(null);
+        }}
+      />
     </div>
   );
 }

@@ -15,6 +15,104 @@ const createTransaction = async (userId, goalId, amount, type, note = '') => {
   }
 };
 
+const getGoalTransactionBalance = async (client, goalId) => {
+  const result = await client.query(
+    `
+      SELECT COALESCE(
+        SUM(CASE WHEN type = 'deposit' THEN amount ELSE -amount END),
+        0
+      )::numeric AS balance
+      FROM transactions
+      WHERE goal_id = $1
+    `,
+    [goalId]
+  );
+
+  return Number.parseFloat(result.rows[0].balance);
+};
+
+/**
+ * Atomically record a transaction and sync goal.saved_amount.
+ * Rejects withdrawals that would take the goal balance below zero.
+ */
+const recordTransaction = async (userId, goalId, amount, type, note = '') => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Lock the goal row so concurrent withdrawals cannot overdraft.
+    const goalLock = await client.query(
+      `
+        SELECT goal_id, saved_amount, target_amount, is_complete
+        FROM saving_goals
+        WHERE goal_id = $1 AND user_id = $2 AND deleted_at IS NULL
+        FOR UPDATE
+      `,
+      [goalId, userId]
+    );
+
+    if (goalLock.rows.length === 0) {
+      const error = new Error('Goal not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const currentBalance = await getGoalTransactionBalance(client, goalId);
+    const parsedAmount = Number.parseFloat(amount);
+
+    if (type === 'withdrawal' && parsedAmount > currentBalance + 0.00001) {
+      const error = new Error(
+        `Withdrawal exceeds available balance (${currentBalance.toFixed(2)}).`
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const insertResult = await client.query(
+      `
+        INSERT INTO transactions (user_id, goal_id, amount, type, note)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING transaction_id, user_id, goal_id, amount, type, note, created_at
+      `,
+      [userId, goalId, parsedAmount, type, note]
+    );
+
+    const updateResult = await client.query(
+      `
+        UPDATE saving_goals
+        SET saved_amount = GREATEST(
+          0,
+          COALESCE((
+            SELECT SUM(CASE WHEN type = 'deposit' THEN amount ELSE -amount END)
+            FROM transactions
+            WHERE goal_id = $1
+          ), 0)
+        )
+        WHERE goal_id = $1
+        RETURNING goal_id, saved_amount
+      `,
+      [goalId]
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      transaction: insertResult.rows[0],
+      savedAmount: updateResult.rows[0],
+    };
+  } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      /* ignore rollback errors */
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 const getTransactionsByGoalId = async (goalId) => {
   const query = `
     SELECT transaction_id, user_id, goal_id, amount, type, note, created_at
@@ -266,11 +364,14 @@ const enrichTransactionsWithBalance = (transactions) => {
 const updateGoalSavedAmount = async (goalId) => {
   const query = `
     UPDATE saving_goals
-    SET saved_amount = COALESCE((
-      SELECT SUM(CASE WHEN type = 'deposit' THEN amount ELSE -amount END)
-      FROM transactions
-      WHERE goal_id = $1
-    ), 0)
+    SET saved_amount = GREATEST(
+      0,
+      COALESCE((
+        SELECT SUM(CASE WHEN type = 'deposit' THEN amount ELSE -amount END)
+        FROM transactions
+        WHERE goal_id = $1
+      ), 0)
+    )
     WHERE goal_id = $1
     RETURNING goal_id, saved_amount
   `;
@@ -303,6 +404,7 @@ const checkAndMarkComplete = async (goalId) => {
 
 module.exports = {
   createTransaction,
+  recordTransaction,
   getTransactionsByGoalId,
   getTransactionsByUserId,
   getTransactionsWithGoalByUserId,

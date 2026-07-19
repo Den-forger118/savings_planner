@@ -11,6 +11,8 @@ import {
 } from 'recharts';
 import api from '../services/api';
 import { formatMoney } from '../utils/currency';
+import { getFriendlyError } from '../utils/friendlyError';
+import ErrorBanner from './ErrorBanner';
 
 const MONTHS = [
   'January', 'February', 'March', 'April',
@@ -25,8 +27,6 @@ const parseAmount = (value) => {
 
 function ExpenseHistogram({
   userId,
-  monthlyBudget,
-  isEarnerMode = false,
   refreshTrigger = 0,
   currencyCode = 'USD',
   currencySymbol = '$',
@@ -40,23 +40,49 @@ function ExpenseHistogram({
     return fmt(value);
   };
 
-  const HistogramTooltip = ({ active, payload }) => {
+  const HistogramTooltip = ({ active, payload, totalSpent }) => {
     if (!active || !payload?.length) {
       return null;
     }
 
-    const { category, total, count } = payload[0].payload;
+    const { category, total, count, color } = payload[0].payload;
+    const share = totalSpent > 0 ? (total / totalSpent) * 100 : 0;
+    const avg = count > 0 ? total / count : 0;
 
     return (
-      <div className="rounded bg-primary-dark px-4 py-3 shadow-lg">
-        <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-gold">
-          {category} Category
+      <div className="min-w-[190px] rounded-lg border border-cream/20 bg-primary-dark px-4 py-3 shadow-xl">
+        <div className="flex items-center gap-2">
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-sm"
+            style={{ backgroundColor: color || '#D4A574' }}
+          />
+          <p className="truncate font-sans text-sm font-normal text-gold">{category}</p>
+        </div>
+
+        <p className="mt-3 font-money text-2xl font-light tracking-[0.02em] text-white">{fmt(total)}</p>
+        <p className="mt-0.5 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-cream/45">
+          Total spent
         </p>
-        <p className="mt-1 font-money text-2xl font-bold text-white">
-          {fmt(total)}
-        </p>
-        <p className="mt-1 font-sans text-xs text-blue-200">
-          Transactions: {count}
+
+        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-cream/15 pt-2">
+          <div>
+            <p className="font-sans text-[9px] font-normal uppercase tracking-[0.14em] text-cream/45">
+              Share
+            </p>
+            <p className="mt-0.5 font-money text-sm font-light text-cream">
+              {share.toFixed(1)}%
+            </p>
+          </div>
+          <div>
+            <p className="font-sans text-[9px] font-normal uppercase tracking-[0.14em] text-cream/45">
+              Transactions
+            </p>
+            <p className="mt-0.5 font-money text-sm font-light text-cream">{count}</p>
+          </div>
+        </div>
+
+        <p className="mt-2 font-sans text-xs text-blue-200">
+          Avg {fmt(avg)} per transaction
         </p>
       </div>
     );
@@ -67,6 +93,8 @@ function ExpenseHistogram({
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState(undefined);
 
   useEffect(() => {
     fetchExpenseData();
@@ -74,6 +102,7 @@ function ExpenseHistogram({
 
   const fetchExpenseData = async () => {
     setLoading(true);
+    setError(null);
 
     try {
       const response = await api.get(
@@ -81,7 +110,7 @@ function ExpenseHistogram({
       );
       setData(response.data);
     } catch (err) {
-      console.error('Error fetching expense histogram:', err);
+      setError(getFriendlyError(err, 'We couldn’t load expense distribution. Please try again.'));
       setData(null);
     } finally {
       setLoading(false);
@@ -89,10 +118,6 @@ function ExpenseHistogram({
   };
 
   const totalSpent = parseAmount(data?.total_spent);
-  const budget = parseAmount(data?.monthly_budget ?? monthlyBudget);
-  const hasBudget = isEarnerMode && budget > 0;
-  const utilization = parseAmount(data?.budget_utilization) || (hasBudget ? (totalSpent / budget) * 100 : 0);
-  const remaining = parseAmount(data?.budget_remaining) || (hasBudget ? Math.max(0, budget - totalSpent) : 0);
   const monthChange = parseAmount(data?.month_over_month_change_percent);
 
   const chartData = (data?.categories || []).map((cat) => ({
@@ -101,6 +126,9 @@ function ExpenseHistogram({
     count: parseInt(cat.transaction_count, 10) || 0,
     color: cat.category_colour || cat.category_color || '#D4A574',
   }));
+
+  const totalTransactions = chartData.reduce((sum, cat) => sum + cat.count, 0);
+  const avgPerTransaction = totalTransactions > 0 ? totalSpent / totalTransactions : 0;
 
   const topCategory = data?.top_category
     ? {
@@ -115,8 +143,16 @@ function ExpenseHistogram({
 
   if (loading) {
     return (
-      <section className="rounded-lg border border-cream bg-cream/30 p-6 shadow-sm">
+      <section className="surface p-6">
         <p className="font-sans text-sm text-taupe">Loading expense distribution...</p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="surface p-6">
+        <ErrorBanner message={error} />
       </section>
     );
   }
@@ -125,7 +161,7 @@ function ExpenseHistogram({
     <section className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="font-serif text-2xl font-bold text-primary-dark md:text-3xl">
+          <h3 className="font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark md:text-3xl">
             Expense Distribution
           </h3>
           <p className="mt-1 font-sans text-sm text-taupe">
@@ -134,7 +170,7 @@ function ExpenseHistogram({
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="font-sans text-xs font-semibold uppercase tracking-widest text-taupe">
+          <label className="font-sans text-xs font-medium uppercase tracking-[0.12em] text-taupe">
             Filter By Period
           </label>
           <select
@@ -157,10 +193,10 @@ function ExpenseHistogram({
         </div>
       </div>
 
-      <div className="rounded-lg border border-cream bg-cream/40 p-5 shadow-sm">
+      <div className="surface p-5 md:p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h4 className="font-serif text-lg font-bold text-primary-dark">Category Histogram</h4>
-          <p className="font-sans text-[10px] font-semibold uppercase tracking-widest text-taupe/70">
+          <h4 className="font-serif text-lg font-light tracking-[-0.015em] text-primary-dark">Category Histogram</h4>
+          <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe/70">
             Bar height = total spent
           </p>
         </div>
@@ -168,7 +204,7 @@ function ExpenseHistogram({
         {chartData.length === 0 ? (
           <div className="flex min-h-[280px] items-center justify-center rounded-lg border border-dashed border-cream bg-white/50 p-10 text-center">
             <div>
-              <p className="font-serif text-xl font-bold text-primary-dark">No expenses logged</p>
+              <p className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">No expenses logged</p>
               <p className="mt-2 font-sans text-sm text-taupe">
                 No expenses for {MONTHS[selectedMonth - 1]} {selectedYear}. Click Log Expense to start tracking.
               </p>
@@ -176,11 +212,25 @@ function ExpenseHistogram({
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <BarChart
+              data={chartData}
+              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+              onMouseMove={(state) => {
+                if (state?.isTooltipActive && state.activeCoordinate) {
+                  setTooltipPos({
+                    x: state.activeCoordinate.x,
+                    y: state.activeCoordinate.y + 18,
+                  });
+                  return;
+                }
+                setTooltipPos(undefined);
+              }}
+              onMouseLeave={() => setTooltipPos(undefined)}
+            >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E8DFC8" />
               <XAxis
                 dataKey="category"
-                tick={{ fill: '#4E4B46', fontSize: 11, fontFamily: 'Montserrat, Helvetica, sans-serif' }}
+                tick={{ fill: '#4E4B46', fontSize: 11, fontFamily: 'Manrope, Helvetica, sans-serif' }}
                 axisLine={{ stroke: '#E8DFC8' }}
                 tickLine={false}
               />
@@ -191,7 +241,15 @@ function ExpenseHistogram({
                 tickLine={false}
                 width={48}
               />
-              <Tooltip content={<HistogramTooltip />} cursor={{ fill: 'rgba(26, 35, 64, 0.06)' }} />
+              <Tooltip
+                shared={false}
+                allowEscapeViewBox={{ x: true, y: true }}
+                position={tooltipPos}
+                cursor={{ fill: 'rgba(26, 35, 64, 0.06)' }}
+                content={({ active, payload }) => (
+                  <HistogramTooltip active={active} payload={payload} totalSpent={totalSpent} />
+                )}
+              />
               <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={56}>
                 {chartData.map((entry) => (
                   <Cell key={entry.category} fill={entry.color} />
@@ -205,39 +263,26 @@ function ExpenseHistogram({
       {chartData.length > 0 && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-lg border border-cream bg-white p-5 shadow-sm">
-            <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+            <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
               Monthly Snapshot
             </p>
             <div className="mt-3 flex items-end justify-between gap-4">
               <div>
                 <p className="font-sans text-xs text-taupe">Total Spend</p>
-                <p className="font-money text-2xl font-bold text-primary-dark">{fmt(totalSpent)}</p>
+                <p className="font-money text-2xl font-light tracking-[0.02em] text-primary-dark">{fmt(totalSpent)}</p>
               </div>
-              {hasBudget && (
-                <div className="text-right">
-                  <p className="font-sans text-xs text-taupe">Budget Cap</p>
-                  <p className="font-money text-lg font-bold text-primary-dark">{fmt(budget)}</p>
-                </div>
-              )}
+              <div className="text-right">
+                <p className="font-sans text-xs text-taupe">Transactions</p>
+                <p className="font-money text-lg font-light tracking-[0.02em] text-primary-dark">{totalTransactions}</p>
+              </div>
             </div>
-            {hasBudget && (
-              <>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-cream">
-                  <div
-                    className="h-full rounded-full bg-primary-dark transition-all duration-500"
-                    style={{ width: `${Math.min(100, utilization)}%` }}
-                  />
-                </div>
-                <div className="mt-2 flex justify-between font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
-                  <span>{utilization.toFixed(0)}% utilized</span>
-                  <span>{fmt(remaining)} remaining</span>
-                </div>
-              </>
-            )}
+            <p className="mt-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+              Avg {fmt(avgPerTransaction)} per entry
+            </p>
           </div>
 
           <div className="rounded-lg border border-cream bg-white p-5 shadow-sm">
-            <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+            <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
               Vs Last Month
             </p>
             <div className="mt-3 flex items-center gap-3">
@@ -249,7 +294,7 @@ function ExpenseHistogram({
                 </span>
               </span>
               <div>
-                <p className={`font-money text-2xl font-bold ${
+                <p className={`font-money text-2xl font-light tracking-[0.02em] ${
                   monthChange >= 0 ? 'text-red-700' : 'text-green-700'
                 }`}>
                   {monthChange >= 0 ? '+' : ''}{monthChange.toFixed(1)}%
@@ -262,19 +307,17 @@ function ExpenseHistogram({
           </div>
 
           <div className="rounded-lg border border-cream bg-white p-5 shadow-sm">
-            <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+            <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
               Top Category
             </p>
             {topCategory && (
               <div className="mt-3 flex items-center gap-3">
                 <span
-                  className="flex h-10 w-10 items-center justify-center rounded-lg"
+                  className="h-3 w-3 shrink-0 rounded-sm"
                   style={{ backgroundColor: topCategory.color }}
-                >
-                  <span className="material-symbols-outlined text-xl text-white">shopping_bag</span>
-                </span>
+                />
                 <div>
-                  <p className="font-serif text-lg font-bold text-primary-dark">{topCategory.category}</p>
+                  <p className="font-serif text-lg font-light tracking-[-0.015em] text-primary-dark">{topCategory.category}</p>
                   <p className="font-sans text-xs text-taupe">
                     {fmt(topCategory.total)} · {topCategory.count} transactions
                   </p>

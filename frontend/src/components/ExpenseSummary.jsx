@@ -3,11 +3,11 @@ import api from '../services/api';
 import Pagination from './Pagination';
 import ExpenseForm from './ExpenseForm';
 import { formatMoney } from '../utils/currency';
+import { getFriendlyError } from '../utils/friendlyError';
+import ErrorBanner from './ErrorBanner';
 
 function ExpenseSummary({
   userId,
-  monthlyBudget,
-  isEarnerMode = false,
   currencyCode = 'USD',
   currencySymbol = '$',
   refreshTrigger,
@@ -18,6 +18,7 @@ function ExpenseSummary({
   const categoryColor = (item) => item?.category_colour || item?.category_color || '#D4A574';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const selectedMonth = new Date().getMonth() + 1;
   const selectedYear = new Date().getFullYear();
   const [page, setPage] = useState(1);
@@ -34,6 +35,7 @@ function ExpenseSummary({
 
   const fetchExpenses = async () => {
     setLoading(true);
+    setError(null);
 
     try {
       const response = await api.get(
@@ -41,7 +43,7 @@ function ExpenseSummary({
       );
       setData(response.data);
     } catch (err) {
-      console.error('Error fetching expenses:', err);
+      setError(getFriendlyError(err, 'We couldn’t load your expenses. Please try again.'));
       setData(null);
     } finally {
       setLoading(false);
@@ -63,17 +65,18 @@ function ExpenseSummary({
   }
 
   const totalSpent = parseFloat(data?.total_spent || 0);
-  const budgetAmount = parseFloat(monthlyBudget);
-  const hasBudget = isEarnerMode && Number.isFinite(budgetAmount) && budgetAmount > 0;
-  const savingsImpact = hasBudget
-    ? ((totalSpent / budgetAmount) * 100).toFixed(1)
-    : 0;
+  const expenseCount = data?.expense_count || 0;
+  const avgPerTransaction = expenseCount > 0 ? totalSpent / expenseCount : 0;
 
   return (
     <div className="space-y-6">
 
+      {error && (
+        <ErrorBanner message={error} />
+      )}
+
       <div className="flex items-center justify-between gap-4">
-        <h2 className="font-serif text-3xl font-bold text-primary-dark">
+        <h2 className="font-serif text-3xl font-light tracking-[-0.02em] text-primary-dark">
           Expense Tracker
         </h2>
         <ExpenseForm
@@ -85,73 +88,42 @@ function ExpenseSummary({
         />
       </div>
 
-      {/* Spending vs Savings Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-primary-dark to-primary-dark-alt rounded-lg p-6 text-cream">
-          <p className="font-sans text-xs uppercase tracking-wide text-gold-light mb-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="rounded-lg bg-gradient-to-br from-primary-dark to-primary-dark-alt p-6 text-cream">
+          <p className="mb-2 font-sans text-xs uppercase tracking-wide text-gold-light">
             Total Spent
           </p>
-          <p className="font-money text-3xl font-bold">{fmt(totalSpent)}</p>
-          <p className="font-sans text-xs text-gold-light mt-2">
+          <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl">{fmt(totalSpent)}</p>
+          <p className="mt-2 font-sans text-xs text-gold-light">
             {months[selectedMonth - 1]} {selectedYear}
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-gold">
-          <p className="font-sans text-xs text-taupe uppercase tracking-wide mb-2">
+        <div className="rounded-lg border border-primary-dark/[0.08] bg-white p-6 shadow-soft">
+          <p className="mb-2 font-sans text-xs uppercase tracking-wide text-taupe">
             Transactions
           </p>
-          <p className="font-money text-3xl font-bold text-primary-dark">
-            {data?.expense_count || 0}
+          <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl text-primary-dark">
+            {expenseCount}
           </p>
-          <p className="font-sans text-xs text-taupe mt-2">This month</p>
+          <p className="mt-2 font-sans text-xs text-taupe">This month</p>
         </div>
 
-        {hasBudget ? (
-        <div className={`rounded-lg shadow p-6 border-l-4 ${
-          savingsImpact > 50
-            ? 'bg-red-50 border-red-500'
-            : 'bg-green-50 border-green-500'
-        }`}>
-          <p className="font-sans text-xs text-taupe uppercase tracking-wide mb-2">
-            Spending vs Budget
+        <div className="rounded-lg border border-primary-dark/[0.08] bg-white p-6 shadow-soft">
+          <p className="mb-2 font-sans text-xs uppercase tracking-wide text-taupe">
+            Avg / Transaction
           </p>
-          <p className={`font-money text-3xl font-bold ${
-            savingsImpact > 50 ? 'text-red-700' : 'text-green-700'
-          }`}>
-            {savingsImpact}%
+          <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl text-primary-dark">
+            {fmt(avgPerTransaction)}
           </p>
-          <p className="font-sans text-xs text-taupe mt-2">
-            {savingsImpact > 50
-              ? '⚠ High spending ratio'
-              : '✓ Healthy spending ratio'
-            }
-          </p>
+          <p className="mt-2 font-sans text-xs text-taupe">This month</p>
         </div>
-        ) : (
-        <div className="rounded-lg shadow p-6 border-l-4 border-cream bg-white">
-          <p className="font-sans text-xs text-taupe uppercase tracking-wide mb-2">
-            Savings Mode
-          </p>
-          <p className="font-serif text-xl font-bold text-primary-dark">
-            {isEarnerMode ? 'Set budget to compare' : 'Non-Earner'}
-          </p>
-          <p className="font-sans text-xs text-taupe mt-2">
-            {isEarnerMode
-              ? 'Add a monthly mandate to track spending against your savings budget.'
-              : 'Expense tracking without budget comparison.'}
-          </p>
-        </div>
-        )}
       </div>
 
-      {/* Category Breakdown */}
       {data?.summary_by_category?.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-
-          {/* Category Bars */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="font-serif text-xl font-bold text-primary-dark mb-6">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="mb-6 font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">
               Spending by Category
             </h3>
             <div className="space-y-4">
@@ -159,32 +131,29 @@ function ExpenseSummary({
                 const percentage = totalSpent > 0
                   ? ((parseFloat(cat.total_spent) / totalSpent) * 100).toFixed(1)
                   : 0;
+                const name = cat.category_name || 'Uncategorized';
+                const color = categoryColor(cat);
+
                 return (
                   <div key={idx}>
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: categoryColor(cat) }}
-                        />
-                        <p className="font-sans text-sm font-semibold text-primary-dark">
-                          {cat.category_name || 'Uncategorized'}
-                        </p>
-                      </div>
-                      <p className="font-money font-bold text-gold">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="font-sans text-sm font-normal text-primary-dark">
+                        {name}
+                      </p>
+                      <p className="font-money font-light text-primary-dark">
                         {fmt(cat.total_spent)}
                       </p>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="h-2 w-full rounded-full bg-gray-200">
                       <div
                         className="h-2 rounded-full transition-all duration-500"
                         style={{
                           width: `${percentage}%`,
-                          backgroundColor: categoryColor(cat)
+                          backgroundColor: color,
                         }}
                       />
                     </div>
-                    <p className="font-sans text-xs text-taupe mt-1">
+                    <p className="mt-1 font-sans text-xs text-taupe">
                       {percentage}% of spending · {cat.transaction_count} transactions
                     </p>
                   </div>
@@ -193,10 +162,9 @@ function ExpenseSummary({
             </div>
           </div>
 
-          {/* Expense List */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-hidden rounded-lg bg-white shadow">
             <div className="flex flex-col gap-3 border-b border-cream px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="font-serif text-xl font-bold text-primary-dark">
+              <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">
                 Expense List
               </h3>
               <select
@@ -210,35 +178,33 @@ function ExpenseSummary({
               </select>
             </div>
             <div className="space-y-3 px-6 py-4">
-              {data.expenses.map(expense => (
-                <div
-                  key={expense.expense_id}
-                  className="flex justify-between items-center p-3 bg-cream rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: categoryColor(expense) }}
-                    />
+              {data.expenses.map((expense) => {
+                const name = expense.category_name || 'Uncategorized';
+
+                return (
+                  <div
+                    key={expense.expense_id}
+                    className="flex items-center justify-between rounded-lg bg-cream p-3"
+                  >
                     <div>
-                      <p className="font-sans text-sm font-semibold text-primary-dark">
-                        {expense.category_name || 'Uncategorized'}
+                      <p className="font-sans text-sm font-normal text-primary-dark">
+                        {name}
                       </p>
                       {expense.note && (
                         <p className="font-sans text-xs text-taupe">{expense.note}</p>
                       )}
                     </div>
+                    <div className="text-right">
+                      <p className="font-money font-light text-primary-dark">
+                        {fmt(expense.amount)}
+                      </p>
+                      <p className="font-sans text-xs text-taupe">
+                        {new Date(expense.expense_date).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-money font-bold text-primary-dark">
-                      {fmt(expense.amount)}
-                    </p>
-                    <p className="font-sans text-xs text-taupe">
-                      {new Date(expense.expense_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <Pagination
               pagination={data.pagination}
@@ -252,42 +218,16 @@ function ExpenseSummary({
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
-          <p className="font-sans text-taupe text-lg">
+        <div className="rounded-lg bg-white p-12 text-center shadow">
+          <p className="font-sans text-lg text-taupe">
             No expenses logged for {months[selectedMonth - 1]} {selectedYear}.
           </p>
-          <p className="font-sans text-taupe text-sm mt-2">
+          <p className="mt-2 font-sans text-sm text-taupe">
             {emptyMessage}
           </p>
         </div>
       )}
 
-      {hasBudget && totalSpent > 0 && (
-        <div className={`flex items-start gap-2 rounded-md border px-3 py-2 ${
-          totalSpent > budgetAmount
-            ? 'border-red-200 bg-red-50'
-            : 'border-green-200 bg-green-50'
-        }`}>
-          <span className={`mt-0.5 font-sans text-xs ${
-            totalSpent > budgetAmount ? 'text-red-600' : 'text-green-600'
-          }`}>
-            {totalSpent > budgetAmount ? '⚠' : '✓'}
-          </span>
-          <p className={`font-sans text-xs leading-snug ${
-            totalSpent > budgetAmount ? 'text-red-700' : 'text-green-700'
-          }`}>
-            {totalSpent > budgetAmount ? (
-              <>
-                Spent <strong>{fmt(totalSpent)}</strong> against a <strong>{fmt(budgetAmount)}</strong> budget — expenses exceed your savings plan.
-              </>
-            ) : (
-              <>
-                Spent <strong>{fmt(totalSpent)}</strong> this month. Budget of <strong>{fmt(budgetAmount)}</strong> is intact.
-              </>
-            )}
-          </p>
-        </div>
-      )}
     </div>
   );
 }

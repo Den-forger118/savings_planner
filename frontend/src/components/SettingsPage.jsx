@@ -3,6 +3,9 @@ import api from '../services/api';
 import BudgetSetup from './BudgetSetup';
 import EarnerModeToggle from './EarnerModeToggle';
 import FeatureGuide from './FeatureGuide';
+import ConfirmDialog from './ConfirmDialog';
+import ErrorBanner from './ErrorBanner';
+import { getFriendlyError } from '../utils/friendlyError';
 import {
   ONBOARDING_CURRENCIES,
   FISCAL_MONTHS,
@@ -84,11 +87,42 @@ function SettingsPage({
   const [trashGoals, setTrashGoals] = useState([]);
   const [trashLoading, setTrashLoading] = useState(false);
   const [trashActionId, setTrashActionId] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   useEffect(() => {
     setCurrency(user?.currency || 'USD');
     setCurrencySymbol(user?.currency_symbol || '$');
-  }, [user?.currency, user?.currency_symbol]);
+    setTheme(user?.theme || 'classic');
+    setUiDensity(user?.ui_density || 'classic');
+  }, [user?.currency, user?.currency_symbol, user?.theme, user?.ui_density]);
+
+  const persistVisualTuning = async (nextTheme, nextDensity) => {
+    try {
+      const response = await api.put(`/users/${user.user_id}/preferences`, {
+        theme: nextTheme,
+        ui_density: nextDensity,
+        fiscal_start_month: fiscalStartMonth,
+        preferences: alertPrefs,
+        currency,
+        currency_symbol: currencySymbol,
+      });
+      onUserUpdate(response.data.user);
+    } catch (err) {
+      flash(err, true);
+    }
+  };
+
+  const selectTheme = (nextTheme) => {
+    setTheme(nextTheme);
+    onThemeChange?.(nextTheme);
+    persistVisualTuning(nextTheme, uiDensity);
+  };
+
+  const selectDensity = (nextDensity) => {
+    setUiDensity(nextDensity);
+    onDensityChange?.(nextDensity);
+    persistVisualTuning(theme, nextDensity);
+  };
 
   const tokenExpiry = useMemo(
     () => getTokenExpiry(localStorage.getItem('token')),
@@ -97,13 +131,14 @@ function SettingsPage({
 
   const flash = (text, isError = false) => {
     if (isError) {
-      setError(text);
+      setError(getFriendlyError(text, typeof text === 'string' ? text : 'Something didn’t go through. Please try again.'));
       setMessage(null);
     } else {
       setMessage(text);
       setError(null);
     }
-    setTimeout(() => {
+    window.clearTimeout(flash.timeoutId);
+    flash.timeoutId = window.setTimeout(() => {
       setError(null);
       setMessage(null);
     }, 4000);
@@ -115,7 +150,7 @@ function SettingsPage({
       const response = await api.get(`/goals/trash?userId=${user.user_id}`);
       setTrashGoals(response.data.goals || []);
     } catch {
-      flash('Unable to load trash', true);
+      flash('We couldn’t load your trash right now.', true);
     } finally {
       setTrashLoading(false);
     }
@@ -127,7 +162,7 @@ function SettingsPage({
       const response = await api.get(`/expenses/categories?userId=${user.user_id}`);
       setCategories(response.data.categories || []);
     } catch {
-      flash('Unable to load categories', true);
+      flash('We couldn’t load your categories right now.', true);
     } finally {
       setCategoriesLoading(false);
     }
@@ -150,44 +185,64 @@ function SettingsPage({
       onGoalsChange?.(response.data.goals || []);
       flash('Goal restored');
     } catch (err) {
-      flash(err.response?.data?.error || 'Failed to restore goal', true);
+      flash(err, true);
     } finally {
       setTrashActionId(null);
     }
   };
 
-  const handlePermanentDelete = async (goalId, goalName) => {
-    if (!window.confirm(`Permanently delete "${goalName}"? This cannot be undone.`)) {
-      return;
-    }
-
-    setTrashActionId(goalId);
-    try {
-      const response = await api.delete(`/goals/${goalId}/permanent?userId=${user.user_id}`);
-      setTrashGoals(response.data.trash || []);
-      flash('Goal permanently deleted');
-    } catch (err) {
-      flash(err.response?.data?.error || 'Failed to delete goal', true);
-    } finally {
-      setTrashActionId(null);
-    }
+  const handlePermanentDelete = (goalId, goalName) => {
+    setConfirmDialog({
+      type: 'delete-one',
+      goalId,
+      title: `Permanently delete "${goalName}"?`,
+      message: 'This cannot be undone. The goal and its history will be removed forever.',
+      confirmLabel: 'Delete Forever',
+    });
   };
 
-  const handleEmptyTrash = async () => {
+  const handleEmptyTrash = () => {
     if (!trashGoals.length) return;
-    if (!window.confirm(`Permanently delete all ${trashGoals.length} goals in trash? This cannot be undone.`)) {
+    setConfirmDialog({
+      type: 'empty-trash',
+      title: `Empty trash (${trashGoals.length} goal${trashGoals.length === 1 ? '' : 's'})?`,
+      message: 'Permanently delete all goals in trash. This cannot be undone.',
+      confirmLabel: 'Empty Trash',
+    });
+  };
+
+  const executeConfirmDialog = async () => {
+    if (!confirmDialog) return;
+
+    if (confirmDialog.type === 'delete-one') {
+      setTrashActionId(confirmDialog.goalId);
+      try {
+        const response = await api.delete(`/goals/${confirmDialog.goalId}/permanent?userId=${user.user_id}`);
+        setTrashGoals(response.data.trash || []);
+        flash('Goal permanently deleted');
+        setConfirmDialog(null);
+      } catch (err) {
+        flash(err, true);
+        setConfirmDialog(null);
+      } finally {
+        setTrashActionId(null);
+      }
       return;
     }
 
-    setTrashActionId('empty');
-    try {
-      const response = await api.delete(`/goals/trash?userId=${user.user_id}`);
-      setTrashGoals(response.data.trash || []);
-      flash('Trash emptied');
-    } catch (err) {
-      flash(err.response?.data?.error || 'Failed to empty trash', true);
-    } finally {
-      setTrashActionId(null);
+    if (confirmDialog.type === 'empty-trash') {
+      setTrashActionId('empty');
+      try {
+        const response = await api.delete(`/goals/trash?userId=${user.user_id}`);
+        setTrashGoals(response.data.trash || []);
+        flash('Trash emptied');
+        setConfirmDialog(null);
+      } catch (err) {
+        flash(err, true);
+        setConfirmDialog(null);
+      } finally {
+        setTrashActionId(null);
+      }
     }
   };
 
@@ -198,7 +253,7 @@ function SettingsPage({
       onUserUpdate(response.data.user);
       flash('Preferences saved');
     } catch (err) {
-      flash(err.response?.data?.error || 'Failed to save preferences', true);
+      flash(err, true);
     } finally {
       setSaving(false);
     }
@@ -218,7 +273,7 @@ function SettingsPage({
       onUserUpdate(response.data.user);
       flash('Preferences saved');
     } catch (err) {
-      flash(err.response?.data?.error || 'Failed to save preferences', true);
+      flash(err, true);
     } finally {
       setSaving(false);
     }
@@ -241,7 +296,7 @@ function SettingsPage({
       loadCategories();
       flash('Category added');
     } catch (err) {
-      flash(err.response?.data?.error || 'Failed to create category', true);
+      flash(err, true);
     }
   };
 
@@ -253,7 +308,7 @@ function SettingsPage({
       });
       loadCategories();
     } catch (err) {
-      flash(err.response?.data?.error || 'Failed to update category', true);
+      flash(err, true);
     }
   };
 
@@ -277,7 +332,7 @@ function SettingsPage({
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       flash('Password updated');
     } catch (err) {
-      flash(err.response?.data?.error || 'Failed to update password', true);
+      flash(err, true);
     } finally {
       setPasswordSaving(false);
     }
@@ -307,8 +362,8 @@ function SettingsPage({
         URL.revokeObjectURL(url);
       }
       flash('Export downloaded');
-    } catch {
-      flash('Export failed', true);
+    } catch (err) {
+      flash(err, true);
     } finally {
       setExportLoading(false);
     }
@@ -323,7 +378,7 @@ function SettingsPage({
     });
   };
 
-  const panelClass = 'rounded-lg border border-cream/80 bg-white p-6 shadow-sm settings-panel';
+  const panelClass = 'surface settings-panel p-6';
 
   const handleHelpNavigate = (page) => {
     if (page === 'settings') {
@@ -336,32 +391,26 @@ function SettingsPage({
   return (
     <div className="space-y-8">
       <section>
-        <p className="font-sans text-xs font-bold uppercase tracking-widest text-gold">
-          Control Room
-        </p>
-        <h2 className="mt-2 font-serif text-4xl font-bold text-primary-dark md:text-5xl">
-          Private Settings
-        </h2>
-        <p className="mt-3 max-w-2xl font-sans text-base text-taupe">
+        <p className="eyebrow">Control Room</p>
+        <h2 className="page-title">Private Settings</h2>
+        <p className="page-lede">
           Configure your ledger currency, financial engine, security posture, and data portability —
           built for private banking-grade savings intelligence.
         </p>
       </section>
 
       {(message || error) && (
-        <div
-          className={`rounded-lg border px-4 py-3 font-sans text-sm ${
-            error
-              ? 'border-red-200 bg-red-50 text-red-800'
-              : 'border-gold/30 bg-cream/50 text-primary-dark'
-          }`}
-        >
-          {error || message}
-        </div>
+        error ? (
+          <ErrorBanner message={error} />
+        ) : (
+          <div className="rounded-lg border border-gold/30 bg-cream/50 px-4 py-3 font-sans text-sm text-primary-dark">
+            {message}
+          </div>
+        )
       )}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
-        <nav className="space-y-1 rounded-lg border border-cream bg-white p-2 shadow-sm">
+        <nav className="surface space-y-1 p-2">
           {SETTINGS_TABS.map((tab) => {
             const active = activeTab === tab.id;
             return (
@@ -369,7 +418,7 @@ function SettingsPage({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left font-sans text-sm font-semibold transition-colors ${
+                className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left font-sans text-sm font-normal transition-colors ${
                   active
                     ? 'bg-primary-dark text-cream'
                     : 'text-taupe hover:bg-cream/60 hover:text-primary-dark'
@@ -386,28 +435,28 @@ function SettingsPage({
           {activeTab === 'profile' && (
             <>
               <section className={panelClass}>
-                <h3 className="font-serif text-2xl font-bold text-primary-dark">Member Profile</h3>
+                <h3 className="font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">Member Profile</h3>
                 <p className="mt-1 font-sans text-sm text-taupe">Your private ledger identity</p>
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">Name</p>
+                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">Name</p>
                     <p className="mt-1 font-sans text-primary-dark">{user.first_name} {user.last_name}</p>
                   </div>
                   <div>
-                    <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">Email</p>
+                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">Email</p>
                     <p className="mt-1 font-sans text-primary-dark">{user.email}</p>
                   </div>
                 </div>
               </section>
 
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-bold text-primary-dark">Display Currency</h3>
+                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Display Currency</h3>
                 <p className="mt-1 font-sans text-sm text-taupe">
                   All amounts across your ledger will format in this currency.
                 </p>
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div className="flex-1">
-                    <label className="mb-1 block font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+                    <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
                       Currency
                     </label>
                     <select
@@ -427,8 +476,8 @@ function SettingsPage({
                     </select>
                   </div>
                   <div className="rounded-lg border border-gold/30 bg-cream/40 px-4 py-2.5">
-                    <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">Preview</p>
-                    <p className="mt-0.5 font-money text-xl font-bold text-gold">
+                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">Preview</p>
+                    <p className="mt-0.5 font-money text-xl font-light tracking-[0.02em] text-gold">
                       {formatMoney(12450.75, currency, currencySymbol)}
                     </p>
                   </div>
@@ -436,10 +485,10 @@ function SettingsPage({
               </section>
 
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-bold text-primary-dark">Visual Tuning</h3>
+                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Visual Tuning</h3>
                 <div className="mt-5 grid gap-5 sm:grid-cols-2">
                   <div>
-                    <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">Theme</p>
+                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">Theme</p>
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       {[
                         { id: 'classic', label: 'Classic Cream', icon: 'light_mode' },
@@ -448,7 +497,7 @@ function SettingsPage({
                         <button
                           key={option.id}
                           type="button"
-                          onClick={() => setTheme(option.id)}
+                          onClick={() => selectTheme(option.id)}
                           className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-sans text-sm transition-colors ${
                             theme === option.id
                               ? 'border-gold bg-primary-dark text-cream'
@@ -462,7 +511,7 @@ function SettingsPage({
                     </div>
                   </div>
                   <div>
-                    <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">UI Density</p>
+                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">UI Density</p>
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       {[
                         { id: 'classic', label: 'Classic', desc: 'Spacious cards' },
@@ -471,14 +520,14 @@ function SettingsPage({
                         <button
                           key={option.id}
                           type="button"
-                          onClick={() => setUiDensity(option.id)}
+                          onClick={() => selectDensity(option.id)}
                           className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
                             uiDensity === option.id
                               ? 'border-gold bg-cream/60'
                               : 'border-cream hover:border-gold/50'
                           }`}
                         >
-                          <p className="font-sans text-sm font-semibold text-primary-dark">{option.label}</p>
+                          <p className="font-sans text-sm font-normal text-primary-dark">{option.label}</p>
                           <p className="font-sans text-xs text-taupe">{option.desc}</p>
                         </button>
                       ))}
@@ -488,13 +537,13 @@ function SettingsPage({
               </section>
 
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-bold text-primary-dark">Intelligence Thresholds</h3>
+                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Intelligence Thresholds</h3>
                 <p className="mt-1 font-sans text-sm text-taupe">
                   Configure when your ledger should surface runway and feasibility alerts.
                 </p>
                 <div className="mt-4 space-y-4">
                   <div>
-                    <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
                       Budget Runway Alerts
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -503,10 +552,10 @@ function SettingsPage({
                           key={pct}
                           type="button"
                           onClick={() => toggleRunwayThreshold(pct)}
-                          className={`rounded-full border px-3 py-1 font-sans text-xs font-semibold transition-colors ${
+                          className={`rounded-full border px-3 py-1 font-sans text-xs font-normal transition-colors ${
                             alertPrefs.budget_runway.includes(pct)
-                              ? 'border-gold bg-gold text-primary-dark'
-                              : 'border-cream text-taupe hover:border-gold/50'
+                              ? 'border-primary-dark bg-primary-dark text-cream'
+                              : 'border-cream text-taupe hover:border-primary-dark/40 hover:text-primary-dark'
                           }`}
                         >
                           {pct}%
@@ -535,7 +584,7 @@ function SettingsPage({
                 type="button"
                 onClick={handleSaveProfile}
                 disabled={saving}
-                className="rounded-lg bg-primary-dark px-6 py-3 font-sans text-sm font-bold text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
+                className="btn-navy disabled:opacity-60"
               >
                 {saving ? 'Saving…' : 'Save Profile & Preferences'}
               </button>
@@ -561,7 +610,7 @@ function SettingsPage({
               />
 
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-bold text-primary-dark">Fiscal Year</h3>
+                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Fiscal Year</h3>
                 <p className="mt-1 font-sans text-sm text-taupe">
                   Set when your financial cycle begins for reporting and runway calculations.
                 </p>
@@ -579,7 +628,7 @@ function SettingsPage({
               <section className={panelClass}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="font-serif text-xl font-bold text-primary-dark">Category Ledger</h3>
+                    <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Category Ledger</h3>
                     <p className="mt-1 font-sans text-sm text-taupe">
                       Customize expense categories and their signature colours.
                     </p>
@@ -611,7 +660,7 @@ function SettingsPage({
                               handleUpdateCategory(cat.category_id, { name: e.target.value.trim() });
                             }
                           }}
-                          className="min-w-[120px] flex-1 rounded border border-transparent bg-transparent px-2 py-1 font-sans text-sm font-semibold text-primary-dark focus:border-gold focus:outline-none"
+                          className="min-w-[120px] flex-1 rounded border border-transparent bg-transparent px-2 py-1 font-sans text-sm font-normal text-primary-dark focus:border-gold focus:outline-none"
                         />
                       </div>
                     ))}
@@ -620,7 +669,7 @@ function SettingsPage({
 
                 <form onSubmit={handleCreateCategory} className="mt-4 flex flex-wrap items-end gap-3 border-t border-cream pt-4">
                   <div className="flex-1 min-w-[140px]">
-                    <label className="mb-1 block font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+                    <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
                       New Category
                     </label>
                     <input
@@ -640,7 +689,7 @@ function SettingsPage({
                   />
                   <button
                     type="submit"
-                    className="rounded-lg border-2 border-gold px-4 py-2 font-sans text-sm font-bold text-primary-dark transition-colors hover:bg-gold"
+                    className="rounded-lg border-2 border-primary-dark px-4 py-2 font-sans text-sm font-normal text-primary-dark transition-colors hover:bg-primary-dark hover:text-cream"
                   >
                     Add
                   </button>
@@ -651,7 +700,7 @@ function SettingsPage({
                 type="button"
                 onClick={() => persistPreferences({ fiscal_start_month: fiscalStartMonth })}
                 disabled={saving}
-                className="rounded-lg bg-primary-dark px-6 py-3 font-sans text-sm font-bold text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
+                className="rounded-lg bg-primary-dark px-6 py-3 font-sans text-sm font-normal text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
               >
                 Save Fiscal Settings
               </button>
@@ -661,14 +710,14 @@ function SettingsPage({
           {activeTab === 'security' && (
             <>
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-bold text-primary-dark">Active Session</h3>
+                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Active Session</h3>
                 <p className="mt-1 font-sans text-sm text-taupe">
                   Your session is secured with a signed token. End all sessions to clear local credentials.
                 </p>
                 <div className="mt-4 rounded-lg border border-cream bg-cream/30 px-4 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="font-sans text-sm font-semibold text-primary-dark">This device</p>
+                      <p className="font-sans text-sm font-normal text-primary-dark">This device</p>
                       <p className="font-sans text-xs text-taupe">
                         {tokenExpiry
                           ? `Expires ${tokenExpiry.toLocaleString()}`
@@ -681,17 +730,17 @@ function SettingsPage({
                 <button
                   type="button"
                   onClick={onLogout}
-                  className="mt-4 rounded-lg border-2 border-primary-dark px-4 py-2 font-sans text-sm font-bold text-primary-dark transition-colors hover:bg-primary-dark hover:text-cream"
+                  className="mt-4 rounded-lg border-2 border-gold px-4 py-2 font-sans text-sm font-normal text-primary-dark transition-colors hover:bg-gold"
                 >
                   Log Out of All Devices
                 </button>
               </section>
 
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-bold text-primary-dark">Password Rotation</h3>
+                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Password Rotation</h3>
                 <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4 max-w-md">
                   <div>
-                    <label className="mb-1 block font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+                    <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
                       Current Password
                     </label>
                     <input
@@ -703,7 +752,7 @@ function SettingsPage({
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+                    <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
                       New Password
                     </label>
                     <input
@@ -716,7 +765,7 @@ function SettingsPage({
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block font-sans text-[10px] font-bold uppercase tracking-widest text-taupe">
+                    <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
                       Confirm New Password
                     </label>
                     <input
@@ -731,7 +780,7 @@ function SettingsPage({
                   <button
                     type="submit"
                     disabled={passwordSaving}
-                    className="rounded-lg bg-primary-dark px-5 py-2.5 font-sans text-sm font-bold text-cream disabled:opacity-60"
+                    className="rounded-md bg-primary-dark px-3.5 py-2 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
                   >
                     {passwordSaving ? 'Updating…' : 'Update Password'}
                   </button>
@@ -743,34 +792,34 @@ function SettingsPage({
           {activeTab === 'data' && (
             <>
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-bold text-primary-dark">Export Financial Statement</h3>
+                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Export Financial Statement</h3>
                 <p className="mt-1 font-sans text-sm text-taupe">
                   Download your complete goals, transactions, expenses, and categories — true data ownership.
                 </p>
-                <div className="mt-5 flex flex-wrap gap-3">
+                <div className="mt-5 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => downloadExport('json')}
                     disabled={exportLoading}
-                    className="flex items-center gap-2 rounded-lg border-2 border-gold bg-gold px-5 py-2.5 font-sans text-sm font-bold text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary-dark px-3 py-1.5 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
                   >
-                    <Icon name="data_object" className="text-base" />
+                    <Icon name="data_object" className="text-sm" />
                     Export JSON
                   </button>
                   <button
                     type="button"
                     onClick={() => downloadExport('csv')}
                     disabled={exportLoading}
-                    className="flex items-center gap-2 rounded-lg border-2 border-primary-dark px-5 py-2.5 font-sans text-sm font-bold text-primary-dark transition-colors hover:bg-primary-dark hover:text-cream disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary-dark px-3 py-1.5 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
                   >
-                    <Icon name="table" className="text-base" />
+                    <Icon name="table" className="text-sm" />
                     Export CSV
                   </button>
                 </div>
               </section>
 
               <section className={`${panelClass} border-red-200/60`}>
-                <h3 className="font-serif text-xl font-bold text-primary-dark">Soft Reset</h3>
+                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Soft Reset</h3>
                 <p className="mt-1 font-sans text-sm text-taupe">
                   Archive your current cycle and begin a fresh savings mandate. Export your statement first —
                   soft reset will be available in a future release.
@@ -790,7 +839,7 @@ function SettingsPage({
             <section className={panelClass}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h3 className="font-serif text-xl font-bold text-primary-dark">Trash</h3>
+                  <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Trash</h3>
                   <p className="mt-1 font-sans text-sm text-taupe">
                     Deleted goals are kept here until you restore them or empty the trash.
                   </p>
@@ -799,7 +848,7 @@ function SettingsPage({
                   type="button"
                   onClick={handleEmptyTrash}
                   disabled={!trashGoals.length || trashActionId === 'empty'}
-                  className="rounded-md border border-red-200 px-4 py-2 font-sans text-xs font-semibold uppercase tracking-wider text-red-700 transition-colors hover:bg-red-50 disabled:opacity-40"
+                  className="rounded-md border border-red-200 px-4 py-2 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-red-700 transition-colors hover:bg-red-50 disabled:opacity-40"
                 >
                   {trashActionId === 'empty' ? 'Emptying…' : 'Empty Trash'}
                 </button>
@@ -810,7 +859,7 @@ function SettingsPage({
               ) : trashGoals.length === 0 ? (
                 <div className="mt-6 rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center">
                   <Icon name="delete" className="text-3xl text-taupe/40" />
-                  <p className="mt-2 font-serif text-lg font-bold text-primary-dark">Trash is empty</p>
+                  <p className="mt-2 font-serif text-lg font-light tracking-[-0.015em] text-primary-dark">Trash is empty</p>
                   <p className="mt-1 font-sans text-sm text-taupe">
                     When you delete a goal, it will appear here.
                   </p>
@@ -823,17 +872,17 @@ function SettingsPage({
                       className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="min-w-0">
-                        <p className="truncate font-serif text-lg font-bold text-primary-dark">
+                        <p className="truncate font-serif text-lg font-light tracking-[-0.015em] text-primary-dark">
                           {goal.name}
                         </p>
                         <p className="mt-0.5 font-sans text-xs text-taupe">
                           Saved{' '}
-                          <span className="font-money font-semibold text-primary-dark">
+                          <span className="font-money font-light text-primary-dark">
                             {formatMoney(goal.saved_amount, currency, currencySymbol)}
                           </span>
                           {' · '}
                           Target{' '}
-                          <span className="font-money font-semibold text-primary-dark">
+                          <span className="font-money font-light text-primary-dark">
                             {formatMoney(goal.target_amount, currency, currencySymbol)}
                           </span>
                           {goal.deleted_at && (
@@ -849,7 +898,7 @@ function SettingsPage({
                           type="button"
                           onClick={() => handleRestoreGoal(goal.goal_id)}
                           disabled={trashActionId === goal.goal_id}
-                          className="rounded-md bg-primary-dark px-3 py-1.5 font-sans text-xs font-semibold uppercase tracking-wider text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-50"
+                          className="rounded-md bg-primary-dark px-3 py-1.5 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-50"
                         >
                           Restore
                         </button>
@@ -857,7 +906,7 @@ function SettingsPage({
                           type="button"
                           onClick={() => handlePermanentDelete(goal.goal_id, goal.name)}
                           disabled={trashActionId === goal.goal_id}
-                          className="rounded-md border border-red-200 px-3 py-1.5 font-sans text-xs font-semibold uppercase tracking-wider text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
+                          className="rounded-md border border-red-200 px-3 py-1.5 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
                         >
                           Delete Forever
                         </button>
@@ -878,6 +927,19 @@ function SettingsPage({
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(confirmDialog)}
+        title={confirmDialog?.title || ''}
+        message={confirmDialog?.message || ''}
+        confirmLabel={confirmDialog?.confirmLabel || 'Confirm'}
+        tone="danger"
+        loading={Boolean(trashActionId)}
+        onConfirm={executeConfirmDialog}
+        onCancel={() => {
+          if (!trashActionId) setConfirmDialog(null);
+        }}
+      />
     </div>
   );
 }

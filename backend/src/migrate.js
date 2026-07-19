@@ -68,12 +68,25 @@ const migrations = [
      ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`,
   `CREATE INDEX IF NOT EXISTS idx_saving_goals_deleted_at
      ON saving_goals(user_id, deleted_at)`,
+  // Repair goals whose transaction net went negative (orphaned overdrafts)
+  // so saved_amount stays within CHECK (saved_amount >= 0).
+  `UPDATE saving_goals g
+     SET saved_amount = GREATEST(
+       0,
+       COALESCE((
+         SELECT SUM(CASE WHEN type = 'deposit' THEN amount ELSE -amount END)
+         FROM transactions t
+         WHERE t.goal_id = g.goal_id
+       ), 0)
+     )`,
 ];
 
 const runMigrations = async () => {
   for (const sql of migrations) {
     await pool.query(sql);
   }
+
+  await repairOverdraftedGoalTransactions();
 
   await pool.query(`
     UPDATE users u
@@ -91,6 +104,75 @@ const runMigrations = async () => {
     await pool.query(
       `UPDATE users SET is_admin = true WHERE LOWER(email) = LOWER($1)`,
       [promoteEmail]
+    );
+  }
+};
+
+/**
+ * Earlier bugs inserted withdrawals even when the saved_amount update failed,
+ * leaving goals with a negative transaction net. Remove newest withdrawals
+ * until each goal's balance is non-negative, then resync saved_amount.
+ */
+const repairOverdraftedGoalTransactions = async () => {
+  const overdrafted = await pool.query(`
+    SELECT g.goal_id
+    FROM saving_goals g
+    LEFT JOIN transactions t ON t.goal_id = g.goal_id
+    GROUP BY g.goal_id
+    HAVING COALESCE(
+      SUM(CASE WHEN t.type = 'deposit' THEN t.amount ELSE -t.amount END),
+      0
+    ) < 0
+  `);
+
+  for (const { goal_id: goalId } of overdrafted.rows) {
+    const txs = await pool.query(
+      `
+        SELECT transaction_id, amount, type
+        FROM transactions
+        WHERE goal_id = $1
+        ORDER BY created_at DESC, transaction_id DESC
+      `,
+      [goalId]
+    );
+
+    let netResult = await pool.query(
+      `
+        SELECT COALESCE(
+          SUM(CASE WHEN type = 'deposit' THEN amount ELSE -amount END),
+          0
+        )::numeric AS net
+        FROM transactions
+        WHERE goal_id = $1
+      `,
+      [goalId]
+    );
+    let net = Number.parseFloat(netResult.rows[0].net);
+
+    for (const tx of txs.rows) {
+      if (net >= 0) break;
+      if (tx.type !== 'withdrawal') continue;
+
+      await pool.query(`DELETE FROM transactions WHERE transaction_id = $1`, [
+        tx.transaction_id,
+      ]);
+      net += Number.parseFloat(tx.amount);
+    }
+
+    await pool.query(
+      `
+        UPDATE saving_goals
+        SET saved_amount = GREATEST(
+          0,
+          COALESCE((
+            SELECT SUM(CASE WHEN type = 'deposit' THEN amount ELSE -amount END)
+            FROM transactions
+            WHERE goal_id = $1
+          ), 0)
+        )
+        WHERE goal_id = $1
+      `,
+      [goalId]
     );
   }
 };

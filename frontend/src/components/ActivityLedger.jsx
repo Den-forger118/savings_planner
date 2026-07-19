@@ -1,11 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import Pagination from './Pagination';
 import { formatMoney } from '../utils/currency';
+import { getFriendlyError } from '../utils/friendlyError';
+import ErrorBanner from './ErrorBanner';
 
 const parseAmount = (value) => parseFloat(value) || 0;
 
-const formatDate = (dateString) => {
+const startOfDay = (date) => {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next.getTime();
+};
+
+const formatDayLabel = (dateString) => {
+  const date = new Date(dateString);
+  const today = startOfDay(new Date());
+  const target = startOfDay(date);
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  if (target === today) return 'Today';
+  if (target === today - dayMs) return 'Yesterday';
+
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
+  });
+};
+
+const formatTime = (dateString) => {
+  return new Date(dateString).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+const formatExportDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -13,13 +45,25 @@ const formatDate = (dateString) => {
   });
 };
 
-const TypeBadge = ({ type }) => (
-  <span className={`rounded-full px-2.5 py-0.5 font-sans text-[10px] font-bold uppercase ${
-    type === 'deposit' ? 'bg-primary-dark text-cream' : 'bg-red-100 text-red-800'
-  }`}>
-    {type}
-  </span>
-);
+const groupTransactionsByDay = (transactions) => {
+  const groups = [];
+  const indexByKey = new Map();
+
+  transactions.forEach((tx) => {
+    const key = startOfDay(tx.created_at);
+    if (!indexByKey.has(key)) {
+      indexByKey.set(key, groups.length);
+      groups.push({
+        key,
+        label: formatDayLabel(tx.created_at),
+        items: [],
+      });
+    }
+    groups[indexByKey.get(key)].items.push(tx);
+  });
+
+  return groups;
+};
 
 function ActivityLedger({
   userId,
@@ -33,11 +77,15 @@ function ActivityLedger({
   const [transactions, setTransactions] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [exportError, setExportError] = useState(null);
   const [goalFilter, setGoalFilter] = useState(initialGoalFilter);
+  const [typeFilter, setTypeFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
+  const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
     setGoalFilter(initialGoalFilter);
@@ -50,6 +98,7 @@ function ActivityLedger({
 
   const fetchLedger = async () => {
     setLoading(true);
+    setError(null);
 
     try {
       const params = new URLSearchParams({
@@ -69,8 +118,9 @@ function ActivityLedger({
       const response = await api.get(`/transactions?${params.toString()}`);
       setTransactions(response.data.transactions || []);
       setPagination(response.data.pagination || null);
+      setExpandedId(null);
     } catch (err) {
-      console.error('Error fetching activity ledger:', err);
+      setError(getFriendlyError(err, 'We couldn’t load your activity ledger. Please try again.'));
       setTransactions([]);
       setPagination(null);
     } finally {
@@ -78,13 +128,30 @@ function ActivityLedger({
     }
   };
 
+  const filteredTransactions = useMemo(() => {
+    if (typeFilter === 'all') return transactions;
+    return transactions.filter((tx) => tx.type === typeFilter);
+  }, [transactions, typeFilter]);
+
+  const dayGroups = useMemo(
+    () => groupTransactionsByDay(filteredTransactions),
+    [filteredTransactions]
+  );
+
   const handleSearchSubmit = (event) => {
     event.preventDefault();
     setPage(1);
     setSearch(searchInput);
   };
 
+  const handleFilterToGoal = (goalId) => {
+    if (!goalId) return;
+    setGoalFilter(String(goalId));
+    setPage(1);
+  };
+
   const handleExport = async () => {
+    setExportError(null);
     try {
       const params = new URLSearchParams({
         userId: String(userId),
@@ -112,17 +179,21 @@ function ActivityLedger({
         currentPage += 1;
       } while (currentPage <= totalPages);
 
-      if (allRows.length === 0) {
+      const exportRows = typeFilter === 'all'
+        ? allRows
+        : allRows.filter((tx) => tx.type === typeFilter);
+
+      if (exportRows.length === 0) {
         return;
       }
 
       const headers = ['Date', 'Goal', 'Description', 'Amount', 'Type', 'Balance'];
-      const rows = allRows.map((tx) => {
+      const rows = exportRows.map((tx) => {
         const amount = parseAmount(tx.amount);
         const signed = tx.type === 'deposit' ? amount : -amount;
 
         return [
-          formatDate(tx.created_at),
+          formatExportDate(tx.created_at),
           tx.goal_name || '',
           tx.note || '',
           signed.toFixed(2),
@@ -143,34 +214,36 @@ function ActivityLedger({
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Error exporting ledger:', err);
+      setExportError(getFriendlyError(err, 'We couldn’t export your ledger. Please try again.'));
     }
   };
+
+  const typeFilters = [
+    { id: 'all', label: 'All' },
+    { id: 'deposit', label: 'Deposits' },
+    { id: 'withdrawal', label: 'Withdrawals' },
+  ];
 
   return (
     <div className="space-y-6">
       <section>
-        <p className="font-sans text-xs font-bold uppercase tracking-widest text-gold">
-          Activity
-        </p>
-        <h2 className="mt-2 font-serif text-4xl font-bold text-primary-dark md:text-5xl">
-          Savings Ledger
-        </h2>
-        <p className="mt-3 max-w-2xl font-sans text-base text-taupe">
-          Full transaction history across all your goals. Filter by goal, search notes, or export your ledger.
+        <p className="eyebrow">Activity</p>
+        <h2 className="page-title">Savings Ledger</h2>
+        <p className="page-lede">
+          A running timeline of deposits and withdrawals across your goals.
         </p>
       </section>
 
-      <section className="rounded-lg border border-cream bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-cream px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
+      <section className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <select
               value={goalFilter}
               onChange={(e) => {
                 setGoalFilter(e.target.value);
                 setPage(1);
               }}
-              className="rounded-lg border border-cream bg-white px-3 py-2 font-sans text-sm focus:border-gold focus:outline-none"
+              className="w-full rounded-lg border border-cream bg-white px-3 py-2.5 font-sans text-sm focus:border-gold focus:outline-none sm:w-auto"
             >
               <option value="all">All goals</option>
               {goals.map((goal) => (
@@ -180,8 +253,8 @@ function ActivityLedger({
               ))}
             </select>
 
-            <form onSubmit={handleSearchSubmit} className="relative">
-              <span className="material-symbols-outlined pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-lg text-taupe">
+            <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-64">
+              <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-lg text-taupe">
                 search
               </span>
               <input
@@ -189,7 +262,7 @@ function ActivityLedger({
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search notes or goals..."
-                className="rounded-lg border border-cream py-2 pl-9 pr-3 font-sans text-sm focus:border-gold focus:outline-none"
+                className="w-full rounded-lg border border-cream py-2.5 pl-9 pr-3 font-sans text-sm focus:border-gold focus:outline-none"
               />
             </form>
           </div>
@@ -198,85 +271,177 @@ function ActivityLedger({
             type="button"
             onClick={handleExport}
             disabled={!pagination?.total_count}
-            className="rounded-lg border-2 border-primary-dark px-4 py-2 font-sans text-xs font-bold uppercase tracking-widest text-primary-dark transition-colors hover:bg-primary-dark hover:text-cream disabled:opacity-40"
+            className="btn-navy w-full disabled:opacity-40 sm:w-auto"
           >
             Export Ledger
           </button>
         </div>
 
-        {loading ? (
-          <div className="px-5 py-10">
-            <p className="font-sans text-sm text-taupe">Loading ledger...</p>
-          </div>
-        ) : transactions.length === 0 ? (
-          <div className="px-5 py-12 text-center">
-            <p className="font-serif text-xl font-bold text-primary-dark">No activity found</p>
-            <p className="mt-2 font-sans text-sm text-taupe">
-              {search || goalFilter !== 'all'
-                ? 'Try adjusting your search or filter.'
-                : 'Record a deposit on any savings goal to build your ledger.'}
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left">
-                <thead>
-                  <tr className="border-b border-cream bg-cream/30">
-                    {['Date', 'Description', 'Amount', 'Type', 'Balance'].map((heading) => (
-                      <th
-                        key={heading}
-                        className="px-5 py-3 font-sans text-[10px] font-bold uppercase tracking-widest text-taupe/70"
-                      >
-                        {heading}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((tx) => {
-                    const isDeposit = tx.type === 'deposit';
-                    const amount = parseAmount(tx.amount);
-                    const description = tx.note?.trim()
-                      ? `${tx.goal_name}: ${tx.note}`
-                      : tx.goal_name;
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Transaction type">
+          {typeFilters.map(({ id, label }) => {
+            const isActive = typeFilter === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTypeFilter(id)}
+                className={`rounded-lg px-3 py-1.5 font-sans text-xs font-medium uppercase tracking-wide transition-colors ${
+                  isActive
+                    ? 'bg-primary-dark text-cream'
+                    : 'border border-cream bg-white text-taupe hover:text-primary-dark'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
 
-                    return (
-                      <tr key={tx.transaction_id} className="border-b border-cream/60 last:border-0">
-                        <td className="px-5 py-3 font-sans text-sm text-taupe">
-                          {formatDate(tx.created_at)}
-                        </td>
-                        <td className="px-5 py-3 font-sans text-sm font-semibold text-primary-dark">
-                          {description}
-                        </td>
-                        <td className={`px-5 py-3 font-money text-sm font-bold ${
-                          isDeposit ? 'text-primary-dark' : 'text-red-700'
-                        }`}>
-                          {isDeposit ? '+' : '−'}{fmt(amount)}
-                        </td>
-                        <td className="px-5 py-3">
-                          <TypeBadge type={tx.type} />
-                        </td>
-                        <td className="px-5 py-3 font-money text-sm text-primary-dark">
-                          {fmt(parseAmount(tx.balance_after))}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+        <div className="surface">
+          {(error || exportError) && (
+            <div className="space-y-2 border-b border-cream px-5 py-4">
+              {error && <ErrorBanner message={error} />}
+              {exportError && <ErrorBanner message={exportError} />}
             </div>
+          )}
+          {loading ? (
+            <div className="px-5 py-10">
+              <p className="font-sans text-sm text-taupe">Loading ledger...</p>
+            </div>
+          ) : dayGroups.length === 0 ? (
+            <div className="px-5 py-12 text-center">
+              <p className="card-title">No activity found</p>
+              <p className="mt-2 font-sans text-sm text-taupe">
+                {search || goalFilter !== 'all' || typeFilter !== 'all'
+                  ? 'Try adjusting your search or filters.'
+                  : 'Record a deposit on any savings goal to build your ledger.'}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="divide-y divide-cream/80">
+                {dayGroups.map((group) => (
+                  <div key={group.key} className="px-4 py-5 sm:px-5">
+                    <div className="mb-4 flex items-center gap-3">
+                      <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+                        {group.label}
+                      </p>
+                      <div className="h-px flex-1 bg-cream" />
+                      <p className="font-sans text-[10px] font-semibold uppercase tracking-wide text-taupe/60">
+                        {group.items.length} {group.items.length === 1 ? 'entry' : 'entries'}
+                      </p>
+                    </div>
 
-            <Pagination
-              pagination={pagination}
-              onPageChange={setPage}
-              onLimitChange={(nextLimit) => {
-                setLimit(nextLimit);
-                setPage(1);
-              }}
-            />
-          </>
-        )}
+                    <ol className="space-y-0">
+                      {group.items.map((tx) => {
+                        const isDeposit = tx.type === 'deposit';
+                        const amount = parseAmount(tx.amount);
+                        const isExpanded = expandedId === tx.transaction_id;
+
+                        return (
+                          <li
+                            key={tx.transaction_id}
+                            className="grid grid-cols-[1rem_minmax(0,1fr)] gap-x-3 pb-5 last:pb-0 sm:grid-cols-[1.125rem_minmax(0,1fr)] sm:gap-x-4"
+                          >
+                            <div className="relative flex justify-center" aria-hidden="true">
+                              <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-primary-dark/15" />
+                              <span
+                                className={`relative z-10 mt-2 h-3.5 w-3.5 shrink-0 rounded-full border-[1.5px] bg-cream sm:h-4 sm:w-4 ${
+                                  isDeposit ? 'border-gold' : 'border-red-400'
+                                }`}
+                              />
+                            </div>
+
+                            <div className="min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedId(isExpanded ? null : tx.transaction_id)}
+                                className="w-full rounded-lg border border-transparent px-1 py-1.5 text-left transition-colors hover:border-cream hover:bg-cream/30 sm:px-2"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                      <p className="truncate font-serif text-base font-light tracking-[-0.015em] text-primary-dark sm:text-lg">
+                                        {tx.goal_name || 'Goal'}
+                                      </p>
+                                      <span className={`font-sans text-[10px] font-normal uppercase tracking-[0.12em] ${
+                                        isDeposit ? 'text-gold' : 'text-red-600'
+                                      }`}>
+                                        {isDeposit ? 'Deposit' : 'Withdrawal'}
+                                      </span>
+                                    </div>
+
+                                    {tx.note?.trim() ? (
+                                      <p className="mt-0.5 line-clamp-2 font-sans text-sm font-light text-taupe">
+                                        {tx.note}
+                                      </p>
+                                    ) : (
+                                      <p className="mt-0.5 font-sans text-sm font-light italic text-taupe/50">
+                                        No note
+                                      </p>
+                                    )}
+
+                                    <p className="mt-1 font-sans text-xs font-light text-taupe/70">
+                                      {formatTime(tx.created_at)}
+                                    </p>
+                                  </div>
+
+                                  <div className="shrink-0 text-right">
+                                    <p className={`font-money text-base font-light tracking-[0.02em] sm:text-lg ${
+                                      isDeposit ? 'text-primary-dark' : 'text-red-700'
+                                    }`}>
+                                      {isDeposit ? '+' : '−'}{fmt(amount)}
+                                    </p>
+                                    <p className="mt-0.5 font-money text-xs font-light text-taupe">
+                                      Bal {fmt(parseAmount(tx.balance_after))}
+                                    </p>
+                                  </div>
+                                </div>
+                              </button>
+
+                              {isExpanded && (
+                                <div className="mt-2 flex flex-wrap gap-2 border-l-2 border-gold/40 pl-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleFilterToGoal(tx.goal_id)}
+                                    className="rounded-lg border border-cream bg-cream/40 px-3 py-1.5 font-sans text-xs font-normal text-primary-dark transition-colors hover:bg-cream"
+                                  >
+                                    View this goal only
+                                  </button>
+                                  {goalFilter !== 'all' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setGoalFilter('all');
+                                        setPage(1);
+                                      }}
+                                      className="rounded-lg border border-cream bg-white px-3 py-1.5 font-sans text-xs font-normal text-taupe transition-colors hover:text-primary-dark"
+                                    >
+                                      Show all goals
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </div>
+                ))}
+              </div>
+
+              <Pagination
+                pagination={pagination}
+                onPageChange={setPage}
+                onLimitChange={(nextLimit) => {
+                  setLimit(nextLimit);
+                  setPage(1);
+                }}
+              />
+            </>
+          )}
+        </div>
       </section>
     </div>
   );

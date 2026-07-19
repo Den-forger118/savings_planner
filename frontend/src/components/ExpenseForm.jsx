@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
+import { getFriendlyError } from '../utils/friendlyError';
+import ErrorBanner from './ErrorBanner';
 
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
@@ -69,7 +71,7 @@ function ExpenseForm({
         }
       } catch (err) {
         console.error('Error fetching categories:', err);
-        setError('Unable to load categories. Please try again.');
+        setError(getFriendlyError(err, 'We couldn’t load your categories. Please try again.'));
       }
     };
 
@@ -109,16 +111,14 @@ function ExpenseForm({
       onExpenseAdded(response.data.expense);
       closeModal();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to log expense');
+      setError(getFriendlyError(err, 'We couldn’t log that expense. Please try again.'));
     } finally {
       setLoading(false);
     }
   };
 
   const triggerClass =
-    variant === 'discrete'
-      ? 'inline-flex items-center justify-center gap-2 rounded-lg bg-primary-dark px-4 py-2 font-sans text-sm font-medium text-cream transition-colors hover:bg-primary-dark-alt'
-      : 'inline-flex items-center justify-center gap-2 rounded-lg bg-gold px-5 py-3 font-sans text-xs font-bold uppercase tracking-widest text-primary-dark shadow-sm transition-colors hover:bg-gold-light';
+    'inline-flex items-center justify-center gap-2 rounded-lg bg-primary-dark px-4 py-2.5 font-sans text-[11px] font-normal uppercase tracking-[0.14em] text-cream transition-colors hover:bg-primary-dark-alt';
 
   return (
     <>
@@ -127,7 +127,7 @@ function ExpenseForm({
         onClick={() => setIsOpen(true)}
         className={`${triggerClass} ${className}`}
       >
-        <Icon name="receipt_long" className={variant === 'discrete' ? 'text-base text-cream/80' : 'text-lg'} />
+        <Icon name="receipt_long" className="text-base text-cream/80" />
         Log Expense
       </button>
 
@@ -149,10 +149,10 @@ function ExpenseForm({
             <div className="bg-primary-dark px-5 py-3.5 text-cream">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-gold">
+                  <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
                     Capital Outflow
                   </p>
-                  <h2 id="log-expense-title" className="mt-0.5 font-serif text-xl font-bold leading-tight">
+                  <h2 id="log-expense-title" className="mt-0.5 font-serif text-xl font-light tracking-[-0.015em] leading-tight">
                     Log an Expense
                   </h2>
                 </div>
@@ -160,7 +160,7 @@ function ExpenseForm({
                   type="button"
                   onClick={closeModal}
                   aria-label="Close"
-                  className="rounded-md border-2 border-cream/40 p-1 text-cream/80 transition-colors hover:border-cream/70 hover:bg-cream/10 hover:text-cream"
+                  className="p-1 text-cream/80 transition-colors hover:bg-cream/10 hover:text-cream"
                 >
                   <Icon name="close" className="text-lg" />
                 </button>
@@ -171,7 +171,7 @@ function ExpenseForm({
               <div>
                 <label
                   htmlFor="expense-category"
-                  className="mb-1.5 block font-sans text-[10px] font-bold uppercase tracking-widest text-taupe"
+                  className="mb-1.5 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe"
                 >
                   Category
                 </label>
@@ -198,12 +198,12 @@ function ExpenseForm({
               <div>
                 <label
                   htmlFor="expense-amount"
-                  className="mb-1.5 block font-sans text-[10px] font-bold uppercase tracking-widest text-taupe"
+                  className="mb-1.5 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe"
                 >
                   Amount
                 </label>
                 <div className="flex items-center gap-2">
-                  <span className="font-money text-lg font-bold text-primary-dark">{currencySymbol}</span>
+                  <span className="font-money text-lg font-light tracking-[0.02em] text-primary-dark">{currencySymbol}</span>
                   <input
                     id="expense-amount"
                     type="number"
@@ -222,7 +222,7 @@ function ExpenseForm({
               <div>
                 <label
                   htmlFor="expense-date"
-                  className="mb-1.5 block font-sans text-[10px] font-bold uppercase tracking-widest text-taupe"
+                  className="mb-1.5 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe"
                 >
                   Date
                 </label>
@@ -239,7 +239,7 @@ function ExpenseForm({
               <div>
                 <label
                   htmlFor="expense-note"
-                  className="mb-1.5 block font-sans text-[10px] font-bold uppercase tracking-widest text-taupe"
+                  className="mb-1.5 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe"
                 >
                   Note <span className="font-normal normal-case tracking-normal text-taupe/70">(optional)</span>
                 </label>
@@ -254,25 +254,21 @@ function ExpenseForm({
                 />
               </div>
 
-              {error && (
-                <div className="rounded-md border-l-2 border-red-500 bg-red-50 px-3 py-2">
-                  <p className="font-sans text-xs text-red-700">{error}</p>
-                </div>
-              )}
+              {error && <ErrorBanner message={error} />}
 
               <div className="flex flex-col-reverse gap-2 border-t border-gray-100 pt-3.5 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={loading}
-                  className="rounded-md border border-gray-200 px-4 py-2 font-sans text-xs font-semibold uppercase tracking-wider text-taupe transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                  className="rounded-md border border-gray-200 px-4 py-2 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-taupe transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading || categories.length === 0}
-                  className="rounded-md bg-primary-dark px-4 py-2 font-sans text-xs font-semibold uppercase tracking-wider text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-50"
+                  className="rounded-md bg-primary-dark px-4 py-2 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-50"
                 >
                   {loading ? 'Logging...' : 'Log Expense'}
                 </button>

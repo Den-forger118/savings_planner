@@ -1,5 +1,10 @@
-import { useState, useImperativeHandle, forwardRef } from 'react';
+import { useState, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
 import api from '../services/api';
+import { getFriendlyError } from '../utils/friendlyError';
+import ConfirmDialog from './ConfirmDialog';
+import ErrorBanner from './ErrorBanner';
+
+const PANEL_DURATION_MS = 320;
 
 const getTodayInputValue = () => new Date().toISOString().slice(0, 10);
 
@@ -24,6 +29,9 @@ const GoalActions = forwardRef(function GoalActions(
   const goalId = goal.goal_id;
   const [internalEditing, setInternalEditing] = useState(false);
   const isEditing = controlledEditing !== undefined ? controlledEditing : internalEditing;
+  const [showForm, setShowForm] = useState(false);
+  const [formExpanded, setFormExpanded] = useState(false);
+  const closeTimerRef = useRef(null);
 
   const setIsEditing = (value) => {
     if (onEditingChange) {
@@ -39,6 +47,40 @@ const GoalActions = forwardRef(function GoalActions(
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  useEffect(() => () => {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isEditing) {
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+
+      setShowForm(true);
+      const frame = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setFormExpanded(true));
+      });
+
+      return () => window.cancelAnimationFrame(frame);
+    }
+
+    setFormExpanded(false);
+
+    if (showForm) {
+      closeTimerRef.current = window.setTimeout(() => {
+        setShowForm(false);
+        closeTimerRef.current = null;
+      }, PANEL_DURATION_MS);
+    }
+
+    return undefined;
+  }, [isEditing, showForm]);
 
   const resetForm = () => {
     setFormData({
@@ -49,12 +91,18 @@ const GoalActions = forwardRef(function GoalActions(
     setError(null);
   };
 
+  const closeEdit = () => {
+    resetForm();
+    setIsEditing(false);
+  };
+
   const handleEditToggle = () => {
     if (isEditing) {
-      resetForm();
+      closeEdit();
+      return;
     }
 
-    setIsEditing(open => !open);
+    setIsEditing(true);
   };
 
   const handleChange = (e) => {
@@ -96,25 +144,27 @@ const GoalActions = forwardRef(function GoalActions(
       onGoalUpdated(response.data.goals || [response.data.goal]);
       setIsEditing(false);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to update goal');
+      setError(getFriendlyError(err, 'We couldn’t update that goal. Please try again.'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!window.confirm('Move this goal to Trash? You can restore it later from Settings → Trash.')) {
-      return;
-    }
+  const handleDelete = () => {
+    setDeleteConfirmOpen(true);
+  };
 
+  const confirmDelete = async () => {
     setLoading(true);
     setError(null);
 
     try {
       const response = await api.delete(`/goals/${goalId}`);
+      setDeleteConfirmOpen(false);
       onGoalDeleted(response.data.goals);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to delete goal');
+      setDeleteConfirmOpen(false);
+      setError(getFriendlyError(err, 'We couldn’t move that goal to trash. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -122,110 +172,118 @@ const GoalActions = forwardRef(function GoalActions(
 
   useImperativeHandle(ref, () => ({
     startEdit: () => setIsEditing(true),
-    cancelEdit: () => {
-      resetForm();
-      setIsEditing(false);
-    },
+    cancelEdit: closeEdit,
     deleteGoal: handleDelete,
   }));
 
-  if (hideActionButtons && !isEditing && !error) {
-    return null;
+  const deleteDialog = (
+    <ConfirmDialog
+      open={deleteConfirmOpen}
+      title={`Move "${goal.name}" to Trash?`}
+      message="You can restore it later from Settings → Trash."
+      confirmLabel="Move to Trash"
+      tone="danger"
+      loading={loading && deleteConfirmOpen}
+      onConfirm={confirmDelete}
+      onCancel={() => {
+        if (!loading) setDeleteConfirmOpen(false);
+      }}
+    />
+  );
+
+  if (hideActionButtons && !showForm && !error) {
+    return deleteDialog;
   }
 
   return (
     <div className={`space-y-4 ${hideActionButtons ? '' : 'border-t border-gray-200 pt-4'}`}>
-      {isEditing && (
-        <form onSubmit={handleUpdate} className="space-y-4 rounded-lg bg-cream/70 p-4">
-          <div>
-            <label className="mb-2 block font-sans text-xs font-bold uppercase tracking-widest text-taupe">
-              Goal Name
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 font-sans text-sm transition-colors focus:border-gold focus:outline-none"
-            />
+      {showForm && (
+        <div className={`goal-edit-panel ${formExpanded ? 'is-open' : ''}`}>
+          <div className="goal-edit-panel-inner">
+            <form onSubmit={handleUpdate} className="space-y-4 rounded-lg bg-cream/70 p-4">
+              <div>
+                <label className="mb-2 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                  Goal Name
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 font-sans text-sm transition-colors focus:border-gold focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                  Target Amount ({currencySymbol})
+                </label>
+                <input
+                  type="number"
+                  name="targetAmount"
+                  value={formData.targetAmount}
+                  onChange={handleChange}
+                  min="0.01"
+                  step="0.01"
+                  className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 font-sans text-sm transition-colors focus:border-gold focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                  Deadline
+                </label>
+                <input
+                  type="date"
+                  name="deadline"
+                  value={formData.deadline}
+                  onChange={handleChange}
+                  min={getTodayInputValue()}
+                  className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 font-sans text-sm transition-colors focus:border-gold focus:outline-none"
+                />
+              </div>
+
+              {error && <ErrorBanner message={error} />}
+
+              {hideActionButtons ? (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleEditToggle}
+                    className="flex-1 rounded-lg bg-gray-100 px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark transition-colors hover:bg-gray-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 rounded-lg bg-gold px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
+                  >
+                    {loading ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-lg bg-gold px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
+                >
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              )}
+            </form>
           </div>
-
-          <div>
-            <label className="mb-2 block font-sans text-xs font-bold uppercase tracking-widest text-taupe">
-              Target Amount ({currencySymbol})
-            </label>
-            <input
-              type="number"
-              name="targetAmount"
-              value={formData.targetAmount}
-              onChange={handleChange}
-              min="0.01"
-              step="0.01"
-              className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 font-sans text-sm transition-colors focus:border-gold focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block font-sans text-xs font-bold uppercase tracking-widest text-taupe">
-              Deadline
-            </label>
-            <input
-              type="date"
-              name="deadline"
-              value={formData.deadline}
-              onChange={handleChange}
-              min={getTodayInputValue()}
-              className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 font-sans text-sm transition-colors focus:border-gold focus:outline-none"
-            />
-          </div>
-
-          {error && (
-            <div className="rounded border-l-4 border-red-500 bg-red-50 p-3">
-              <p className="font-sans text-sm text-red-700">{error}</p>
-            </div>
-          )}
-
-          {hideActionButtons ? (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleEditToggle}
-                className="flex-1 rounded-lg bg-gray-100 px-4 py-3 font-sans text-xs font-bold uppercase tracking-widest text-primary-dark transition-colors hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 rounded-lg bg-gold px-4 py-3 font-sans text-xs font-bold uppercase tracking-widest text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
-              >
-                {loading ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          ) : (
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-gold px-4 py-3 font-sans text-xs font-bold uppercase tracking-widest text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
-            >
-              {loading ? 'Saving...' : 'Save Changes'}
-            </button>
-          )}
-        </form>
-      )}
-
-      {!isEditing && error && (
-        <div className="rounded border-l-4 border-red-500 bg-red-50 p-3">
-          <p className="font-sans text-sm text-red-700">{error}</p>
         </div>
       )}
+
+      {!isEditing && error && <ErrorBanner message={error} />}
 
       {!hideActionButtons && (
         <div className="flex gap-2">
           <button
             type="button"
             onClick={handleEditToggle}
-            className="flex-1 rounded-lg bg-gray-100 px-3 py-2 font-sans text-sm font-semibold text-primary-dark transition-colors hover:bg-gray-200"
+            className="flex-1 rounded-lg bg-gray-100 px-3 py-2 font-sans text-sm font-normal text-primary-dark transition-colors hover:bg-gray-200"
           >
             {isEditing ? 'Cancel' : 'Edit'}
           </button>
@@ -233,12 +291,14 @@ const GoalActions = forwardRef(function GoalActions(
             type="button"
             onClick={handleDelete}
             disabled={loading}
-            className="flex-1 rounded-lg bg-red-100 px-3 py-2 font-sans text-sm font-semibold text-red-800 transition-colors hover:bg-red-200 disabled:opacity-50"
+            className="flex-1 rounded-lg bg-red-100 px-3 py-2 font-sans text-sm font-normal text-red-800 transition-colors hover:bg-red-200 disabled:opacity-50"
           >
             {loading ? 'Deleting...' : 'Delete'}
           </button>
         </div>
       )}
+
+      {deleteDialog}
     </div>
   );
 });

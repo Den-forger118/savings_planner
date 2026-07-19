@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
+import { getFriendlyError } from '../utils/friendlyError';
+import ErrorBanner from './ErrorBanner';
 
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
@@ -80,7 +82,7 @@ function CreateGoalForm({
       onGoalCreated(response.data.goal);
       closeModal();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create goal');
+      setError(getFriendlyError(err, 'We couldn’t create that goal. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -88,8 +90,8 @@ function CreateGoalForm({
 
   const triggerClass =
     variant === 'discrete'
-      ? 'inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary-dark px-4 font-sans text-sm font-medium text-cream transition-colors hover:bg-primary-dark-alt'
-      : 'inline-flex items-center justify-center gap-2 rounded-lg bg-gold px-5 py-3 font-sans text-xs font-bold uppercase tracking-widest text-primary-dark shadow-sm transition-colors hover:bg-gold-light';
+      ? 'btn-navy h-10'
+      : 'btn-navy';
 
   return (
     <>
@@ -98,7 +100,7 @@ function CreateGoalForm({
         onClick={() => setIsOpen(true)}
         className={`${triggerClass} ${className}`}
       >
-        <Icon name="add" className={variant === 'discrete' ? 'text-base text-cream/80' : 'text-lg'} />
+        <Icon name="add" className="text-base text-cream/80" />
         New Goal
       </button>
 
@@ -108,22 +110,22 @@ function CreateGoalForm({
           role="presentation"
           onClick={closeModal}
         >
-          <div className="absolute inset-0 bg-primary-dark/40 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" />
 
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="create-goal-title"
-            className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl"
+            className="modal-shell"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="bg-primary-dark px-5 py-3.5 text-cream">
+            <div className="modal-header">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-gold">
+                  <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
                     New Objective
                   </p>
-                  <h2 id="create-goal-title" className="mt-0.5 font-serif text-xl font-bold leading-tight">
+                  <h2 id="create-goal-title" className="mt-0.5 font-serif text-xl font-light leading-tight">
                     Create a Goal
                   </h2>
                 </div>
@@ -131,19 +133,16 @@ function CreateGoalForm({
                   type="button"
                   onClick={closeModal}
                   aria-label="Close"
-                  className="rounded-md border-2 border-cream/40 p-1 text-cream/80 transition-colors hover:border-cream/70 hover:bg-cream/10 hover:text-cream"
+                  className="p-1 text-cream/80 transition-colors hover:bg-cream/10 hover:text-cream"
                 >
                   <Icon name="close" className="text-lg" />
                 </button>
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3.5 px-5 py-4">
+            <form onSubmit={handleSubmit} className="space-y-3.5 px-5 py-5">
               <div>
-                <label
-                  htmlFor="goal-name"
-                  className="mb-1.5 block font-sans text-[10px] font-bold uppercase tracking-widest text-taupe"
-                >
+                <label htmlFor="goal-name" className="field-label">
                   Goal Name
                 </label>
                 <input
@@ -154,19 +153,16 @@ function CreateGoalForm({
                   onChange={handleChange}
                   placeholder="e.g., Summer Vacation, Car Down Payment"
                   autoFocus
-                  className="w-full rounded-md border border-gray-200 px-3 py-2 font-sans text-sm transition-colors focus:border-primary-dark focus:outline-none"
+                  className="field"
                 />
               </div>
 
               <div>
-                <label
-                  htmlFor="goal-amount"
-                  className="mb-1.5 block font-sans text-[10px] font-bold uppercase tracking-widest text-taupe"
-                >
+                <label htmlFor="goal-amount" className="field-label">
                   Target Amount
                 </label>
                 <div className="flex items-center gap-2">
-                  <span className="font-money text-lg font-bold text-primary-dark">{currencySymbol}</span>
+                  <span className="font-money text-lg font-light tracking-[0.02em] text-primary-dark">{currencySymbol}</span>
                   <input
                     id="goal-amount"
                     type="number"
@@ -176,16 +172,13 @@ function CreateGoalForm({
                     placeholder="5000.00"
                     step="0.01"
                     min="0"
-                    className="w-full rounded-md border border-gray-200 px-3 py-2 font-sans text-sm transition-colors focus:border-primary-dark focus:outline-none"
+                    className="field"
                   />
                 </div>
               </div>
 
               <div>
-                <label
-                  htmlFor="goal-deadline"
-                  className="mb-1.5 block font-sans text-[10px] font-bold uppercase tracking-widest text-taupe"
-                >
+                <label htmlFor="goal-deadline" className="field-label">
                   Target Deadline
                 </label>
                 <input
@@ -194,29 +187,25 @@ function CreateGoalForm({
                   name="deadline"
                   value={formData.deadline}
                   onChange={handleChange}
-                  className="w-full rounded-md border border-gray-200 px-3 py-2 font-sans text-sm transition-colors focus:border-primary-dark focus:outline-none"
+                  className="field"
                 />
               </div>
 
-              {error && (
-                <div className="rounded-md border-l-2 border-red-500 bg-red-50 px-3 py-2">
-                  <p className="font-sans text-xs text-red-700">{error}</p>
-                </div>
-              )}
+              {error && <ErrorBanner message={error} />}
 
-              <div className="flex flex-col-reverse gap-2 border-t border-gray-100 pt-3.5 sm:flex-row sm:justify-end">
+              <div className="flex flex-col-reverse gap-2 border-t border-primary-dark/[0.08] pt-4 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={loading}
-                  className="rounded-md border border-gray-200 px-4 py-2 font-sans text-xs font-semibold uppercase tracking-wider text-taupe transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                  className="btn-ghost"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="rounded-md bg-primary-dark px-4 py-2 font-sans text-xs font-semibold uppercase tracking-wider text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-50"
+                  className="btn-primary"
                 >
                   {loading ? 'Creating...' : 'Create Goal'}
                 </button>

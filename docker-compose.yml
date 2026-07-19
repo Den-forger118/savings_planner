@@ -25,7 +25,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: savings_planner_backend
     environment:
       PORT: 5001
@@ -49,20 +49,64 @@ services:
     networks:
       - savings_network
     restart: unless-stopped
+    develop:
+      watch:
+        # App code → copy into container; nodemon restarts the API
+        - path: ./backend/src
+          action: sync
+          target: /app/src
+          initial_sync: true
+        # Dependency changes need a full image rebuild
+        - path: ./backend/package.json
+          action: rebuild
+        - path: ./backend/package-lock.json
+          action: rebuild
+        - path: ./backend/Dockerfile.dev
+          action: rebuild
 
   # ─── React Frontend ────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: savings_planner_frontend
+    environment:
+      REACT_APP_API_URL: http://localhost:5001/api
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      WDS_SOCKET_PORT: "0"
     ports:
-      - "8080:80"
+      - "8080:3000"
     depends_on:
       - backend
     networks:
       - savings_network
     restart: unless-stopped
+    develop:
+      watch:
+        # Source / public → sync; CRA hot-reloads in the browser
+        - path: ./frontend/src
+          action: sync
+          target: /app/src
+          initial_sync: true
+        - path: ./frontend/public
+          action: sync
+          target: /app/public
+          initial_sync: true
+        # Tailwind / PostCSS config → sync then restart CRA
+        - path: ./frontend/tailwind.config.js
+          action: sync+restart
+          target: /app/tailwind.config.js
+        - path: ./frontend/postcss.config.js
+          action: sync+restart
+          target: /app/postcss.config.js
+        # Dependency / Dockerfile changes need a rebuild
+        - path: ./frontend/package.json
+          action: rebuild
+        - path: ./frontend/package-lock.json
+          action: rebuild
+        - path: ./frontend/Dockerfile.dev
+          action: rebuild
 
 # ─── Volumes ──────────────────────────────────────────────────
 volumes:

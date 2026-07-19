@@ -37,7 +37,7 @@ function Pagination({
             type="button"
             onClick={() => onPageChange(page - 1)}
             disabled={!has_prev}
-            className="rounded border border-cream px-3 py-1.5 font-sans text-xs font-semibold text-primary-dark transition-colors hover:bg-cream/50 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded border border-cream px-3 py-1.5 font-sans text-xs font-normal text-primary-dark transition-colors hover:bg-cream/50 disabled:cursor-not-allowed disabled:opacity-40"
           >
             ‹ Prev
           </button>
@@ -48,7 +48,7 @@ function Pagination({
             type="button"
             onClick={() => onPageChange(page + 1)}
             disabled={!has_next}
-            className="rounded border border-cream px-3 py-1.5 font-sans text-xs font-semibold text-primary-dark transition-colors hover:bg-cream/50 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded border border-cream px-3 py-1.5 font-sans text-xs font-normal text-primary-dark transition-colors hover:bg-cream/50 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Next ›
           </button>
