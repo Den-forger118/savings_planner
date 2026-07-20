@@ -1,22 +1,25 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { getFriendlyError } from '../utils/friendlyError';
 import ErrorBanner from './ErrorBanner';
+import { PATHS } from '../utils/paths';
 
-function RegisterPage({ onRegister, onSwitchToLogin }) {
+function RegisterPage({ onRegister }) {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -40,12 +43,17 @@ function RegisterPage({ onRegister, onSwitchToLogin }) {
         first_name: formData.first_name,
         last_name: formData.last_name,
         email: formData.email,
-        password: formData.password
+        password: formData.password,
       });
 
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       onRegister(response.data.user, response.data.token);
+      const next =
+        response.data.user.onboarding_complete === false
+          ? PATHS.onboarding
+          : PATHS.dashboard;
+      navigate(next, { replace: true });
     } catch (err) {
       setError(getFriendlyError(err, 'We couldn’t create your account. Please try again.'));
     } finally {
@@ -57,22 +65,18 @@ function RegisterPage({ onRegister, onSwitchToLogin }) {
     <div className="page-canvas flex min-h-screen items-center justify-center px-4 py-12">
       <div className="relative z-10 w-full max-w-[440px]">
         <div className="mb-10 text-center">
-          <h1 className="font-engraved text-5xl text-primary-dark md:text-6xl">
-            QUANT
-          </h1>
-          <p className="mt-3 font-sans text-[10px] font-normal uppercase tracking-[0.18em] text-gold">
+          <h1 className="font-engraved text-5xl text-primary-dark md:text-6xl">QUANT</h1>
+          <p className="mt-3 font-sans text-xs font-normal uppercase tracking-[0.14em] text-gold">
             Private Savings Intelligence
           </p>
         </div>
 
         <div className="surface overflow-hidden">
           <div className="border-b border-primary-dark/[0.06] bg-navy-sheen px-7 py-5 text-cream">
-            <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
               Open Account
             </p>
-            <h2 className="mt-1 font-serif text-3xl font-light tracking-[-0.025em]">
-              Get started
-            </h2>
+            <h2 className="mt-1 font-serif text-3xl font-light tracking-[-0.025em]">Get started</h2>
           </div>
 
           <div className="px-7 py-7">
@@ -144,19 +148,19 @@ function RegisterPage({ onRegister, onSwitchToLogin }) {
 
               {error && <ErrorBanner message={error} />}
 
-              <button type="submit" disabled={loading} className="btn-accent mt-2 w-full py-3">
+              <button type="submit" disabled={loading} className="btn-navy mt-2 w-full py-3 text-white">
                 {loading ? 'Creating Account...' : 'Create Account'}
               </button>
             </form>
 
             <p className="mt-6 text-center font-sans text-sm text-taupe">
               Already have an account?{' '}
-              <button
-                onClick={onSwitchToLogin}
+              <Link
+                to={PATHS.login}
                 className="font-normal text-primary-dark underline decoration-gold/50 underline-offset-4 transition-colors hover:text-gold"
               >
                 Sign in
-              </button>
+              </Link>
             </p>
           </div>
         </div>

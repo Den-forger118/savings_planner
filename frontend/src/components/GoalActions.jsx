@@ -161,7 +161,9 @@ const GoalActions = forwardRef(function GoalActions(
     try {
       const response = await api.delete(`/goals/${goalId}`);
       setDeleteConfirmOpen(false);
-      onGoalDeleted(response.data.goals);
+      window.requestAnimationFrame(() => {
+        onGoalDeleted(response.data.goals);
+      });
     } catch (err) {
       setDeleteConfirmOpen(false);
       setError(getFriendlyError(err, 'We couldn’t move that goal to trash. Please try again.'));
@@ -202,7 +204,7 @@ const GoalActions = forwardRef(function GoalActions(
           <div className="goal-edit-panel-inner">
             <form onSubmit={handleUpdate} className="space-y-4 rounded-lg bg-cream/70 p-4">
               <div>
-                <label className="mb-2 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                <label className="mb-2 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                   Goal Name
                 </label>
                 <input
@@ -215,7 +217,7 @@ const GoalActions = forwardRef(function GoalActions(
               </div>
 
               <div>
-                <label className="mb-2 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                <label className="mb-2 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                   Target Amount ({currencySymbol})
                 </label>
                 <input
@@ -230,7 +232,7 @@ const GoalActions = forwardRef(function GoalActions(
               </div>
 
               <div>
-                <label className="mb-2 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                <label className="mb-2 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                   Deadline
                 </label>
                 <input
@@ -250,14 +252,14 @@ const GoalActions = forwardRef(function GoalActions(
                   <button
                     type="button"
                     onClick={handleEditToggle}
-                    className="flex-1 rounded-lg bg-gray-100 px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark transition-colors hover:bg-gray-200"
+                    className="flex-1 rounded-lg bg-gray-100 px-4 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gray-200"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 rounded-lg bg-gold px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
+                    className="flex-1 rounded-lg bg-gold px-4 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
                   >
                     {loading ? 'Saving...' : 'Save Changes'}
                   </button>
@@ -266,7 +268,7 @@ const GoalActions = forwardRef(function GoalActions(
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-lg bg-gold px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
+                  className="w-full rounded-lg bg-gold px-4 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
                 >
                   {loading ? 'Saving...' : 'Save Changes'}
                 </button>

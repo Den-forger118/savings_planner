@@ -42,7 +42,7 @@ function BudgetSetup({ userId, currentBudget, isEarnerMode = false, onBudgetSet,
       <section className="relative overflow-hidden rounded-card bg-primary-dark p-5 text-cream shadow-soft sm:p-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
-            <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold-light">
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold-light">
               Monthly Savings Mandate
             </p>
             <p className="mt-3 break-words font-money text-3xl font-light tracking-[0.02em] text-gold sm:text-4xl md:text-5xl">
@@ -54,7 +54,7 @@ function BudgetSetup({ userId, currentBudget, isEarnerMode = false, onBudgetSet,
           </div>
           <button
             onClick={() => setIsEditing(true)}
-            className="rounded-lg border-2 border-gold px-6 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold transition-colors hover:bg-gold hover:text-primary-dark"
+            className="rounded-lg border-2 border-gold px-6 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold transition-colors hover:bg-gold hover:text-primary-dark"
           >
             Edit Budget
           </button>
@@ -66,7 +66,7 @@ function BudgetSetup({ userId, currentBudget, isEarnerMode = false, onBudgetSet,
   if (!isEditing && hasBudget && !isEarnerMode) {
     return (
       <section className="rounded-lg border-l-4 border-gold bg-white p-8 shadow-sm transition-shadow duration-300 hover:shadow-lg">
-        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+        <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
           Monthly Budget Saved
         </p>
         <h2 className="mt-2 font-money text-2xl font-light tracking-[0.02em] text-primary-dark">
@@ -79,7 +79,7 @@ function BudgetSetup({ userId, currentBudget, isEarnerMode = false, onBudgetSet,
         <button
           type="button"
           onClick={() => setIsEditing(true)}
-          className="mt-6 rounded-lg border-2 border-gold px-6 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold transition-colors hover:bg-gold hover:text-primary-dark"
+          className="mt-6 rounded-lg border-2 border-gold px-6 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold transition-colors hover:bg-gold hover:text-primary-dark"
         >
           Edit Budget
         </button>
@@ -90,7 +90,7 @@ function BudgetSetup({ userId, currentBudget, isEarnerMode = false, onBudgetSet,
   if (!isEditing && !hasBudget) {
     return (
       <section className="rounded-lg border-l-4 border-gold bg-white p-8 shadow-sm transition-shadow duration-300 hover:shadow-lg">
-        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+        <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
           {isEarnerMode ? 'Monthly Budget Required' : 'Non-Earner Mode'}
         </p>
         <h2 className="mt-2 font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">
@@ -106,7 +106,7 @@ function BudgetSetup({ userId, currentBudget, isEarnerMode = false, onBudgetSet,
         <button
           type="button"
           onClick={() => setIsEditing(true)}
-          className="mt-6 rounded-lg bg-gold px-6 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark transition-colors hover:bg-gold-light"
+          className="mt-6 rounded-lg bg-gold px-6 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
         >
           Set Monthly Budget
         </button>
@@ -117,7 +117,7 @@ function BudgetSetup({ userId, currentBudget, isEarnerMode = false, onBudgetSet,
   return (
     <section className="rounded-lg border-t-4 border-gold bg-white p-8 shadow-sm transition-shadow duration-300 hover:shadow-lg">
       <div className="mb-6">
-        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+        <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
           Savings Mandate
         </p>
         <h2 className="mt-2 font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">
@@ -130,7 +130,7 @@ function BudgetSetup({ userId, currentBudget, isEarnerMode = false, onBudgetSet,
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label className="mb-2 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+          <label className="mb-2 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
             Monthly Budget
           </label>
           <div className="flex items-center gap-3">
@@ -153,7 +153,7 @@ function BudgetSetup({ userId, currentBudget, isEarnerMode = false, onBudgetSet,
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 rounded-lg bg-gold px-6 py-4 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
+            className="flex-1 rounded-lg bg-gold px-6 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
           >
             {loading ? 'Processing...' : 'Set Budget'}
           </button>
@@ -161,7 +161,7 @@ function BudgetSetup({ userId, currentBudget, isEarnerMode = false, onBudgetSet,
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              className="rounded-lg border-2 border-gold px-6 py-4 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold transition-colors hover:bg-gold hover:text-primary-dark"
+              className="rounded-lg border-2 border-gold px-6 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold transition-colors hover:bg-gold hover:text-primary-dark"
             >
               Cancel
             </button>

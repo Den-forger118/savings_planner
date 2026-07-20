@@ -60,13 +60,13 @@ function ExpenseHistogram({
         </div>
 
         <p className="mt-3 font-money text-2xl font-light tracking-[0.02em] text-white">{fmt(total)}</p>
-        <p className="mt-0.5 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-cream/45">
+        <p className="mt-0.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/60">
           Total spent
         </p>
 
         <div className="mt-3 grid grid-cols-2 gap-3 border-t border-cream/15 pt-2">
           <div>
-            <p className="font-sans text-[9px] font-normal uppercase tracking-[0.14em] text-cream/45">
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/60">
               Share
             </p>
             <p className="mt-0.5 font-money text-sm font-light text-cream">
@@ -74,7 +74,7 @@ function ExpenseHistogram({
             </p>
           </div>
           <div>
-            <p className="font-sans text-[9px] font-normal uppercase tracking-[0.14em] text-cream/45">
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/60">
               Transactions
             </p>
             <p className="mt-0.5 font-money text-sm font-light text-cream">{count}</p>
@@ -196,7 +196,7 @@ function ExpenseHistogram({
       <div className="surface p-5 md:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h4 className="font-serif text-lg font-light tracking-[-0.015em] text-primary-dark">Category Histogram</h4>
-          <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe/70">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
             Bar height = total spent
           </p>
         </div>
@@ -263,7 +263,7 @@ function ExpenseHistogram({
       {chartData.length > 0 && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-lg border border-cream bg-white p-5 shadow-sm">
-            <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
               Monthly Snapshot
             </p>
             <div className="mt-3 flex items-end justify-between gap-4">
@@ -276,13 +276,13 @@ function ExpenseHistogram({
                 <p className="font-money text-lg font-light tracking-[0.02em] text-primary-dark">{totalTransactions}</p>
               </div>
             </div>
-            <p className="mt-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+            <p className="mt-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
               Avg {fmt(avgPerTransaction)} per entry
             </p>
           </div>
 
           <div className="rounded-lg border border-cream bg-white p-5 shadow-sm">
-            <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
               Vs Last Month
             </p>
             <div className="mt-3 flex items-center gap-3">
@@ -307,7 +307,7 @@ function ExpenseHistogram({
           </div>
 
           <div className="rounded-lg border border-cream bg-white p-5 shadow-sm">
-            <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
               Top Category
             </p>
             {topCategory && (

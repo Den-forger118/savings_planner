@@ -3,6 +3,7 @@ import api from '../services/api';
 import { ONBOARDING_CURRENCIES, formatMoney, getCurrencyByCode } from '../utils/currency';
 import { getFriendlyError } from '../utils/friendlyError';
 import ErrorBanner from '../components/ErrorBanner';
+import ProgressBar from '../components/ProgressBar';
 
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
@@ -247,7 +248,7 @@ function OnboardingPage({ user, onComplete }) {
             <button
               type="button"
               onClick={goNext}
-              className="mt-10 rounded-lg bg-gold px-8 py-4 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
+              className="mt-10 rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
             >
               Get Started →
             </button>
@@ -295,7 +296,7 @@ function OnboardingPage({ user, onComplete }) {
             <button
               type="button"
               onClick={handleIdentityContinue}
-              className="mt-8 rounded-lg bg-gold px-8 py-4 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
+              className="mt-8 rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
             >
               Continue →
             </button>
@@ -329,7 +330,7 @@ function OnboardingPage({ user, onComplete }) {
             <button
               type="button"
               onClick={handleIncomeContinue}
-              className="mt-8 rounded-lg bg-gold px-8 py-4 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
+              className="mt-8 rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
             >
               Continue →
             </button>
@@ -359,7 +360,7 @@ function OnboardingPage({ user, onComplete }) {
             <button
               type="button"
               onClick={handleBudgetContinue}
-              className="mt-8 rounded-lg bg-gold px-8 py-4 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
+              className="mt-8 rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
             >
               Continue →
             </button>
@@ -386,7 +387,7 @@ function OnboardingPage({ user, onComplete }) {
             <button
               type="button"
               onClick={goNext}
-              className="mt-8 rounded-lg bg-gold px-8 py-4 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
+              className="mt-8 rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
             >
               Continue →
             </button>
@@ -402,7 +403,7 @@ function OnboardingPage({ user, onComplete }) {
             </p>
             <div className="mt-8 space-y-4">
               <div>
-                <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                   Goal Name
                 </label>
                 <input
@@ -414,7 +415,7 @@ function OnboardingPage({ user, onComplete }) {
                 />
               </div>
               <div>
-                <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                   Target Amount
                 </label>
                 <div className="flex items-center gap-2">
@@ -430,7 +431,7 @@ function OnboardingPage({ user, onComplete }) {
                 </div>
               </div>
               <div>
-                <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                   Deadline
                 </label>
                 <input
@@ -447,7 +448,7 @@ function OnboardingPage({ user, onComplete }) {
                 type="button"
                 onClick={handleCreateGoal}
                 disabled={goalSaving}
-                className="rounded-lg bg-gold px-8 py-4 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-60"
+                className="rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-60"
               >
                 {goalSaving ? 'Creating…' : 'Create Goal & Continue →'}
               </button>
@@ -471,25 +472,25 @@ function OnboardingPage({ user, onComplete }) {
             </p>
             <div className="mx-auto mt-8 max-w-sm rounded-lg border border-cream bg-white p-6 text-left shadow-sm">
               <p className="font-sans text-sm text-primary-dark">
-                <span className="font-normal uppercase tracking-[0.16em] text-taupe text-[10px]">Mode</span>
+                <span className="font-normal uppercase tracking-[0.14em] text-taupe text-xs">Mode</span>
                 <br />
                 {data.mode === 'earner' ? 'Earner' : 'Non-Earner'}
               </p>
               <p className="mt-4 font-sans text-sm text-primary-dark">
-                <span className="font-normal uppercase tracking-[0.16em] text-taupe text-[10px]">Currency</span>
+                <span className="font-normal uppercase tracking-[0.14em] text-taupe text-xs">Currency</span>
                 <br />
                 {data.currency} ({data.currency_symbol})
               </p>
               {data.mode === 'earner' && (
                 <p className="mt-4 font-sans text-sm text-primary-dark">
-                  <span className="font-normal uppercase tracking-[0.16em] text-taupe text-[10px]">Monthly Budget</span>
+                  <span className="font-normal uppercase tracking-[0.14em] text-taupe text-xs">Monthly Budget</span>
                   <br />
                   {formatMoney(data.monthly_budget, data.currency, data.currency_symbol)}/month
                 </p>
               )}
               {data.firstGoal && (
                 <p className="mt-4 font-sans text-sm text-primary-dark">
-                  <span className="font-normal uppercase tracking-[0.16em] text-taupe text-[10px]">First Goal</span>
+                  <span className="font-normal uppercase tracking-[0.14em] text-taupe text-xs">First Goal</span>
                   <br />
                   {data.firstGoal.name} — {formatMoney(data.firstGoal.target_amount, data.currency, data.currency_symbol)}
                 </p>
@@ -499,7 +500,7 @@ function OnboardingPage({ user, onComplete }) {
               type="button"
               onClick={finishOnboarding}
               disabled={submitting}
-              className="mt-10 rounded-lg bg-gold px-8 py-4 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-60"
+              className="mt-10 rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-60"
             >
               {submitting ? 'Setting up…' : 'Go to Dashboard →'}
             </button>
@@ -520,12 +521,13 @@ function OnboardingPage({ user, onComplete }) {
             Step {stepIndex + 1} of {totalSteps || 1}
           </p>
         </div>
-        <div className="mx-auto mt-3 h-1 max-w-3xl overflow-hidden rounded-full bg-white">
-          <div
-            className="h-full bg-gold transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
+        <ProgressBar
+          className="mx-auto mt-3 max-w-3xl"
+          value={progress}
+          size="sm"
+          rounded="rounded-full"
+          trackClassName="bg-white"
+        />
       </header>
 
       <main className="flex flex-1 items-center justify-center px-6 py-10">

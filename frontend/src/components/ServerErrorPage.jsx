@@ -55,7 +55,7 @@ function ServerErrorPage({
           )}
         </div>
 
-        <p className="mt-12 font-sans text-[10px] font-normal uppercase tracking-[0.16em] text-taupe/70">
+        <p className="mt-12 font-sans text-xs font-normal uppercase tracking-[0.14em] text-taupe">
           Private savings intelligence
         </p>
       </div>

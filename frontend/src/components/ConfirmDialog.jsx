@@ -91,7 +91,7 @@ function ConfirmDialog({
         <div className={`h-1 ${styles.accent}`} />
 
         <div className="px-5 pt-5">
-          <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe/60">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe/60">
             {styles.eyebrow}
           </p>
           <h2
@@ -125,7 +125,7 @@ function ConfirmDialog({
               type="button"
               disabled={loading}
               onClick={onConfirm}
-              className={`${hideCancel ? 'w-full' : 'flex-1'} rounded-lg px-4 py-2.5 font-sans text-[11px] font-normal uppercase tracking-[0.12em] transition-all duration-200 ease-out-expo disabled:opacity-50 ${styles.confirm}`}
+              className={`${hideCancel ? 'w-full' : 'flex-1'} rounded-lg px-4 py-2.5 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-all duration-200 ease-out-expo disabled:opacity-50 ${styles.confirm}`}
             >
               {loading ? 'Please wait…' : confirmLabel}
             </button>

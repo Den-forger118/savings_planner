@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS users (
   onboarding_complete BOOLEAN NOT NULL DEFAULT false,
   is_admin BOOLEAN NOT NULL DEFAULT false,
   is_active BOOLEAN NOT NULL DEFAULT true,
+  failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+  login_locked_until TIMESTAMPTZ,
   theme VARCHAR(20) NOT NULL DEFAULT 'classic',
   ui_density VARCHAR(20) NOT NULL DEFAULT 'classic',
   fiscal_start_month INTEGER NOT NULL DEFAULT 1 CHECK (fiscal_start_month BETWEEN 1 AND 12),

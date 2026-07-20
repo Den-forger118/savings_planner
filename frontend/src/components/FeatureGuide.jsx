@@ -317,7 +317,7 @@ function DocField({ label, icon, children }) {
     <div className="rounded-lg border border-cream bg-white/60 px-4 py-3">
       <div className="mb-1.5 flex items-center gap-2">
         <Icon name={icon} className="text-base text-gold" />
-        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+        <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
           {label}
         </p>
       </div>
@@ -345,11 +345,11 @@ function FeatureDoc({ feature, onNavigate, isEarnerMode }) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">{feature.title}</h3>
-              <span className="rounded-full bg-primary-dark/10 px-2.5 py-0.5 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark">
+              <span className="rounded-full bg-primary-dark/10 px-2.5 py-0.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark">
                 {feature.badge}
               </span>
               {isEarnerOnly && (
-                <span className="rounded-full bg-gold/20 px-2.5 py-0.5 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+                <span className="rounded-full bg-gold/20 px-2.5 py-0.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
                   Earner mode
                 </span>
               )}
@@ -365,7 +365,7 @@ function FeatureDoc({ feature, onNavigate, isEarnerMode }) {
           <button
             type="button"
             onClick={() => onNavigate(feature.page)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border-2 border-primary-dark px-4 py-2 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark transition-colors hover:bg-primary-dark hover:text-cream"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border-2 border-primary-dark px-4 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-primary-dark hover:text-cream"
           >
             Open
             <Icon name="arrow_forward" className="text-sm" />
@@ -403,7 +403,7 @@ function FeatureGuide({ isEarnerMode = false, onNavigate, embedded = false }) {
   return (
     <div className="space-y-8">
       <section>
-        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+        <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
           {embedded ? 'Help' : 'Guide'}
         </p>
         <h2 className="mt-2 font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark md:text-5xl">
@@ -414,7 +414,7 @@ function FeatureGuide({ isEarnerMode = false, onNavigate, embedded = false }) {
           where to find it, who it is for, and how to use it step by step.
         </p>
         <div className="mt-4 inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-white px-4 py-2">
-          <span className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+          <span className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
             Your mode
           </span>
           <span className="rounded-full bg-gold/20 px-2.5 py-0.5 font-sans text-xs font-medium text-primary-dark">
@@ -424,7 +424,7 @@ function FeatureGuide({ isEarnerMode = false, onNavigate, embedded = false }) {
       </section>
 
       <section className="rounded-lg border border-primary-dark/[0.08] bg-white p-6 shadow-soft">
-        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+        <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
           Quick start
         </p>
         <h3 className="mt-1 font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">
@@ -466,7 +466,7 @@ function FeatureGuide({ isEarnerMode = false, onNavigate, embedded = false }) {
 
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-[240px_minmax(0,1fr)]">
         <nav className="xl:sticky xl:top-24 xl:self-start">
-          <p className="mb-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+          <p className="mb-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
             On this page
           </p>
           <ul className="space-y-1 rounded-lg border border-cream bg-white p-2 shadow-sm">

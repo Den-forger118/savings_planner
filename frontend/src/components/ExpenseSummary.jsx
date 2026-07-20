@@ -5,6 +5,8 @@ import ExpenseForm from './ExpenseForm';
 import { formatMoney } from '../utils/currency';
 import { getFriendlyError } from '../utils/friendlyError';
 import ErrorBanner from './ErrorBanner';
+import OdometerNumber from './OdometerNumber';
+import ProgressBar from './ProgressBar';
 
 function ExpenseSummary({
   userId,
@@ -18,6 +20,7 @@ function ExpenseSummary({
   const categoryColor = (item) => item?.category_colour || item?.category_color || '#D4A574';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const selectedMonth = new Date().getMonth() + 1;
   const selectedYear = new Date().getFullYear();
@@ -34,7 +37,12 @@ function ExpenseSummary({
   }, [userId, refreshTrigger, page, limit, sort]);
 
   const fetchExpenses = async () => {
-    setLoading(true);
+    const isInitial = data === null;
+    if (isInitial) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     setError(null);
 
     try {
@@ -44,9 +52,12 @@ function ExpenseSummary({
       setData(response.data);
     } catch (err) {
       setError(getFriendlyError(err, 'We couldn’t load your expenses. Please try again.'));
-      setData(null);
+      if (isInitial) {
+        setData(null);
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -56,7 +67,7 @@ function ExpenseSummary({
     'September', 'October', 'November', 'December'
   ];
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
         <p className="font-sans text-taupe">Loading expenses...</p>
@@ -69,7 +80,7 @@ function ExpenseSummary({
   const avgPerTransaction = expenseCount > 0 ? totalSpent / expenseCount : 0;
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${refreshing ? 'opacity-95' : ''}`}>
 
       {error && (
         <ErrorBanner message={error} />
@@ -93,7 +104,9 @@ function ExpenseSummary({
           <p className="mb-2 font-sans text-xs uppercase tracking-wide text-gold-light">
             Total Spent
           </p>
-          <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl">{fmt(totalSpent)}</p>
+          <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl">
+            <OdometerNumber value={totalSpent} prefix={currencySymbol} />
+          </p>
           <p className="mt-2 font-sans text-xs text-gold-light">
             {months[selectedMonth - 1]} {selectedYear}
           </p>
@@ -104,7 +117,7 @@ function ExpenseSummary({
             Transactions
           </p>
           <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl text-primary-dark">
-            {expenseCount}
+            <OdometerNumber value={expenseCount} decimals={0} />
           </p>
           <p className="mt-2 font-sans text-xs text-taupe">This month</p>
         </div>
@@ -114,7 +127,7 @@ function ExpenseSummary({
             Avg / Transaction
           </p>
           <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl text-primary-dark">
-            {fmt(avgPerTransaction)}
+            <OdometerNumber value={avgPerTransaction} prefix={currencySymbol} />
           </p>
           <p className="mt-2 font-sans text-xs text-taupe">This month</p>
         </div>
@@ -144,15 +157,14 @@ function ExpenseSummary({
                         {fmt(cat.total_spent)}
                       </p>
                     </div>
-                    <div className="h-2 w-full rounded-full bg-gray-200">
-                      <div
-                        className="h-2 rounded-full transition-all duration-500"
-                        style={{
-                          width: `${percentage}%`,
-                          backgroundColor: color,
-                        }}
-                      />
-                    </div>
+                    <ProgressBar
+                      value={percentage}
+                      size="lg"
+                      rounded="rounded-full"
+                      trackClassName="bg-gray-200"
+                      fillClassName=""
+                      fillStyle={{ backgroundColor: color }}
+                    />
                     <p className="mt-1 font-sans text-xs text-taupe">
                       {percentage}% of spending · {cat.transaction_count} transactions
                     </p>

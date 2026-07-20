@@ -35,7 +35,7 @@ function EarnerModeToggle({ userId, isEarner, hasBudget, onModeChange }) {
     <section className="rounded-lg border border-cream bg-white p-8 shadow-sm">
       <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
         <div className="max-w-xl">
-          <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
             Savings Mode
           </p>
           <h3 className="mt-2 font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">
@@ -72,7 +72,7 @@ function EarnerModeToggle({ userId, isEarner, hasBudget, onModeChange }) {
               }`}
             />
           </button>
-          <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.14em] text-taupe/70">
+          <p className="font-sans text-xs font-semibold uppercase tracking-[0.12em] text-taupe">
             {loading ? 'Saving…' : isEarner ? 'Earner' : 'Non-Earner'}
           </p>
         </div>

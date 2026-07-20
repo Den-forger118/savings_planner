@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { Routes, Route, Navigate, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
 import api from './services/api';
 import BudgetSetup from './components/BudgetSetup';
 import CreateGoalForm from './components/CreateGoalForm';
@@ -14,10 +15,13 @@ import OnboardingPage from './pages/OnboardingPage';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
+import AnimatedOutlet, { ScreenTransition } from './components/AnimatedOutlet';
 import { formatMoney } from './utils/currency';
 import { getFriendlyError, isServerUnavailable } from './utils/friendlyError';
 import ServerErrorPage from './components/ServerErrorPage';
 import ErrorBanner from './components/ErrorBanner';
+import OdometerNumber from './components/OdometerNumber';
+import { PATHS, pathForPageId } from './utils/paths';
 
 const GOALS_PER_PAGE = 12;
 
@@ -33,12 +37,36 @@ const parseAmount = (value) => {
 const CircularProgress = ({ value, size = 88, strokeWidth = 5 }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const clamped = Math.min(100, Math.max(0, value));
-  const offset = circumference - (clamped / 100) * circumference;
+  const target = Math.min(100, Math.max(0, Number(value) || 0));
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (reduceMotion) {
+      setDisplay(target);
+      return undefined;
+    }
+
+    let frameA;
+    let frameB;
+    frameA = requestAnimationFrame(() => {
+      frameB = requestAnimationFrame(() => setDisplay(target));
+    });
+
+    return () => {
+      cancelAnimationFrame(frameA);
+      cancelAnimationFrame(frameB);
+    };
+  }, [target]);
+
+  const offset = circumference - (display / 100) * circumference;
 
   return (
     <div className="relative shrink-0 self-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
+      <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -57,11 +85,13 @@ const CircularProgress = ({ value, size = 88, strokeWidth = 5 }) => {
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          className="transition-all duration-700"
+          className="progress-ring-fg"
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="font-money text-base font-light tracking-[0.02em] text-primary-dark">{Math.round(clamped)}%</span>
+        <span className="font-money text-base font-light tracking-[0.02em] text-primary-dark">
+          {Math.round(target)}%
+        </span>
       </div>
     </div>
   );
@@ -239,11 +269,19 @@ function GoalPortfolioCard({
         note: txNote,
       });
 
-      setGoals((goals) => goals.map((g) =>
-        g.goal_id === response.data.updated_goal.goal_id ? response.data.updated_goal : g
-      ));
-      onTransactionRecorded?.(response.data);
+      const updatedGoal = response.data.updated_goal;
+
+      // Close the modal first so the goal card is visible when digits roll
       closeTransactionModal();
+
+      window.requestAnimationFrame(() => {
+        setGoals((goals) =>
+          goals.map((g) =>
+            Number(g.goal_id) === Number(updatedGoal.goal_id) ? updatedGoal : g
+          )
+        );
+        onTransactionRecorded?.(response.data);
+      });
     } catch (err) {
       setTxError(getFriendlyError(err, 'We couldn’t record that transaction. Please try again.'));
     } finally {
@@ -287,8 +325,11 @@ function GoalPortfolioCard({
       const response = await api.patch(`/goals/${goal.goal_id}/pause`, {
         is_paused: nextPaused,
       });
-      setGoals(response.data.goals);
+      // Close confirm first so remaining goal cards are visible while amounts roll
       setPauseConfirmOpen(false);
+      window.requestAnimationFrame(() => {
+        setGoals(response.data.goals);
+      });
     } catch (err) {
       setPauseConfirmOpen(false);
       setStatusAlert(getFriendlyError(err, 'We couldn’t update that goal. Please try again.'));
@@ -354,7 +395,7 @@ function GoalPortfolioCard({
           className="pointer-events-none absolute right-3 top-3 z-10 rotate-[-12deg] rounded-lg border-4 border-gold bg-primary-dark/80 px-2.5 py-1 opacity-90"
           title="Completed — use the menu to edit or correct transactions"
         >
-          <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
             Complete ✓
           </p>
         </div>
@@ -364,7 +405,7 @@ function GoalPortfolioCard({
           className="pointer-events-none absolute right-3 top-3 z-10 rotate-[-12deg] rounded-lg border-4 border-taupe/40 bg-primary-dark/80 px-2.5 py-1 opacity-90"
           title="On hold — resume from the menu to include in budget allocation again"
         >
-          <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-cream">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream">
             On Hold
           </p>
         </div>
@@ -373,19 +414,19 @@ function GoalPortfolioCard({
       <div className="rounded-t-[0.75rem] bg-navy-sheen px-4 py-3.5 text-cream">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-cream/45">
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/60">
               Private Objective
             </p>
             <h3 className={`mt-1 truncate font-serif text-xl font-light leading-snug tracking-[-0.02em] ${isComplete || isOnHold ? 'pr-24' : ''}`}>
               {goal.name}
             </h3>
             {isComplete && goal.completed_at && (
-              <p className="mt-0.5 font-sans text-[11px] text-cream/70">
+              <p className="mt-0.5 font-sans text-xs text-cream/70">
                 Completed {new Date(goal.completed_at).toLocaleDateString()}
               </p>
             )}
             {isOnHold && goal.paused_at && (
-              <p className="mt-0.5 font-sans text-[11px] text-cream/70">
+              <p className="mt-0.5 font-sans text-xs text-cream/70">
                 On hold since {new Date(goal.paused_at).toLocaleDateString()}
               </p>
             )}
@@ -514,25 +555,48 @@ function GoalPortfolioCard({
           <CircularProgress value={isComplete ? 100 : completion} />
 
           <div className="min-w-0 flex-1">
-            <p className="font-sans text-[9px] font-normal uppercase tracking-[0.12em] text-taupe/70">
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
               Goal Status
             </p>
             <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-1">
-              {[
-                ['Target', money(goal.target_amount)],
-                ['Saved', money(goal.saved_amount)],
-                ['Remaining', money(goal.remaining_amount)],
-                ['Days Left', goal.days_remaining],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <p className="font-sans text-[9px] font-normal uppercase tracking-[0.08em] text-taupe/55">
-                    {label}
-                  </p>
-                  <p className="font-money text-sm font-light leading-tight text-primary-dark">
-                    {value}
-                  </p>
-                </div>
-              ))}
+              <div>
+                <p className="font-sans text-xs font-normal uppercase tracking-[0.08em] text-taupe">
+                  Target
+                </p>
+                <p className="font-money text-sm font-light leading-tight text-primary-dark">
+                  {money(goal.target_amount)}
+                </p>
+              </div>
+              <div>
+                <p className="font-sans text-xs font-normal uppercase tracking-[0.08em] text-taupe">
+                  Saved
+                </p>
+                <p className="font-money text-sm font-light leading-tight text-primary-dark">
+                  <OdometerNumber
+                    value={goal.saved_amount}
+                    prefix={user.currency_symbol || '$'}
+                  />
+                </p>
+              </div>
+              <div>
+                <p className="font-sans text-xs font-normal uppercase tracking-[0.08em] text-taupe">
+                  Remaining
+                </p>
+                <p className="font-money text-sm font-light leading-tight text-primary-dark">
+                  <OdometerNumber
+                    value={goal.remaining_amount}
+                    prefix={user.currency_symbol || '$'}
+                  />
+                </p>
+              </div>
+              <div>
+                <p className="font-sans text-xs font-normal uppercase tracking-[0.08em] text-taupe">
+                  Days Left
+                </p>
+                <p className="font-money text-sm font-light leading-tight text-primary-dark">
+                  {goal.days_remaining}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -541,11 +605,14 @@ function GoalPortfolioCard({
           <div className="border-t border-cream/80 pt-2">
             <div className="border border-cream bg-cream/30 p-2">
               <div className="flex items-center justify-between gap-3">
-                <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe/70">
+                <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                   {selectedFrequency} Savings Needed
                 </p>
                 <p className="font-money text-sm font-light text-primary-dark">
-                  {money(selectedFrequencyAmount)}
+                  <OdometerNumber
+                    value={parseAmount(selectedFrequencyAmount)}
+                    prefix={user.currency_symbol || '$'}
+                  />
                 </p>
               </div>
 
@@ -563,7 +630,7 @@ function GoalPortfolioCard({
                       type="button"
                       aria-pressed={isSelected}
                       onClick={() => setSelectedFrequency(label)}
-                      className={`px-1.5 py-1.5 font-sans text-[9px] font-normal uppercase tracking-[0.08em] transition-colors ${
+                      className={`px-1.5 py-1.5 font-sans text-xs font-normal uppercase tracking-[0.08em] transition-colors ${
                         isSelected
                           ? 'bg-primary-dark text-cream'
                           : 'bg-white text-taupe hover:bg-cream/70 hover:text-primary-dark'
@@ -605,21 +672,34 @@ function GoalPortfolioCard({
             <div className="min-w-0 flex-1">
               {isEarnerMode ? (
                 <>
-                  <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-cream/45">
+                  <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/60">
                     Monthly Allocation
                   </p>
                   <p className="mt-0.5 font-money text-lg font-light leading-tight tracking-[0.02em]">
-                    {money(allocated)}
+                    <OdometerNumber
+                      value={allocated}
+                      prefix={user.currency_symbol || '$'}
+                    />
                   </p>
-                  <p className="mt-0.5 font-sans text-[11px] text-cream/60">
+                  <p className="mt-0.5 font-sans text-xs text-cream/60">
                     {goal.is_feasible
                       ? 'Achievable with current funding'
-                      : `Shortfall: ${money(shortfall)}/month`}
+                      : (
+                        <>
+                          Shortfall:{' '}
+                          <OdometerNumber
+                            value={shortfall}
+                            prefix={user.currency_symbol || '$'}
+                            className="inline-flex"
+                          />
+                          /month
+                        </>
+                      )}
                   </p>
                 </>
               ) : (
                 <>
-                  <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-cream/45">
+                  <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/60">
                     Pace Check
                   </p>
                   <p className="mt-0.5 font-serif text-lg font-light leading-tight tracking-[-0.02em]">
@@ -629,9 +709,19 @@ function GoalPortfolioCard({
                         ? 'Ahead of pace'
                         : 'On track'}
                   </p>
-                  <p className="mt-0.5 font-sans text-[11px] text-cream/60">
+                  <p className="mt-0.5 font-sans text-xs text-cream/60">
                     {isBehindSchedule || !goal.on_track
-                      ? `Save an extra ${money(parseAmount(goal.extra_per_day_to_catch_up))}/day to catch up`
+                      ? (
+                        <>
+                          Save an extra{' '}
+                          <OdometerNumber
+                            value={parseAmount(goal.extra_per_day_to_catch_up)}
+                            prefix={user.currency_symbol || '$'}
+                            className="inline-flex"
+                          />
+                          /day to catch up
+                        </>
+                      )
                       : isAhead
                         ? `You can skip saving for ${parseAmount(goal.days_can_skip).toFixed(1)} days`
                         : 'Keep your current saving rhythm'}
@@ -652,7 +742,7 @@ function GoalPortfolioCard({
 
               {suggestionsOpen && (
                 <div className="absolute bottom-full right-0 z-[60] mb-2 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-xl">
-                  <p className="mb-2 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                  <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                     Suggestions
                   </p>
                   {suggestionsLoading ? (
@@ -703,7 +793,7 @@ function GoalPortfolioCard({
             <div className="modal-header">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+                  <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
                     Goal Ledger
                   </p>
                   <h2 id="record-transaction-title" className="mt-0.5 font-serif text-xl font-light leading-tight">
@@ -727,7 +817,7 @@ function GoalPortfolioCard({
                 <button
                   type="button"
                   onClick={() => setTxType('deposit')}
-                  className={`rounded-md px-3 py-2 font-sans text-[11px] font-normal uppercase tracking-[0.12em] transition-colors ${
+                  className={`rounded-md px-3 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-colors ${
                     txType === 'deposit'
                       ? 'bg-primary-dark text-cream'
                       : 'text-taupe hover:text-primary-dark'
@@ -738,7 +828,7 @@ function GoalPortfolioCard({
                 <button
                   type="button"
                   onClick={() => setTxType('withdrawal')}
-                  className={`rounded-md px-3 py-2 font-sans text-[11px] font-normal uppercase tracking-[0.12em] transition-colors ${
+                  className={`rounded-md px-3 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-colors ${
                     txType === 'withdrawal'
                       ? 'bg-primary-dark text-cream'
                       : 'text-taupe hover:text-primary-dark'
@@ -774,9 +864,9 @@ function GoalPortfolioCard({
               <div>
                 <label
                   htmlFor={`tx-note-${goal.goal_id}`}
-                  className="mb-1.5 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe"
+                  className="mb-1.5 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe"
                 >
-                  Note <span className="font-normal normal-case tracking-normal text-taupe/70">(optional)</span>
+                  Note <span className="font-normal normal-case tracking-normal text-taupe">(optional)</span>
                 </label>
                 <input
                   id={`tx-note-${goal.goal_id}`}
@@ -795,14 +885,14 @@ function GoalPortfolioCard({
                   type="button"
                   onClick={closeTransactionModal}
                   disabled={txLoading}
-                  className="rounded-md border border-gray-200 px-4 py-2 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-taupe transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                  className="rounded-md border border-gray-200 px-4 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={txLoading}
-                  className="rounded-md bg-gold px-4 py-2 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
+                  className="rounded-md bg-gold px-4 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
                 >
                   {txLoading ? 'Recording...' : 'Confirm'}
                 </button>
@@ -845,16 +935,17 @@ function GoalPortfolioCard({
 }
 
 function App() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const activityGoalFilter = searchParams.get('goal') || 'all';
+
   const [user, setUser] = useState(null);
-  const [authPage, setAuthPage] = useState('login');
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [monthlyBudget, setMonthlyBudget] = useState(null);
   const [expenseRefresh, setExpenseRefresh] = useState(0);
   const [transactionRefresh, setTransactionRefresh] = useState(0);
-  const [activityGoalFilter, setActivityGoalFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState('dashboard');
   const [goalsPage, setGoalsPage] = useState(1);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -869,10 +960,6 @@ function App() {
   const userCurrency = user?.currency || 'USD';
   const userCurrencySymbol = user?.currency_symbol || '$';
 
-  const applyTheme = (theme) => {
-    document.documentElement.classList.toggle('theme-midnight', theme === 'midnight');
-  };
-
   const applyDensity = (density) => {
     document.documentElement.classList.toggle('density-compact', density === 'compact');
   };
@@ -880,7 +967,6 @@ function App() {
   const handleUserUpdate = (updatedUser) => {
     localStorage.setItem('user', JSON.stringify(updatedUser));
     setUser(updatedUser);
-    applyTheme(updatedUser.theme || 'classic');
     applyDensity(updatedUser.ui_density || 'classic');
   };
 
@@ -889,14 +975,21 @@ function App() {
 
     if (responseData?.goal_completed) {
       setCompletedGoalName(responseData.completed_goal_name);
-      fetchData();
+      // Let allocation odometers on remaining goals roll after the modal is gone
+      window.setTimeout(() => {
+        fetchData();
+      }, 80);
       setTimeout(() => setCompletedGoalName(null), 5000);
     }
   };
 
   const openActivityPage = (goalId = 'all') => {
-    setActivityGoalFilter(goalId === undefined ? 'all' : String(goalId));
-    setCurrentPage('activity');
+    const search = goalId && goalId !== 'all' ? `?goal=${encodeURIComponent(goalId)}` : '';
+    navigate(`${PATHS.activity}${search}`);
+  };
+
+  const selectPage = (page) => {
+    navigate(pathForPageId(page));
   };
 
   const toggleSidebar = () => {
@@ -917,13 +1010,14 @@ function App() {
   };
 
   useEffect(() => {
+    document.documentElement.classList.remove('theme-midnight');
+
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
 
     if (savedToken && savedUser) {
       const parsedUser = JSON.parse(savedUser);
       setUser(parsedUser);
-      applyTheme(parsedUser.theme || 'classic');
       applyDensity(parsedUser.ui_density || 'classic');
     } else {
       setLoading(false);
@@ -943,9 +1037,9 @@ function App() {
     localStorage.setItem('user', JSON.stringify(updatedUser));
     setUser(updatedUser);
     setIsEarnerMode(updatedUser.mode === 'earner' || updatedUser.is_earner);
-    applyTheme(updatedUser.theme || 'classic');
     applyDensity(updatedUser.ui_density || 'classic');
     setLoading(true);
+    navigate(PATHS.dashboard, { replace: true });
   };
 
   useEffect(() => {
@@ -970,11 +1064,7 @@ function App() {
     }
   };
 
-  const handleLogin = (userData, userToken, redirect) => {
-    if (redirect === 'register') {
-      setAuthPage('register');
-      return;
-    }
+  const handleLogin = (userData) => {
     setUser(userData);
     setIsEarnerMode(userData.mode === 'earner' || userData.is_earner === true);
   };
@@ -986,8 +1076,7 @@ function App() {
     setGoals([]);
     setMonthlyBudget(null);
     setIsEarnerMode(false);
-    setAuthPage('login');
-    setCurrentPage('dashboard');
+    navigate(PATHS.login, { replace: true });
   };
 
   const handleBudgetSet = (budget, updatedUser) => {
@@ -1009,8 +1098,11 @@ function App() {
   const hasBudget = parseAmount(monthlyBudget) > 0;
 
   const handleGoalCreated = () => {
-    fetchData();
-    setGoalsPage(1);
+    // Refresh after create so sibling goal allocations can odometer to new shares
+    window.requestAnimationFrame(() => {
+      fetchData();
+      setGoalsPage(1);
+    });
   };
 
   const handleGoalUpdated = (updatedGoals) => {
@@ -1026,19 +1118,30 @@ function App() {
   };
 
   if (!user) {
-    if (authPage === 'register') {
-      return (
-        <RegisterPage
-          onRegister={handleLogin}
-          onSwitchToLogin={() => setAuthPage('login')}
-        />
-      );
-    }
-    return <LoginPage onLogin={handleLogin} />;
+    return (
+      <Routes>
+        <Route path={PATHS.register} element={
+          <ScreenTransition screenKey="register"><RegisterPage onRegister={handleLogin} /></ScreenTransition>
+        } />
+        <Route path={PATHS.login} element={
+          <ScreenTransition screenKey="login"><LoginPage onLogin={handleLogin} /></ScreenTransition>
+        } />
+        <Route path="*" element={<Navigate to={PATHS.login} replace />} />
+      </Routes>
+    );
   }
 
   if (user.onboarding_complete === false) {
-    return <OnboardingPage user={user} onComplete={handleOnboardingComplete} />;
+    return (
+      <Routes>
+        <Route path={PATHS.onboarding} element={
+          <ScreenTransition screenKey="onboarding">
+            <OnboardingPage user={user} onComplete={handleOnboardingComplete} />
+          </ScreenTransition>
+        } />
+        <Route path="*" element={<Navigate to={PATHS.onboarding} replace />} />
+      </Routes>
+    );
   }
 
   if (loading) {
@@ -1046,7 +1149,7 @@ function App() {
       <div className="page-canvas flex min-h-screen items-center justify-center">
         <div className="relative z-10 text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-gold/30 border-t-gold" />
-          <p className="mt-5 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-primary-dark">
+          <p className="mt-5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark">
             Preparing your private ledger
           </p>
         </div>
@@ -1097,10 +1200,6 @@ function App() {
     { id: 'settings', label: 'Settings', icon: 'settings' },
     ...(user.is_admin ? [{ id: 'admin', label: 'Admin', icon: 'admin_panel_settings' }] : []),
   ];
-
-  const selectPage = (page) => {
-    setCurrentPage(page);
-  };
 
   const renderDashboard = () => (
     <div className="space-y-10">
@@ -1172,15 +1271,18 @@ function App() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="surface flex h-10 items-center divide-x divide-primary-dark/10">
               <div className="flex items-baseline gap-1.5 px-3.5">
-                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.14em] text-taupe">
+                <span className="font-sans text-xs font-semibold uppercase tracking-[0.12em] text-taupe">
                   Saved
                 </span>
                 <span className="font-money text-sm font-light text-primary-dark">
-                  {formatMoney(totalSaved, userCurrency, userCurrencySymbol)}
+                  <OdometerNumber
+                    value={totalSaved}
+                    prefix={userCurrencySymbol}
+                  />
                 </span>
               </div>
               <div className="flex items-baseline gap-1.5 px-3.5">
-                <span className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe">
+                <span className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                   Active
                 </span>
                 <span className="font-money text-sm font-light text-primary-dark">
@@ -1283,7 +1385,6 @@ function App() {
       onBudgetSet={handleBudgetSet}
       onEarnerModeChange={handleEarnerModeChange}
       onLogout={handleLogout}
-      onThemeChange={applyTheme}
       onDensityChange={applyDensity}
       onNavigate={selectPage}
       onGoalsChange={setGoals}
@@ -1324,7 +1425,7 @@ function App() {
                 <p className="truncate font-sans text-sm font-normal text-cream">
                   {user.first_name} {user.last_name}
                 </p>
-                <p className="mt-0.5 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold/80">
+                <p className="mt-0.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold/80">
                   Private Member
                 </p>
               </div>
@@ -1333,21 +1434,17 @@ function App() {
         </div>
 
         <nav className={`relative z-10 flex-1 space-y-1 py-6 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
-          {navItems.map(item => {
-            const active = currentPage === item.id;
-            return (
-              <button
-                key={`${item.label}-${item.id}`}
-                type="button"
-                onClick={() => selectPage(item.id)}
-                className={`nav-item ${active ? 'nav-item-active' : 'nav-item-idle'}`}
-                title={sidebarCollapsed ? item.label : undefined}
-              >
-                <Icon name={item.icon} className="text-xl opacity-90" />
-                {!sidebarCollapsed && item.label}
-              </button>
-            );
-          })}
+          {navItems.map(item => (
+            <NavLink
+              key={`${item.label}-${item.id}`}
+              to={pathForPageId(item.id)}
+              className={({ isActive }) => `nav-item ${isActive ? 'nav-item-active' : 'nav-item-idle'}`}
+              title={sidebarCollapsed ? item.label : undefined}
+            >
+              <Icon name={item.icon} className="text-xl opacity-90" />
+              {!sidebarCollapsed && item.label}
+            </NavLink>
+          ))}
         </nav>
 
         <div className={`relative z-10 border-t border-cream/10 ${sidebarCollapsed ? 'p-2' : 'p-4'}`}>
@@ -1365,7 +1462,7 @@ function App() {
       </aside>
 
       <header className="fixed inset-x-0 top-0 z-50 flex h-14 items-center justify-between border-b border-primary-dark/10 bg-cream/80 px-4 backdrop-blur-md lg:hidden">
-        <h1 className="font-engraved text-2xl font-normal tracking-[0.14em] text-primary-dark">QUANT</h1>
+        <h1 className="font-engraved text-2xl font-normal tracking-[0.12em] text-primary-dark">QUANT</h1>
         <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-gold/40 bg-gold/10 font-serif text-sm font-medium text-gold">
           {userInitials}
         </div>
@@ -1387,33 +1484,41 @@ function App() {
           sidebarCollapsed ? 'lg:ml-[4.75rem]' : 'lg:ml-[17.5rem]'
         }`}
       >
-        <div className="mx-auto w-full min-w-0 max-w-[1180px]">
-          {currentPage === 'dashboard' && renderDashboard()}
-          {currentPage === 'savings' && renderSavingsGoals()}
-          {currentPage === 'activity' && renderActivity()}
-          {currentPage === 'expenses' && renderExpenses()}
-          {currentPage === 'settings' && renderSettings()}
-          {currentPage === 'admin' && user.is_admin && <AdminPage />}
-        </div>
+        <Routes>
+          <Route
+            element={
+              <div className="mx-auto w-full min-w-0 max-w-[1180px]">
+                <AnimatedOutlet />
+              </div>
+            }
+          >
+            <Route path={PATHS.dashboard} element={renderDashboard()} />
+            <Route path={PATHS.savings} element={renderSavingsGoals()} />
+            <Route path={PATHS.activity} element={renderActivity()} />
+            <Route path={PATHS.expenses} element={renderExpenses()} />
+            <Route path={PATHS.settings} element={renderSettings()} />
+            {user.is_admin ? <Route path={PATHS.admin} element={<AdminPage />} /> : null}
+            <Route path="/" element={<Navigate to={PATHS.dashboard} replace />} />
+            <Route path="*" element={<Navigate to={PATHS.dashboard} replace />} />
+          </Route>
+        </Routes>
       </main>
 
       <nav className={`fixed inset-x-0 bottom-0 z-50 grid ${user.is_admin ? 'grid-cols-6' : 'grid-cols-5'} border-t border-primary-dark/10 bg-ivory/90 px-1 py-2 shadow-lift backdrop-blur-md lg:hidden`}>
-        {mobileNavItems.map(item => {
-          const active = currentPage === item.id;
-          return (
-            <button
-              key={`bottom-${item.label}`}
-              type="button"
-              onClick={() => selectPage(item.id)}
-              className={`flex flex-col items-center gap-0.5 rounded-lg px-0.5 py-2 font-sans text-[10px] font-medium tracking-wide transition-colors ${
-                active ? 'text-gold' : 'text-taupe/70'
-              }`}
-            >
-              <Icon name={item.icon} className="text-xl" />
-              {item.label}
-            </button>
-          );
-        })}
+        {mobileNavItems.map(item => (
+          <NavLink
+            key={`bottom-${item.label}`}
+            to={pathForPageId(item.id)}
+            className={({ isActive }) =>
+              `flex flex-col items-center gap-0.5 rounded-lg px-0.5 py-2 font-sans text-xs font-medium tracking-wide transition-colors ${
+                isActive ? 'text-gold' : 'text-taupe'
+              }`
+            }
+          >
+            <Icon name={item.icon} className="text-xl" />
+            {item.label}
+          </NavLink>
+        ))}
       </nav>
     </div>
   );

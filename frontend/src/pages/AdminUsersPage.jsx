@@ -121,7 +121,7 @@ function AdminUsersPage() {
   return (
     <div className="space-y-8">
       <section>
-        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+        <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
           Admin Console
         </p>
         <h2 className="mt-2 font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark md:text-5xl">
@@ -174,14 +174,14 @@ function AdminUsersPage() {
                     <button
                       type="button"
                       onClick={() => handleSort(column.key)}
-                      className="flex items-center gap-1 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe transition-colors hover:text-primary-dark"
+                      className="flex items-center gap-1 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe transition-colors hover:text-primary-dark"
                     >
                       {column.label}
                       <Icon name={sortIcon(column.key)} className="text-sm" />
                     </button>
                   </th>
                 ))}
-                <th className="px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                <th className="px-4 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                   Actions
                 </th>
               </tr>
@@ -207,7 +207,7 @@ function AdminUsersPage() {
                     <div className="flex items-center gap-2">
                       {member.full_name}
                       {member.is_admin && (
-                        <span className="rounded-full bg-primary-dark px-2 py-0.5 font-sans text-[9px] font-normal uppercase tracking-[0.14em] text-cream">
+                        <span className="rounded-full bg-primary-dark px-2 py-0.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream">
                           Admin
                         </span>
                       )}
@@ -218,7 +218,7 @@ function AdminUsersPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex rounded-full px-2.5 py-1 font-sans text-[10px] font-normal uppercase tracking-[0.14em] ${
+                      className={`inline-flex rounded-full px-2.5 py-1 font-sans text-xs font-normal uppercase tracking-[0.12em] ${
                         member.is_active === false
                           ? 'bg-red-100 text-red-700'
                           : 'bg-emerald-100 text-emerald-800'
@@ -246,7 +246,7 @@ function AdminUsersPage() {
                           event.stopPropagation();
                           setSelectedUserId(member.user_id);
                         }}
-                        className="inline-flex items-center gap-1 rounded-lg border border-gold/40 px-2.5 py-1 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold transition-colors hover:bg-gold hover:text-primary-dark"
+                        className="inline-flex items-center gap-1 rounded-lg border border-gold/40 px-2.5 py-1 font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold transition-colors hover:bg-gold hover:text-primary-dark"
                       >
                         <Icon name="visibility" className="text-sm" />
                         View
@@ -256,7 +256,7 @@ function AdminUsersPage() {
                           type="button"
                           disabled={statusUpdatingId === member.user_id}
                           onClick={(event) => handleStatusChange(member, member.is_active === false, event)}
-                          className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 font-sans text-[10px] font-normal uppercase tracking-[0.14em] transition-colors disabled:opacity-50 ${
+                          className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-colors disabled:opacity-50 ${
                             member.is_active === false
                               ? 'border-emerald-300 text-emerald-800 hover:bg-emerald-50'
                               : 'border-red-300 text-red-700 hover:bg-red-50'

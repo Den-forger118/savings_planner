@@ -192,13 +192,13 @@ const CombinedTooltip = ({ active, payload, mode, goals, hoveredGoalId }) => {
         <p className="truncate font-sans text-sm font-normal text-gold">{goal.goal_name}</p>
       </div>
 
-      <p className="mt-1 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-cream/50">
+      <p className="mt-1 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/50">
         {formatTooltipDate(meta.date || row?.date)}
       </p>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <div>
-          <p className="font-sans text-[9px] font-normal uppercase tracking-[0.14em] text-cream/45">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/60">
             {mode === 'percent' ? 'Progress' : 'Balance'}
           </p>
           <p className="mt-0.5 font-money text-xl font-light text-cream">
@@ -206,7 +206,7 @@ const CombinedTooltip = ({ active, payload, mode, goals, hoveredGoalId }) => {
           </p>
         </div>
         <div>
-          <p className="font-sans text-[9px] font-normal uppercase tracking-[0.14em] text-cream/45">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/60">
             Target
           </p>
           <p className="mt-0.5 font-money text-sm font-light text-cream/80">
@@ -228,14 +228,14 @@ const CombinedTooltip = ({ active, payload, mode, goals, hoveredGoalId }) => {
 
       {meta.isEvent && (
         <div className="mt-3 border-t border-cream/15 pt-2">
-          <p className="font-sans text-[9px] font-normal uppercase tracking-[0.14em] text-cream/45">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/60">
             This transaction
           </p>
           <p className={`mt-0.5 font-money text-base font-light ${
             meta.type === 'deposit' ? 'text-gold' : 'text-red-400'
           }`}>
             {meta.type === 'deposit' ? '+' : '−'}${meta.amount.toFixed(2)}
-            <span className="ml-2 font-sans text-[10px] font-normal uppercase tracking-wide text-cream/50">
+            <span className="ml-2 font-sans text-xs font-normal uppercase tracking-wide text-cream/50">
               {meta.type}
             </span>
           </p>
@@ -529,7 +529,7 @@ function GoalsLineGraph({ userId, goals: liveGoals, refreshKey = 0 }) {
               onClick={() => !isInactive && handleLegendClick(goal.goal_id)}
               onDoubleClick={() => !isInactive && toggleGoalVisibility(goal.goal_id)}
               disabled={isInactive}
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-sans text-[10px] font-normal uppercase tracking-wide transition-opacity ${
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-sans text-xs font-normal uppercase tracking-wide transition-opacity ${
                 isHidden || isInactive
                   ? 'border-gray-200 bg-gray-50 text-taupe/50 opacity-50'
                   : isFocused

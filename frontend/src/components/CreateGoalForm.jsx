@@ -122,7 +122,7 @@ function CreateGoalForm({
             <div className="modal-header">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+                  <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
                     New Objective
                   </p>
                   <h2 id="create-goal-title" className="mt-0.5 font-serif text-xl font-light leading-tight">

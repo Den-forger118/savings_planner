@@ -53,7 +53,6 @@ function SettingsPage({
   onBudgetSet,
   onEarnerModeChange,
   onLogout,
-  onThemeChange,
   onDensityChange,
   onNavigate,
   onGoalsChange,
@@ -65,7 +64,6 @@ function SettingsPage({
 
   const [currency, setCurrency] = useState(user?.currency || 'USD');
   const [currencySymbol, setCurrencySymbol] = useState(user?.currency_symbol || '$');
-  const [theme, setTheme] = useState(user?.theme || 'classic');
   const [uiDensity, setUiDensity] = useState(user?.ui_density || 'classic');
   const [fiscalStartMonth, setFiscalStartMonth] = useState(user?.fiscal_start_month || 1);
   const [alertPrefs, setAlertPrefs] = useState(parsePreferences(user));
@@ -92,14 +90,12 @@ function SettingsPage({
   useEffect(() => {
     setCurrency(user?.currency || 'USD');
     setCurrencySymbol(user?.currency_symbol || '$');
-    setTheme(user?.theme || 'classic');
     setUiDensity(user?.ui_density || 'classic');
-  }, [user?.currency, user?.currency_symbol, user?.theme, user?.ui_density]);
+  }, [user?.currency, user?.currency_symbol, user?.ui_density]);
 
-  const persistVisualTuning = async (nextTheme, nextDensity) => {
+  const persistDensity = async (nextDensity) => {
     try {
       const response = await api.put(`/users/${user.user_id}/preferences`, {
-        theme: nextTheme,
         ui_density: nextDensity,
         fiscal_start_month: fiscalStartMonth,
         preferences: alertPrefs,
@@ -112,16 +108,10 @@ function SettingsPage({
     }
   };
 
-  const selectTheme = (nextTheme) => {
-    setTheme(nextTheme);
-    onThemeChange?.(nextTheme);
-    persistVisualTuning(nextTheme, uiDensity);
-  };
-
   const selectDensity = (nextDensity) => {
     setUiDensity(nextDensity);
     onDensityChange?.(nextDensity);
-    persistVisualTuning(theme, nextDensity);
+    persistDensity(nextDensity);
   };
 
   const tokenExpiry = useMemo(
@@ -263,7 +253,6 @@ function SettingsPage({
     setSaving(true);
     try {
       const response = await api.put(`/users/${user.user_id}/preferences`, {
-        theme,
         ui_density: uiDensity,
         fiscal_start_month: fiscalStartMonth,
         preferences: alertPrefs,
@@ -277,7 +266,6 @@ function SettingsPage({
     } finally {
       setSaving(false);
     }
-    onThemeChange(theme);
     onDensityChange(uiDensity);
   };
 
@@ -439,11 +427,11 @@ function SettingsPage({
                 <p className="mt-1 font-sans text-sm text-taupe">Your private ledger identity</p>
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">Name</p>
+                    <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">Name</p>
                     <p className="mt-1 font-sans text-primary-dark">{user.first_name} {user.last_name}</p>
                   </div>
                   <div>
-                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">Email</p>
+                    <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">Email</p>
                     <p className="mt-1 font-sans text-primary-dark">{user.email}</p>
                   </div>
                 </div>
@@ -456,7 +444,7 @@ function SettingsPage({
                 </p>
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div className="flex-1">
-                    <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                    <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                       Currency
                     </label>
                     <select
@@ -476,7 +464,7 @@ function SettingsPage({
                     </select>
                   </div>
                   <div className="rounded-lg border border-gold/30 bg-cream/40 px-4 py-2.5">
-                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">Preview</p>
+                    <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">Preview</p>
                     <p className="mt-0.5 font-money text-xl font-light tracking-[0.02em] text-gold">
                       {formatMoney(12450.75, currency, currencySymbol)}
                     </p>
@@ -486,52 +474,27 @@ function SettingsPage({
 
               <section className={panelClass}>
                 <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Visual Tuning</h3>
-                <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                  <div>
-                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">Theme</p>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      {[
-                        { id: 'classic', label: 'Classic Cream', icon: 'light_mode' },
-                        { id: 'midnight', label: 'Midnight Navy', icon: 'dark_mode' },
-                      ].map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => selectTheme(option.id)}
-                          className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-sans text-sm transition-colors ${
-                            theme === option.id
-                              ? 'border-gold bg-primary-dark text-cream'
-                              : 'border-cream text-primary-dark hover:border-gold/50'
-                          }`}
-                        >
-                          <Icon name={option.icon} className="text-base" />
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">UI Density</p>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      {[
-                        { id: 'classic', label: 'Classic', desc: 'Spacious cards' },
-                        { id: 'compact', label: 'Compact', desc: 'Dense ledger' },
-                      ].map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => selectDensity(option.id)}
-                          className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                            uiDensity === option.id
-                              ? 'border-gold bg-cream/60'
-                              : 'border-cream hover:border-gold/50'
-                          }`}
-                        >
-                          <p className="font-sans text-sm font-normal text-primary-dark">{option.label}</p>
-                          <p className="font-sans text-xs text-taupe">{option.desc}</p>
-                        </button>
-                      ))}
-                    </div>
+                <div className="mt-5">
+                  <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">UI Density</p>
+                  <div className="mt-2 grid max-w-md grid-cols-2 gap-2">
+                    {[
+                      { id: 'classic', label: 'Classic', desc: 'Spacious cards' },
+                      { id: 'compact', label: 'Compact', desc: 'Dense ledger' },
+                    ].map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => selectDensity(option.id)}
+                        className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                          uiDensity === option.id
+                            ? 'border-gold bg-cream/60'
+                            : 'border-cream hover:border-gold/50'
+                        }`}
+                      >
+                        <p className="font-sans text-sm font-normal text-primary-dark">{option.label}</p>
+                        <p className="font-sans text-xs text-taupe">{option.desc}</p>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </section>
@@ -543,7 +506,7 @@ function SettingsPage({
                 </p>
                 <div className="mt-4 space-y-4">
                   <div>
-                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                    <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                       Budget Runway Alerts
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -669,7 +632,7 @@ function SettingsPage({
 
                 <form onSubmit={handleCreateCategory} className="mt-4 flex flex-wrap items-end gap-3 border-t border-cream pt-4">
                   <div className="flex-1 min-w-[140px]">
-                    <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                    <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                       New Category
                     </label>
                     <input
@@ -740,7 +703,7 @@ function SettingsPage({
                 <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Password Rotation</h3>
                 <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4 max-w-md">
                   <div>
-                    <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                    <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                       Current Password
                     </label>
                     <input
@@ -752,7 +715,7 @@ function SettingsPage({
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                    <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                       New Password
                     </label>
                     <input
@@ -765,7 +728,7 @@ function SettingsPage({
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                    <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                       Confirm New Password
                     </label>
                     <input
@@ -780,7 +743,7 @@ function SettingsPage({
                   <button
                     type="submit"
                     disabled={passwordSaving}
-                    className="rounded-md bg-primary-dark px-3.5 py-2 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
+                    className="rounded-md bg-primary-dark px-3.5 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
                   >
                     {passwordSaving ? 'Updating…' : 'Update Password'}
                   </button>
@@ -801,7 +764,7 @@ function SettingsPage({
                     type="button"
                     onClick={() => downloadExport('json')}
                     disabled={exportLoading}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-primary-dark px-3 py-1.5 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary-dark px-3 py-1.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
                   >
                     <Icon name="data_object" className="text-sm" />
                     Export JSON
@@ -810,7 +773,7 @@ function SettingsPage({
                     type="button"
                     onClick={() => downloadExport('csv')}
                     disabled={exportLoading}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-primary-dark px-3 py-1.5 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary-dark px-3 py-1.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
                   >
                     <Icon name="table" className="text-sm" />
                     Export CSV
@@ -848,7 +811,7 @@ function SettingsPage({
                   type="button"
                   onClick={handleEmptyTrash}
                   disabled={!trashGoals.length || trashActionId === 'empty'}
-                  className="rounded-md border border-red-200 px-4 py-2 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-red-700 transition-colors hover:bg-red-50 disabled:opacity-40"
+                  className="rounded-md border border-red-200 px-4 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-red-700 transition-colors hover:bg-red-50 disabled:opacity-40"
                 >
                   {trashActionId === 'empty' ? 'Emptying…' : 'Empty Trash'}
                 </button>
@@ -898,7 +861,7 @@ function SettingsPage({
                           type="button"
                           onClick={() => handleRestoreGoal(goal.goal_id)}
                           disabled={trashActionId === goal.goal_id}
-                          className="rounded-md bg-primary-dark px-3 py-1.5 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-50"
+                          className="rounded-md bg-primary-dark px-3 py-1.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-50"
                         >
                           Restore
                         </button>
@@ -906,7 +869,7 @@ function SettingsPage({
                           type="button"
                           onClick={() => handlePermanentDelete(goal.goal_id, goal.name)}
                           disabled={trashActionId === goal.goal_id}
-                          className="rounded-md border border-red-200 px-3 py-1.5 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
+                          className="rounded-md border border-red-200 px-3 py-1.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
                         >
                           Delete Forever
                         </button>

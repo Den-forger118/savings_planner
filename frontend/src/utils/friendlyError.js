@@ -20,8 +20,16 @@ const KNOWN_PATTERNS = [
     message: 'Please choose a password with at least 8 characters.',
   },
   {
-    test: /invalid email or password|incorrect password|invalid credentials/i,
+    test: /invalid email or password|incorrect password|invalid credentials|doesn’t look right|doesn't look right/i,
     message: 'That email or password doesn’t look right. Please try again.',
+  },
+  {
+    test: /sign-in is paused|temporarily paused|too many.*attempt/i,
+    message: 'For your security, sign-in is paused for a few minutes.',
+  },
+  {
+    test: /account deactivated|account is deactivated/i,
+    message: 'This account is deactivated. Please contact support.',
   },
   {
     test: /email already|already registered|already exists|duplicate/i,
@@ -96,14 +104,29 @@ function isTechnical(message) {
  */
 export function getFriendlyError(error, fallback = 'Something didn’t go through. Please try again.') {
   const status = error?.response?.status;
+  const data = error?.response?.data;
   const raw = extractRawMessage(error);
+  const code = data?.code;
 
   if (!error?.response && (error?.code === 'ERR_NETWORK' || /network|timeout|failed to fetch/i.test(raw))) {
     return 'We couldn’t reach QUANT right now. Check your connection and try again.';
   }
 
+  if (code === 'LOGIN_LOCKED' || status === 429) {
+    return data?.error || 'For your security, sign-in is paused for a few minutes.';
+  }
+
   if (status >= 500) {
     return 'Our servers need a moment. Your ledger is safe — please try again shortly.';
+  }
+
+  // Prefer known copy before generic session messaging (login uses 401 too)
+  for (const rule of KNOWN_PATTERNS) {
+    if (rule.test.test(raw)) return rule.message;
+  }
+
+  if (code === 'INVALID_CREDENTIALS') {
+    return 'That email or password doesn’t look right. Please try again.';
   }
 
   if (status === 401) {
@@ -111,21 +134,11 @@ export function getFriendlyError(error, fallback = 'Something didn’t go throug
   }
 
   if (status === 403) {
-    for (const rule of KNOWN_PATTERNS) {
-      if (rule.test.test(raw)) return rule.message;
-    }
     return 'You don’t have permission to do that.';
   }
 
   if (status === 404) {
-    for (const rule of KNOWN_PATTERNS) {
-      if (rule.test.test(raw)) return rule.message;
-    }
     return 'We couldn’t find what you were looking for.';
-  }
-
-  for (const rule of KNOWN_PATTERNS) {
-    if (rule.test.test(raw)) return rule.message;
   }
 
   if (raw && !isTechnical(raw)) {
@@ -133,6 +146,32 @@ export function getFriendlyError(error, fallback = 'Something didn’t go throug
   }
 
   return fallback;
+}
+
+/** Structured login lock / attempt info from an auth error response. */
+export function getLoginThrottleInfo(error) {
+  const data = error?.response?.data;
+  if (!data) return null;
+
+  if (data.code === 'LOGIN_LOCKED' || error?.response?.status === 429) {
+    return {
+      kind: 'locked',
+      lockedUntil: data.lockedUntil || null,
+      retryAfterSeconds: Number(data.retryAfterSeconds) || 0,
+      message: data.error || 'For your security, sign-in is paused for a few minutes.',
+    };
+  }
+
+  if (data.code === 'INVALID_CREDENTIALS' && Number.isFinite(Number(data.attemptsRemaining))) {
+    return {
+      kind: 'attempts',
+      attemptsRemaining: Number(data.attemptsRemaining),
+      failedAttempts: Number(data.failedAttempts) || null,
+      message: data.error || 'That email or password doesn’t look right.',
+    };
+  }
+
+  return null;
 }
 
 export function isServerUnavailable(error) {

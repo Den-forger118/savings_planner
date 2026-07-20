@@ -108,8 +108,10 @@ function ExpenseForm({
         expenseDate: formData.expenseDate,
       });
 
-      onExpenseAdded(response.data.expense);
       closeModal();
+      window.requestAnimationFrame(() => {
+        onExpenseAdded(response.data.expense);
+      });
     } catch (err) {
       setError(getFriendlyError(err, 'We couldn’t log that expense. Please try again.'));
     } finally {
@@ -118,7 +120,7 @@ function ExpenseForm({
   };
 
   const triggerClass =
-    'inline-flex items-center justify-center gap-2 rounded-lg bg-primary-dark px-4 py-2.5 font-sans text-[11px] font-normal uppercase tracking-[0.14em] text-cream transition-colors hover:bg-primary-dark-alt';
+    'inline-flex items-center justify-center gap-2 rounded-lg bg-primary-dark px-4 py-2.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt';
 
   return (
     <>
@@ -149,7 +151,7 @@ function ExpenseForm({
             <div className="bg-primary-dark px-5 py-3.5 text-cream">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+                  <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
                     Capital Outflow
                   </p>
                   <h2 id="log-expense-title" className="mt-0.5 font-serif text-xl font-light tracking-[-0.015em] leading-tight">
@@ -171,7 +173,7 @@ function ExpenseForm({
               <div>
                 <label
                   htmlFor="expense-category"
-                  className="mb-1.5 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe"
+                  className="mb-1.5 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe"
                 >
                   Category
                 </label>
@@ -198,7 +200,7 @@ function ExpenseForm({
               <div>
                 <label
                   htmlFor="expense-amount"
-                  className="mb-1.5 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe"
+                  className="mb-1.5 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe"
                 >
                   Amount
                 </label>
@@ -222,7 +224,7 @@ function ExpenseForm({
               <div>
                 <label
                   htmlFor="expense-date"
-                  className="mb-1.5 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe"
+                  className="mb-1.5 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe"
                 >
                   Date
                 </label>
@@ -239,9 +241,9 @@ function ExpenseForm({
               <div>
                 <label
                   htmlFor="expense-note"
-                  className="mb-1.5 block font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe"
+                  className="mb-1.5 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe"
                 >
-                  Note <span className="font-normal normal-case tracking-normal text-taupe/70">(optional)</span>
+                  Note <span className="font-normal normal-case tracking-normal text-taupe">(optional)</span>
                 </label>
                 <input
                   id="expense-note"
@@ -261,14 +263,14 @@ function ExpenseForm({
                   type="button"
                   onClick={closeModal}
                   disabled={loading}
-                  className="rounded-md border border-gray-200 px-4 py-2 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-taupe transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                  className="rounded-md border border-gray-200 px-4 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading || categories.length === 0}
-                  className="rounded-md bg-primary-dark px-4 py-2 font-sans text-[11px] font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-50"
+                  className="rounded-md bg-primary-dark px-4 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-50"
                 >
                   {loading ? 'Logging...' : 'Log Expense'}
                 </button>

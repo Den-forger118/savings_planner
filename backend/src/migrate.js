@@ -53,6 +53,20 @@ const migrations = [
      ALTER COLUMN is_active SET DEFAULT true`,
   `ALTER TABLE users
      ALTER COLUMN is_active SET NOT NULL`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0`,
+  `UPDATE users
+     SET failed_login_attempts = 0
+     WHERE failed_login_attempts IS NULL`,
+  `ALTER TABLE users
+     ALTER COLUMN failed_login_attempts SET DEFAULT 0`,
+  `ALTER TABLE users
+     ALTER COLUMN failed_login_attempts SET NOT NULL`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS login_locked_until TIMESTAMPTZ`,
+  `UPDATE users
+     SET theme = 'classic'
+     WHERE theme = 'midnight'`,
   `ALTER TABLE saving_goals
      ADD COLUMN IF NOT EXISTS is_paused BOOLEAN DEFAULT false`,
   `UPDATE saving_goals

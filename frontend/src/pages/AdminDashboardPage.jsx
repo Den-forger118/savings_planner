@@ -13,6 +13,7 @@ import api from '../services/api';
 import { formatMoney } from '../utils/currency';
 import { getFriendlyError } from '../utils/friendlyError';
 import ErrorBanner from '../components/ErrorBanner';
+import ProgressBar from '../components/ProgressBar';
 
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
@@ -38,7 +39,7 @@ const CategoryTooltip = ({ active, payload }) => {
 
   return (
     <div className="rounded bg-primary-dark px-4 py-3 shadow-lg">
-      <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+      <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
         {name}
       </p>
       <p className="mt-1 font-money text-2xl font-light tracking-[0.02em] text-white">
@@ -113,7 +114,7 @@ function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       <section>
-        <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+        <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
           Admin Console
         </p>
         <h2 className="mt-2 font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark md:text-5xl">
@@ -132,7 +133,7 @@ function AdminDashboardPage() {
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                   {card.label}
                 </p>
                 <p className="mt-2 font-money text-3xl font-light tracking-[0.02em] text-primary-dark">
@@ -229,15 +230,17 @@ function AdminDashboardPage() {
                         {category.expense_count} entries · {money(category.total_amount)}
                       </p>
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-cream">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${widthPct}%`,
-                          backgroundColor: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
-                        }}
-                      />
-                    </div>
+                    <ProgressBar
+                      className="mt-2"
+                      value={widthPct}
+                      size="lg"
+                      rounded="rounded-full"
+                      trackClassName="bg-cream"
+                      fillClassName=""
+                      fillStyle={{
+                        backgroundColor: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+                      }}
+                    />
                   </div>
                 );
               })}

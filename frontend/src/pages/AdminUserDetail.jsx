@@ -118,7 +118,7 @@ function AdminUserDetail({ userId, onBack }) {
           >
             ← Back to members
           </button>
-          <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
             Member Support View
           </p>
           <h2 className="mt-2 font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark">
@@ -127,12 +127,12 @@ function AdminUserDetail({ userId, onBack }) {
           <p className="mt-2 font-sans text-sm text-taupe">{user.email}</p>
         </div>
         <div className="flex flex-col items-start gap-3 sm:items-end">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-cream bg-cream/50 px-3 py-1.5 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-cream bg-cream/50 px-3 py-1.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
             <Icon name="visibility" className="text-sm" />
             Read-only
           </span>
           <span
-            className={`inline-flex rounded-full px-3 py-1.5 font-sans text-[10px] font-normal uppercase tracking-[0.14em] ${
+            className={`inline-flex rounded-full px-3 py-1.5 font-sans text-xs font-normal uppercase tracking-[0.12em] ${
               user.is_active === false
                 ? 'bg-red-100 text-red-700'
                 : 'bg-emerald-100 text-emerald-800'
@@ -146,7 +146,7 @@ function AdminUserDetail({ userId, onBack }) {
               type="button"
               disabled={statusUpdating}
               onClick={() => handleStatusChange(user.is_active === false)}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 font-sans text-[10px] font-normal uppercase tracking-[0.14em] transition-colors disabled:opacity-50 ${
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-colors disabled:opacity-50 ${
                 user.is_active === false
                   ? 'border-emerald-300 text-emerald-800 hover:bg-emerald-50'
                   : 'border-red-300 text-red-700 hover:bg-red-50'
@@ -176,7 +176,7 @@ function AdminUserDetail({ userId, onBack }) {
           ['Joined', formatDate(user.created_at)],
         ].map(([label, value]) => (
           <div key={label} className="rounded-lg border border-cream bg-white p-4 shadow-sm">
-            <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">{label}</p>
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">{label}</p>
             <p className="mt-1 font-sans text-sm font-normal text-primary-dark">{value}</p>
           </div>
         ))}
@@ -191,7 +191,7 @@ function AdminUserDetail({ userId, onBack }) {
             <thead>
               <tr className="border-b border-cream bg-cream/30">
                 {['Name', 'Target', 'Saved', 'Progress', 'Deadline', 'Status'].map((label) => (
-                  <th key={label} className="px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                  <th key={label} className="px-4 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                     {label}
                   </th>
                 ))}
@@ -235,7 +235,7 @@ function AdminUserDetail({ userId, onBack }) {
             <thead>
               <tr className="border-b border-cream bg-cream/30">
                 {['Date', 'Goal', 'Type', 'Amount', 'Note'].map((label) => (
-                  <th key={label} className="px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                  <th key={label} className="px-4 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                     {label}
                   </th>
                 ))}
@@ -274,7 +274,7 @@ function AdminUserDetail({ userId, onBack }) {
             <thead>
               <tr className="border-b border-cream bg-cream/30">
                 {['Date', 'Category', 'Amount', 'Note'].map((label) => (
-                  <th key={label} className="px-4 py-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-taupe">
+                  <th key={label} className="px-4 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                     {label}
                   </th>
                 ))}

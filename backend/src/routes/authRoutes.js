@@ -5,6 +5,30 @@ const jwt = require('jsonwebtoken');
 const pool = require('../dbcon');
 const { formatAuthUser } = require('../utils/authUser');
 
+const MAX_FAILED_ATTEMPTS = 3;
+const LOCK_DURATION_MS = 5 * 60 * 1000;
+
+function buildLockPayload(lockedUntil) {
+  const until = new Date(lockedUntil);
+  const retryAfterSeconds = Math.max(0, Math.ceil((until.getTime() - Date.now()) / 1000));
+  return {
+    code: 'LOGIN_LOCKED',
+    error: 'For your security, sign-in is paused for a few minutes.',
+    lockedUntil: until.toISOString(),
+    retryAfterSeconds,
+  };
+}
+
+async function clearLoginLock(userId) {
+  await pool.query(
+    `UPDATE users
+     SET failed_login_attempts = 0,
+         login_locked_until = NULL
+     WHERE user_id = $1`,
+    [userId]
+  );
+}
+
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
@@ -85,44 +109,83 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validation
     if (!email || !password) {
       return res.status(400).json({ 
         error: 'Please provide email and password' 
       });
     }
 
-    // Find user by email
+    const normalizedEmail = String(email).trim().toLowerCase();
+
     const result = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
+      'SELECT * FROM users WHERE LOWER(email) = $1',
+      [normalizedEmail]
     );
 
     const user = result.rows[0];
 
-    // Check if user exists
+    // Same generic message whether or not the account exists
     if (!user) {
-      return res.status(401).json({ 
-        error: 'Invalid email or password' 
+      return res.status(401).json({
+        code: 'INVALID_CREDENTIALS',
+        error: 'That email or password doesn’t look right.',
       });
     }
 
-    // Compare password with hash
+    const lockedUntilRaw = user.login_locked_until;
+    if (lockedUntilRaw) {
+      const lockedUntil = new Date(lockedUntilRaw);
+      if (lockedUntil.getTime() > Date.now()) {
+        return res.status(429).json(buildLockPayload(lockedUntil));
+      }
+      await clearLoginLock(user.user_id);
+      user.failed_login_attempts = 0;
+      user.login_locked_until = null;
+    }
+
     const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!passwordMatch) {
-      return res.status(401).json({ 
-        error: 'Invalid email or password' 
+      const nextAttempts = (Number(user.failed_login_attempts) || 0) + 1;
+
+      if (nextAttempts >= MAX_FAILED_ATTEMPTS) {
+        const lockedUntil = new Date(Date.now() + LOCK_DURATION_MS);
+        await pool.query(
+          `UPDATE users
+           SET failed_login_attempts = $1,
+               login_locked_until = $2
+           WHERE user_id = $3`,
+          [nextAttempts, lockedUntil.toISOString(), user.user_id]
+        );
+        return res.status(429).json(buildLockPayload(lockedUntil));
+      }
+
+      await pool.query(
+        `UPDATE users
+         SET failed_login_attempts = $1,
+             login_locked_until = NULL
+         WHERE user_id = $2`,
+        [nextAttempts, user.user_id]
+      );
+
+      const attemptsRemaining = MAX_FAILED_ATTEMPTS - nextAttempts;
+      return res.status(401).json({
+        code: 'INVALID_CREDENTIALS',
+        error: 'That email or password doesn’t look right.',
+        failedAttempts: nextAttempts,
+        attemptsRemaining,
       });
     }
 
     if (user.is_active === false) {
       return res.status(403).json({
-        error: 'Account deactivated. Contact support.',
+        code: 'ACCOUNT_DEACTIVATED',
+        error: 'This account is deactivated. Please contact support.',
       });
     }
 
-    // Generate JWT token
+    await clearLoginLock(user.user_id);
+
     const token = jwt.sign(
       { userId: user.user_id, email: user.email },
       process.env.JWT_SECRET,

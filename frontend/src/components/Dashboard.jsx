@@ -3,6 +3,8 @@ import ExpenseHistogram from './ExpenseHistogram';
 import GoalsLineGraph from './GoalsLineGraph';
 import RecentActivity from './RecentActivity';
 import { formatMoney } from '../utils/currency';
+import OdometerNumber from './OdometerNumber';
+import ProgressBar from './ProgressBar';
 
 function Dashboard({
   userId,
@@ -77,7 +79,7 @@ function Dashboard({
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <div className="surface-navy p-5 text-cream">
-              <p className="mb-2 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold/80">
+              <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold/80">
                 Your Monthly Budget
               </p>
               <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl">{fmt(budgetAmount)}</p>
@@ -85,7 +87,7 @@ function Dashboard({
             </div>
 
             <div className="stat-tile">
-              <p className="mb-2 font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe">
+              <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                 Allocated to Goals
               </p>
               <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl text-primary-dark">
@@ -97,7 +99,7 @@ function Dashboard({
             </div>
 
             <div className="stat-tile">
-              <p className="mb-2 font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe">
+              <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                 Unallocated
               </p>
               <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl text-primary-dark">
@@ -107,7 +109,7 @@ function Dashboard({
             </div>
 
             <div className="stat-tile">
-              <p className="mb-2 font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe">
+              <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                 Goals Status
               </p>
               <div className="flex gap-5">
@@ -133,13 +135,13 @@ function Dashboard({
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="stat-tile">
-              <p className="mb-2 font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe">
+              <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                 Total Goals
               </p>
               <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl text-primary-dark">{goals.length}</p>
             </div>
             <div className="stat-tile">
-              <p className="mb-2 font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe">
+              <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                 Total Target
               </p>
               <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl text-primary-dark">
@@ -147,11 +149,11 @@ function Dashboard({
               </p>
             </div>
             <div className="stat-tile">
-              <p className="mb-2 font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe">
+              <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
                 Total Saved
               </p>
               <p className="font-money text-2xl font-light tracking-[0.02em] sm:text-3xl text-primary-dark">
-                {fmt(totalSaved)}
+                <OdometerNumber value={totalSaved} prefix={currencySymbol} />
               </p>
             </div>
           </div>
@@ -233,12 +235,11 @@ function Dashboard({
                       <p className="font-sans text-sm font-normal text-primary-dark">{goal.name}</p>
                       <p className="font-money font-light text-primary-dark">{fmt(goal.allocated)}</p>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded bg-gold/25">
-                      <div
-                        className="h-1.5 rounded bg-gold transition-all duration-500"
-                        style={{ width: `${(goal.allocated / budgetAmount) * 100}%` }}
-                      />
-                    </div>
+                    <ProgressBar
+                      value={(goal.allocated / budgetAmount) * 100}
+                      size="md"
+                      rounded="rounded"
+                    />
                     <p className="mt-1 font-sans text-xs text-taupe">
                       {((goal.allocated / budgetAmount) * 100).toFixed(1)}% of budget
                     </p>
@@ -264,7 +265,7 @@ function Dashboard({
                   >
                     <div className="mb-2 flex items-start justify-between gap-2">
                       <p className="font-sans font-normal text-primary-dark">{goal.name}</p>
-                      <span className={`rounded-md px-2 py-1 text-[10px] font-medium uppercase tracking-wide ${
+                      <span className={`rounded-md px-2 py-1 text-xs font-medium uppercase tracking-wide ${
                         goal.feasible
                           ? 'bg-emerald-500/20 text-emerald-700'
                           : 'bg-amber-500/20 text-amber-800'

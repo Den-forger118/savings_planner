@@ -29,7 +29,7 @@ api.interceptors.response.use(
       if (localStorage.getItem('token')) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/';
+        window.location.href = '/login';
       }
     }
     return Promise.reject(error);

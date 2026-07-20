@@ -323,11 +323,11 @@ function ActivityLedger({
                 {dayGroups.map((group) => (
                   <div key={group.key} className="px-4 py-5 sm:px-5">
                     <div className="mb-4 flex items-center gap-3">
-                      <p className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+                      <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
                         {group.label}
                       </p>
                       <div className="h-px flex-1 bg-cream" />
-                      <p className="font-sans text-[10px] font-semibold uppercase tracking-wide text-taupe/60">
+                      <p className="font-sans text-xs font-semibold uppercase tracking-wide text-taupe/60">
                         {group.items.length} {group.items.length === 1 ? 'entry' : 'entries'}
                       </p>
                     </div>
@@ -364,7 +364,7 @@ function ActivityLedger({
                                       <p className="truncate font-serif text-base font-light tracking-[-0.015em] text-primary-dark sm:text-lg">
                                         {tx.goal_name || 'Goal'}
                                       </p>
-                                      <span className={`font-sans text-[10px] font-normal uppercase tracking-[0.12em] ${
+                                      <span className={`font-sans text-xs font-normal uppercase tracking-[0.12em] ${
                                         isDeposit ? 'text-gold' : 'text-red-600'
                                       }`}>
                                         {isDeposit ? 'Deposit' : 'Withdrawal'}
@@ -381,7 +381,7 @@ function ActivityLedger({
                                       </p>
                                     )}
 
-                                    <p className="mt-1 font-sans text-xs font-light text-taupe/70">
+                                    <p className="mt-1 font-sans text-xs font-light text-taupe">
                                       {formatTime(tx.created_at)}
                                     </p>
                                   </div>

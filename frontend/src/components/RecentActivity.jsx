@@ -137,7 +137,7 @@ function RecentActivity({
         <div className="divide-y divide-cream/80 px-4 py-2 sm:px-5">
           {dayGroups.map((group) => (
             <div key={group.key} className="py-4">
-              <p className="mb-3 font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-gold">
+              <p className="mb-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
                 {group.label}
               </p>
               <ol className="space-y-0">
@@ -168,7 +168,7 @@ function RecentActivity({
                               {tx.note}
                             </p>
                           ) : null}
-                          <p className="mt-0.5 font-sans text-xs font-light text-taupe/70">
+                          <p className="mt-0.5 font-sans text-xs font-light text-taupe">
                             {formatTime(tx.created_at)} · {isDeposit ? 'Deposit' : 'Withdrawal'}
                           </p>
                         </div>
@@ -178,7 +178,7 @@ function RecentActivity({
                           }`}>
                             {isDeposit ? '+' : '−'}{fmt(amount)}
                           </p>
-                          <p className="mt-0.5 font-money text-[11px] font-light text-taupe">
+                          <p className="mt-0.5 font-money text-xs font-light text-taupe">
                             Bal {fmt(parseAmount(tx.balance_after))}
                           </p>
                         </div>
