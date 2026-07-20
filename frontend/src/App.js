@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Routes, Route, Navigate, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
 import api from './services/api';
@@ -1009,6 +1009,23 @@ function App() {
     return Number.isFinite(amount) ? amount : null;
   };
 
+  const fetchData = useCallback(async () => {
+    if (!user?.user_id) return;
+
+    try {
+      const goalsResponse = await api.get(
+        `/goals?userId=${user.user_id}`
+      );
+      setGoals(goalsResponse.data.goals);
+      setMonthlyBudget(normalizeAmount(goalsResponse.data.monthly_budget));
+      setIsEarnerMode(goalsResponse.data.mode === 'earner');
+      setLoading(false);
+    } catch (err) {
+      setError(err);
+      setLoading(false);
+    }
+  }, [user?.user_id]);
+
   useEffect(() => {
     document.documentElement.classList.remove('theme-midnight');
 
@@ -1031,7 +1048,7 @@ function App() {
       return;
     }
     fetchData();
-  }, [user]);
+  }, [user, fetchData]);
 
   const handleOnboardingComplete = (updatedUser) => {
     localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -1048,21 +1065,6 @@ function App() {
       setGoalsPage(totalPages);
     }
   }, [goals.length, goalsPage]);
-
-  const fetchData = async () => {
-    try {
-      const goalsResponse = await api.get(
-        `/goals?userId=${user.user_id}`
-      );
-      setGoals(goalsResponse.data.goals);
-      setMonthlyBudget(normalizeAmount(goalsResponse.data.monthly_budget));
-      setIsEarnerMode(goalsResponse.data.mode === 'earner');
-      setLoading(false);
-    } catch (err) {
-      setError(err);
-      setLoading(false);
-    }
-  };
 
   const handleLogin = (userData) => {
     setUser(userData);

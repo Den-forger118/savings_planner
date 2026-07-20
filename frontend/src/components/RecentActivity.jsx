@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../services/api';
 import { formatMoney } from '../utils/currency';
 import { getFriendlyError } from '../utils/friendlyError';
@@ -68,11 +68,7 @@ function RecentActivity({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchRecent();
-  }, [userId, refreshKey, limit]);
-
-  const fetchRecent = async () => {
+  const fetchRecent = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -89,7 +85,11 @@ function RecentActivity({
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, limit]);
+
+  useEffect(() => {
+    fetchRecent();
+  }, [fetchRecent, refreshKey]);
 
   const dayGroups = useMemo(
     () => groupTransactionsByDay(transactions),

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   BarChart,
   Bar,
@@ -96,11 +96,7 @@ function ExpenseHistogram({
   const [error, setError] = useState(null);
   const [tooltipPos, setTooltipPos] = useState(undefined);
 
-  useEffect(() => {
-    fetchExpenseData();
-  }, [userId, selectedMonth, selectedYear, refreshTrigger]);
-
-  const fetchExpenseData = async () => {
+  const fetchExpenseData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -115,7 +111,11 @@ function ExpenseHistogram({
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    fetchExpenseData();
+  }, [fetchExpenseData, refreshTrigger]);
 
   const totalSpent = parseAmount(data?.total_spent);
   const monthChange = parseAmount(data?.month_over_month_change_percent);

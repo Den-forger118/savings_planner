@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../services/api';
 import Pagination from './Pagination';
 import { formatMoney } from '../utils/currency';
@@ -92,11 +92,7 @@ function ActivityLedger({
     setPage(1);
   }, [initialGoalFilter]);
 
-  useEffect(() => {
-    fetchLedger();
-  }, [userId, goalFilter, refreshKey, page, limit, search]);
-
-  const fetchLedger = async () => {
+  const fetchLedger = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -126,7 +122,11 @@ function ActivityLedger({
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, goalFilter, page, limit, search]);
+
+  useEffect(() => {
+    fetchLedger();
+  }, [fetchLedger, refreshKey]);
 
   const filteredTransactions = useMemo(() => {
     if (typeFilter === 'all') return transactions;

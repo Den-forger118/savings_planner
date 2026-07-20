@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   LineChart,
   Line,
@@ -265,11 +265,7 @@ function GoalsLineGraph({ userId, goals: liveGoals, refreshKey = 0 }) {
 
   const refreshToken = liveGoals.map((g) => g.saved_amount).join('-');
 
-  useEffect(() => {
-    fetchChartData();
-  }, [userId, refreshKey, refreshToken]);
-
-  const fetchChartData = async () => {
+  const fetchChartData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -282,7 +278,11 @@ function GoalsLineGraph({ userId, goals: liveGoals, refreshKey = 0 }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    fetchChartData();
+  }, [fetchChartData, refreshKey, refreshToken]);
 
   const activeGoals = useMemo(
     () => chartGoals.filter((goal) => goal.has_activity),
@@ -440,7 +440,7 @@ function GoalsLineGraph({ userId, goals: liveGoals, refreshKey = 0 }) {
 
     setHiddenGoalIds(hidden);
     setFocusedGoalId(null);
-  }, [chartGoals, refreshToken]);
+  }, [chartGoals, refreshToken, activeGoals]);
 
   if (loading) {
     return (

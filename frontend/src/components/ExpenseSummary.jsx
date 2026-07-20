@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../services/api';
 import Pagination from './Pagination';
 import ExpenseForm from './ExpenseForm';
@@ -27,17 +27,15 @@ function ExpenseSummary({
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [sort, setSort] = useState('expense_date_desc');
+  const hasDataRef = useRef(false);
 
   useEffect(() => {
     setPage(1);
+    hasDataRef.current = false;
   }, [userId, refreshTrigger, sort]);
 
-  useEffect(() => {
-    fetchExpenses();
-  }, [userId, refreshTrigger, page, limit, sort]);
-
-  const fetchExpenses = async () => {
-    const isInitial = data === null;
+  const fetchExpenses = useCallback(async () => {
+    const isInitial = !hasDataRef.current;
     if (isInitial) {
       setLoading(true);
     } else {
@@ -50,6 +48,7 @@ function ExpenseSummary({
         `/expenses?userId=${userId}&month=${selectedMonth}&year=${selectedYear}&page=${page}&limit=${limit}&sort=${sort}`
       );
       setData(response.data);
+      hasDataRef.current = true;
     } catch (err) {
       setError(getFriendlyError(err, 'We couldn’t load your expenses. Please try again.'));
       if (isInitial) {
@@ -59,7 +58,11 @@ function ExpenseSummary({
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [userId, selectedMonth, selectedYear, page, limit, sort]);
+
+  useEffect(() => {
+    fetchExpenses();
+  }, [fetchExpenses, refreshTrigger]);
 
   const months = [
     'January', 'February', 'March', 'April',

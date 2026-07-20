@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import api from '../services/api';
 import BudgetSetup from './BudgetSetup';
 import EarnerModeToggle from './EarnerModeToggle';
@@ -119,7 +119,7 @@ function SettingsPage({
     []
   );
 
-  const flash = (text, isError = false) => {
+  const flash = useCallback((text, isError = false) => {
     if (isError) {
       setError(getFriendlyError(text, typeof text === 'string' ? text : 'Something didn’t go through. Please try again.'));
       setMessage(null);
@@ -132,9 +132,9 @@ function SettingsPage({
       setError(null);
       setMessage(null);
     }, 4000);
-  };
+  }, []);
 
-  const loadTrash = async () => {
+  const loadTrash = useCallback(async () => {
     setTrashLoading(true);
     try {
       const response = await api.get(`/goals/trash?userId=${user.user_id}`);
@@ -144,9 +144,9 @@ function SettingsPage({
     } finally {
       setTrashLoading(false);
     }
-  };
+  }, [user.user_id, flash]);
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     setCategoriesLoading(true);
     try {
       const response = await api.get(`/expenses/categories?userId=${user.user_id}`);
@@ -156,7 +156,7 @@ function SettingsPage({
     } finally {
       setCategoriesLoading(false);
     }
-  };
+  }, [user.user_id, flash]);
 
   useEffect(() => {
     if (activeTab === 'financial') {
@@ -165,7 +165,7 @@ function SettingsPage({
     if (activeTab === 'trash') {
       loadTrash();
     }
-  }, [activeTab, user.user_id]);
+  }, [activeTab, loadCategories, loadTrash]);
 
   const handleRestoreGoal = async (goalId) => {
     setTrashActionId(goalId);
