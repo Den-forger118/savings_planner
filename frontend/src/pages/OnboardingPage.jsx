@@ -4,6 +4,7 @@ import { ONBOARDING_CURRENCIES, formatMoney, getCurrencyByCode } from '../utils/
 import { getFriendlyError } from '../utils/friendlyError';
 import ErrorBanner from '../components/ErrorBanner';
 import ProgressBar from '../components/ProgressBar';
+import OnboardingChapterShell from '../components/OnboardingChapterShell';
 
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
@@ -51,7 +52,7 @@ function CurrencyPicker({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between rounded-lg border-2 border-gray-200 bg-white px-4 py-3 text-left font-sans text-sm transition-colors hover:border-gold focus:border-gold focus:outline-none"
+        className="flex w-full items-center justify-between rounded-lg border border-primary-dark/15 bg-white px-4 py-3 text-left font-sans text-sm transition-colors hover:border-gold focus:border-gold focus:outline-none"
       >
         <span>
           {selected.symbol} — {selected.code} — {selected.name}
@@ -238,19 +239,22 @@ function OnboardingPage({ user, onComplete }) {
     switch (currentStepId) {
       case STEP_IDS.welcome:
         return (
-          <div className="text-center">
-            <h1 className="font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark md:text-5xl">
-              Welcome to QUANT, {user.first_name}.
-            </h1>
-            <p className="mx-auto mt-4 max-w-md font-sans text-base text-taupe">
-              Let&apos;s personalise your experience. This will only take a minute.
+          <div>
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.14em] text-gold">
+              Welcome
+            </p>
+            <h2 className="mt-2 font-serif text-3xl font-light tracking-[-0.025em] text-primary-dark sm:text-4xl">
+              Hello, {user.first_name}.
+            </h2>
+            <p className="mt-3 font-sans text-[15px] font-light leading-relaxed text-taupe">
+              Let&apos;s personalise your ledger. This will only take a minute.
             </p>
             <button
               type="button"
               onClick={goNext}
-              className="mt-10 rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
+              className="btn-navy mt-10 w-full py-3 text-white sm:w-auto sm:px-10"
             >
-              Get Started →
+              Begin →
             </button>
           </div>
         );
@@ -258,45 +262,54 @@ function OnboardingPage({ user, onComplete }) {
       case STEP_IDS.identity:
         return (
           <div>
-            <h1 className="font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark">How would you describe yourself?</h1>
-            <p className="mt-3 max-w-md font-sans text-base text-taupe">
-              This helps us tailor how the app works for you. You can change this anytime.
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.14em] text-gold">
+              Identity
             </p>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <h2 className="mt-2 font-serif text-3xl font-light tracking-[-0.025em] text-primary-dark sm:text-4xl">
+              How do you save?
+            </h2>
+            <p className="mt-3 font-sans text-[15px] font-light leading-relaxed text-taupe">
+              This shapes how QUANT works for you. You can change it anytime.
+            </p>
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
               {[
                 {
                   id: 'earner',
                   icon: 'work',
                   title: 'I have an income',
-                  description: 'Employed, freelancing, or receiving a regular allowance. I want to set a savings mandate from my earnings.',
+                  description: 'Set a savings mandate from regular earnings.',
                 },
                 {
                   id: 'non-earner',
                   icon: 'school',
                   title: 'I save when I can',
-                  description: 'Student, between jobs, or no fixed income. I want to track goals without a fixed monthly commitment.',
+                  description: 'Track goals without a fixed monthly commitment.',
                 },
               ].map((option) => (
                 <button
                   key={option.id}
                   type="button"
                   onClick={() => setData((prev) => ({ ...prev, mode: option.id }))}
-                  className={`rounded-lg border-2 p-6 text-left transition-all ${
+                  className={`rounded-lg border p-5 text-left transition-all ${
                     data.mode === option.id
-                      ? 'border-gold bg-white shadow-lg'
-                      : 'border-gray-200 bg-white hover:border-gold/50'
+                      ? 'border-gold bg-cream/40 shadow-soft'
+                      : 'border-primary-dark/12 bg-white hover:border-gold/50'
                   }`}
                 >
-                  <Icon name={option.icon} className="text-3xl text-gold" />
-                  <h3 className="mt-4 font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">{option.title}</h3>
-                  <p className="mt-2 font-sans text-sm leading-relaxed text-taupe">{option.description}</p>
+                  <Icon name={option.icon} className="text-2xl text-gold" />
+                  <h3 className="mt-3 font-serif text-lg font-light tracking-[-0.015em] text-primary-dark">
+                    {option.title}
+                  </h3>
+                  <p className="mt-1.5 font-sans text-sm font-light leading-relaxed text-taupe">
+                    {option.description}
+                  </p>
                 </button>
               ))}
             </div>
             <button
               type="button"
               onClick={handleIdentityContinue}
-              className="mt-8 rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
+              className="btn-navy mt-8 w-full py-3 text-white sm:w-auto sm:px-10"
             >
               Continue →
             </button>
@@ -306,9 +319,14 @@ function OnboardingPage({ user, onComplete }) {
       case STEP_IDS.income:
         return (
           <div>
-            <h1 className="font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark">What is your monthly income?</h1>
-            <p className="mt-3 max-w-md font-sans text-base text-taupe">
-              We&apos;ll use this to suggest a healthy savings budget. You set the final amount.
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.14em] text-gold">
+              Income
+            </p>
+            <h2 className="mt-2 font-serif text-3xl font-light tracking-[-0.025em] text-primary-dark sm:text-4xl">
+              Monthly income
+            </h2>
+            <p className="mt-3 font-sans text-[15px] font-light leading-relaxed text-taupe">
+              We&apos;ll suggest a healthy savings rate. You set the final amount.
             </p>
             <div className="mt-8 flex items-center gap-2">
               <span className="font-money text-3xl font-light tracking-[0.02em] text-gold">$</span>
@@ -323,14 +341,15 @@ function OnboardingPage({ user, onComplete }) {
               />
             </div>
             {incomeValue > 0 && (
-              <p className="mt-4 font-sans text-sm text-taupe">
-                💡 A healthy savings rate is 20% of income. Based on ${incomeValue.toFixed(2)}, we suggest saving ${suggestedBudget}/month.
+              <p className="mt-4 font-sans text-sm font-light leading-relaxed text-taupe">
+                A common starting point is 20% of income — about{' '}
+                <span className="font-money text-primary-dark">${suggestedBudget}</span> / month.
               </p>
             )}
             <button
               type="button"
               onClick={handleIncomeContinue}
-              className="mt-8 rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
+              className="btn-navy mt-8 w-full py-3 text-white sm:w-auto sm:px-10"
             >
               Continue →
             </button>
@@ -340,9 +359,14 @@ function OnboardingPage({ user, onComplete }) {
       case STEP_IDS.budget:
         return (
           <div>
-            <h1 className="font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark">How much can you commit to saving each month?</h1>
-            <p className="mt-3 max-w-md font-sans text-base text-taupe">
-              This is the total amount distributed across all your goals automatically.
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.14em] text-gold">
+              Budget
+            </p>
+            <h2 className="mt-2 font-serif text-3xl font-light tracking-[-0.025em] text-primary-dark sm:text-4xl">
+              Monthly savings commitment
+            </h2>
+            <p className="mt-3 font-sans text-[15px] font-light leading-relaxed text-taupe">
+              This total is distributed across your goals automatically.
             </p>
             <div className="mt-8 flex items-center gap-2">
               <span className="font-money text-3xl font-light tracking-[0.02em] text-gold">$</span>
@@ -356,11 +380,11 @@ function OnboardingPage({ user, onComplete }) {
               />
               <span className="shrink-0 font-sans text-sm text-taupe">/month</span>
             </div>
-            <p className="mt-4 font-sans text-xs text-taupe">You can change this anytime from your settings.</p>
+            <p className="mt-4 font-sans text-xs text-taupe">You can change this anytime in Settings.</p>
             <button
               type="button"
               onClick={handleBudgetContinue}
-              className="mt-8 rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
+              className="btn-navy mt-8 w-full py-3 text-white sm:w-auto sm:px-10"
             >
               Continue →
             </button>
@@ -370,9 +394,14 @@ function OnboardingPage({ user, onComplete }) {
       case STEP_IDS.currency:
         return (
           <div>
-            <h1 className="font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark">What currency do you save in?</h1>
-            <p className="mt-3 max-w-md font-sans text-base text-taupe">
-              All your goals and expenses will display in this currency.
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.14em] text-gold">
+              Currency
+            </p>
+            <h2 className="mt-2 font-serif text-3xl font-light tracking-[-0.025em] text-primary-dark sm:text-4xl">
+              Unit of account
+            </h2>
+            <p className="mt-3 font-sans text-[15px] font-light leading-relaxed text-taupe">
+              Goals and expenses will display in this currency.
             </p>
             <div className="mt-8">
               <CurrencyPicker
@@ -387,7 +416,7 @@ function OnboardingPage({ user, onComplete }) {
             <button
               type="button"
               onClick={goNext}
-              className="mt-8 rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
+              className="btn-navy mt-8 w-full py-3 text-white sm:w-auto sm:px-10"
             >
               Continue →
             </button>
@@ -397,58 +426,59 @@ function OnboardingPage({ user, onComplete }) {
       case STEP_IDS.goal:
         return (
           <div>
-            <h1 className="font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark">What are you saving towards?</h1>
-            <p className="mt-3 max-w-md font-sans text-base text-taupe">
-              Set your first goal now, or skip and do it from your dashboard.
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.14em] text-gold">
+              First goal
+            </p>
+            <h2 className="mt-2 font-serif text-3xl font-light tracking-[-0.025em] text-primary-dark sm:text-4xl">
+              What are you saving towards?
+            </h2>
+            <p className="mt-3 font-sans text-[15px] font-light leading-relaxed text-taupe">
+              Set your first objective now, or skip and add it from the dashboard.
             </p>
             <div className="mt-8 space-y-4">
               <div>
-                <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-                  Goal Name
-                </label>
+                <label className="field-label">Goal Name</label>
                 <input
                   type="text"
                   value={goalForm.name}
                   onChange={(e) => setGoalForm((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full rounded-lg border-2 border-gray-200 px-4 py-3 font-sans text-sm focus:border-gold focus:outline-none"
+                  className="field"
                   placeholder="e.g. Bali Trip"
                 />
               </div>
               <div>
-                <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-                  Target Amount
-                </label>
+                <label className="field-label">Target Amount</label>
                 <div className="flex items-center gap-2">
-                  <span className="font-money text-lg font-light tracking-[0.02em] text-gold">{data.currency_symbol}</span>
+                  <span className="font-money text-lg font-light tracking-[0.02em] text-gold">
+                    {data.currency_symbol}
+                  </span>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={goalForm.targetAmount}
                     onChange={(e) => setGoalForm((prev) => ({ ...prev, targetAmount: e.target.value }))}
-                    className="w-full rounded-lg border-2 border-gray-200 px-4 py-3 font-sans text-sm focus:border-gold focus:outline-none"
+                    className="field"
                   />
                 </div>
               </div>
               <div>
-                <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-                  Deadline
-                </label>
+                <label className="field-label">Deadline</label>
                 <input
                   type="date"
                   value={goalForm.deadline}
                   onChange={(e) => setGoalForm((prev) => ({ ...prev, deadline: e.target.value }))}
                   min={new Date().toISOString().slice(0, 10)}
-                  className="w-full rounded-lg border-2 border-gray-200 px-4 py-3 font-sans text-sm focus:border-gold focus:outline-none"
+                  className="field"
                 />
               </div>
             </div>
-            <div className="mt-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+            <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
               <button
                 type="button"
                 onClick={handleCreateGoal}
                 disabled={goalSaving}
-                className="rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-60"
+                className="btn-navy py-3 text-white sm:px-8"
               >
                 {goalSaving ? 'Creating…' : 'Create Goal & Continue →'}
               </button>
@@ -465,42 +495,54 @@ function OnboardingPage({ user, onComplete }) {
 
       case STEP_IDS.complete:
         return (
-          <div className="text-center">
-            <h1 className="font-serif text-4xl font-normal tracking-[-0.03em] text-primary-dark">You&apos;re all set, {user.first_name}.</h1>
-            <p className="mx-auto mt-4 max-w-md font-sans text-base text-taupe">
+          <div>
+            <p className="font-sans text-xs font-normal uppercase tracking-[0.14em] text-gold">
+              Ready
+            </p>
+            <h2 className="mt-2 font-serif text-3xl font-light tracking-[-0.025em] text-primary-dark sm:text-4xl">
+              You&apos;re all set, {user.first_name}.
+            </h2>
+            <p className="mt-3 font-sans text-[15px] font-light leading-relaxed text-taupe">
               Your QUANT dashboard is ready.
             </p>
-            <div className="mx-auto mt-8 max-w-sm rounded-lg border border-cream bg-white p-6 text-left shadow-sm">
-              <p className="font-sans text-sm text-primary-dark">
-                <span className="font-normal uppercase tracking-[0.14em] text-taupe text-xs">Mode</span>
-                <br />
-                {data.mode === 'earner' ? 'Earner' : 'Non-Earner'}
-              </p>
-              <p className="mt-4 font-sans text-sm text-primary-dark">
-                <span className="font-normal uppercase tracking-[0.14em] text-taupe text-xs">Currency</span>
-                <br />
-                {data.currency} ({data.currency_symbol})
-              </p>
-              {data.mode === 'earner' && (
-                <p className="mt-4 font-sans text-sm text-primary-dark">
-                  <span className="font-normal uppercase tracking-[0.14em] text-taupe text-xs">Monthly Budget</span>
-                  <br />
-                  {formatMoney(data.monthly_budget, data.currency, data.currency_symbol)}/month
+            <div className="mt-8 space-y-4 border-t border-primary-dark/10 pt-6">
+              <div>
+                <p className="font-sans text-xs uppercase tracking-[0.14em] text-taupe">Mode</p>
+                <p className="mt-1 font-sans text-sm text-primary-dark">
+                  {data.mode === 'earner' ? 'Earner' : 'Non-Earner'}
                 </p>
+              </div>
+              <div>
+                <p className="font-sans text-xs uppercase tracking-[0.14em] text-taupe">Currency</p>
+                <p className="mt-1 font-sans text-sm text-primary-dark">
+                  {data.currency} ({data.currency_symbol})
+                </p>
+              </div>
+              {data.mode === 'earner' && (
+                <div>
+                  <p className="font-sans text-xs uppercase tracking-[0.14em] text-taupe">Monthly Budget</p>
+                  <p className="mt-1 font-money text-sm font-light text-primary-dark">
+                    {formatMoney(data.monthly_budget, data.currency, data.currency_symbol)}/month
+                  </p>
+                </div>
               )}
               {data.firstGoal && (
-                <p className="mt-4 font-sans text-sm text-primary-dark">
-                  <span className="font-normal uppercase tracking-[0.14em] text-taupe text-xs">First Goal</span>
-                  <br />
-                  {data.firstGoal.name} — {formatMoney(data.firstGoal.target_amount, data.currency, data.currency_symbol)}
-                </p>
+                <div>
+                  <p className="font-sans text-xs uppercase tracking-[0.14em] text-taupe">First Goal</p>
+                  <p className="mt-1 font-sans text-sm text-primary-dark">
+                    {data.firstGoal.name} —{' '}
+                    <span className="font-money font-light">
+                      {formatMoney(data.firstGoal.target_amount, data.currency, data.currency_symbol)}
+                    </span>
+                  </p>
+                </div>
               )}
             </div>
             <button
               type="button"
               onClick={finishOnboarding}
               disabled={submitting}
-              className="mt-10 rounded-lg bg-gold px-8 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-60"
+              className="btn-navy mt-10 w-full py-3 text-white sm:w-auto sm:px-10"
             >
               {submitting ? 'Setting up…' : 'Go to Dashboard →'}
             </button>
@@ -513,45 +555,41 @@ function OnboardingPage({ user, onComplete }) {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-cream">
-      <header className="border-b border-cream/80 bg-cream px-6 py-4">
-        <div className="mx-auto flex max-w-3xl items-center justify-between">
-          <p className="font-engraved text-2xl font-normal text-primary-dark">QUANT</p>
-          <p className="font-sans text-xs text-taupe">
-            Step {stepIndex + 1} of {totalSteps || 1}
-          </p>
-        </div>
+    <OnboardingChapterShell
+      stepId={currentStepId}
+      stepIndex={stepIndex}
+      totalSteps={totalSteps}
+      progress={progress}
+      ProgressBarComponent={(
         <ProgressBar
-          className="mx-auto mt-3 max-w-3xl"
           value={progress}
           size="sm"
           rounded="rounded-full"
-          trackClassName="bg-white"
+          trackClassName="bg-cream/15"
+          fillClassName="bg-gold"
         />
-      </header>
+      )}
+    >
+      <div
+        className={`transition-all duration-300 ${
+          transitioning ? 'translate-y-1 opacity-0' : 'translate-y-0 opacity-100'
+        }`}
+      >
+        {error && <ErrorBanner className="mb-6" message={error} />}
 
-      <main className="flex flex-1 items-center justify-center px-6 py-10">
-        <div
-          className={`w-full max-w-xl transition-all duration-300 ${
-            transitioning ? 'translate-y-1 opacity-0' : 'translate-y-0 opacity-100'
-          }`}
-        >
-          {error && <ErrorBanner className="mb-6" message={error} />}
+        {stepIndex > 0 && currentStepId !== STEP_IDS.complete && (
+          <button
+            type="button"
+            onClick={goBack}
+            className="mb-6 flex items-center gap-1 font-sans text-sm text-taupe transition-colors hover:text-primary-dark"
+          >
+            ← Back
+          </button>
+        )}
 
-          {stepIndex > 0 && currentStepId !== STEP_IDS.complete && (
-            <button
-              type="button"
-              onClick={goBack}
-              className="mb-6 flex items-center gap-1 font-sans text-sm text-taupe transition-colors hover:text-primary-dark"
-            >
-              ← Back
-            </button>
-          )}
-
-          {renderStep()}
-        </div>
-      </main>
-    </div>
+        {renderStep()}
+      </div>
+    </OnboardingChapterShell>
   );
 }
 

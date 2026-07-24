@@ -71,7 +71,7 @@ function SettingsPage({
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [newCategoryColor, setNewCategoryColor] = useState('#D4A574');
+  const [newCategoryColor, setNewCategoryColor] = useState('#D4B16D');
 
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -280,7 +280,7 @@ function SettingsPage({
         color: newCategoryColor,
       });
       setNewCategoryName('');
-      setNewCategoryColor('#D4A574');
+      setNewCategoryColor('#D4B16D');
       loadCategories();
       flash('Category added');
     } catch (err) {
@@ -610,7 +610,7 @@ function SettingsPage({
                       >
                         <input
                           type="color"
-                          value={cat.colour || '#D4A574'}
+                          value={cat.colour || '#D4B16D'}
                           onChange={(e) => handleUpdateCategory(cat.category_id, { color: e.target.value })}
                           className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent"
                           aria-label={`Colour for ${cat.name}`}

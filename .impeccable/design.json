@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-24T16:59:00.000Z",
+  "title": "Design System: QUANT",
+  "extensions": {
+    "colorMeta": {
+      "primary-dark": {
+        "role": "primary",
+        "displayName": "Ink Navy",
+        "canonical": "#0A0F1A",
+        "tonalRamp": ["#0A0F1A", "#131B2E", "#1A2438", "#243054", "#3A4A6B", "#6B7385", "#A8ADB8", "#E8E6E1"]
+      },
+      "gold": {
+        "role": "secondary",
+        "displayName": "Ledger Gold",
+        "canonical": "#D4B16D",
+        "tonalRamp": ["#5C451D", "#7B612C", "#A88B52", "#D4B16D", "#E8C77A", "#F4E0A5", "#F8EBC8", "#FBF6EA"]
+      },
+      "cream": {
+        "role": "neutral",
+        "displayName": "Warm Cream",
+        "canonical": "#F8F4EC",
+        "tonalRamp": ["#5C574F", "#8A8378", "#B5AFA5", "#D4CFC4", "#E8E4DC", "#F8F4EC", "#FBFAF7", "#FDFAF5"]
+      },
+      "taupe": {
+        "role": "neutral",
+        "displayName": "Taupe",
+        "canonical": "#5C574F",
+        "tonalRamp": ["#2A2724", "#3D3934", "#5C574F", "#7A746A", "#9A9388", "#C4BEB4", "#E0DBD3", "#F5F2EC"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Page Title", "purpose": "Primary page headlines (Newsreader light)." },
+      "body": { "displayName": "Body", "purpose": "UI and reading copy (Manrope light)." },
+      "money": { "displayName": "Money", "purpose": "Currency and KPI figures (IBM Plex Mono)." },
+      "label": { "displayName": "Label", "purpose": "Uppercase tracked eyebrows and field labels." }
+    },
+    "shadows": [
+      {
+        "name": "soft",
+        "value": "0 1px 1px rgba(10, 15, 26, 0.04), 0 8px 28px rgba(10, 15, 26, 0.06)",
+        "purpose": "Default surface lift on cream canvas."
+      },
+      {
+        "name": "lift",
+        "value": "0 12px 32px rgba(10, 15, 26, 0.08)",
+        "purpose": "Modals and elevated dialogs."
+      }
+    ],
+    "motion": [
+      {
+        "name": "out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Default ease for button and nav transitions."
+      },
+      {
+        "name": "progress-fill",
+        "value": "900ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Progress bar scale-in."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Navy Button",
+      "kind": "button",
+      "refersTo": "button-navy",
+      "description": "Primary operational CTA — navy sheen with gold-tinted border.",
+      "html": "<button class=\"ds-btn-navy\" type=\"button\">+ NEW GOAL</button>",
+      "css": ".ds-btn-navy{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:8px;padding:10px 16px;font-family:Manrope,Helvetica,sans-serif;font-size:12px;font-weight:400;letter-spacing:0.12em;text-transform:uppercase;color:#fff;border:1px solid rgba(212,177,109,0.22);background:linear-gradient(180deg,#1A2438 0%,#0A0F1A 100%);box-shadow:0 1px 2px rgba(10,15,26,0.12),inset 0 1px 0 rgba(255,255,255,0.1);transition:background .2s cubic-bezier(0.16,1,0.3,1),box-shadow .2s cubic-bezier(0.16,1,0.3,1),transform .2s cubic-bezier(0.16,1,0.3,1)}.ds-btn-navy:hover{background:linear-gradient(180deg,#22304A 0%,#0F1626 100%)}.ds-btn-navy:active{transform:scale(0.98)}"
+    },
+    {
+      "name": "Gold Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Accent CTA — scarce gold fill on navy text.",
+      "html": "<button class=\"ds-btn-gold\" type=\"button\">SAVE</button>",
+      "css": ".ds-btn-gold{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:8px;padding:10px 16px;font-family:Manrope,Helvetica,sans-serif;font-size:12px;font-weight:400;letter-spacing:0.12em;text-transform:uppercase;color:#0A0F1A;background:#D4B16D;border:none;transition:background .2s cubic-bezier(0.16,1,0.3,1),transform .2s cubic-bezier(0.16,1,0.3,1)}.ds-btn-gold:hover{background:#F4E0A5}.ds-btn-gold:active{transform:scale(0.98)}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action with ink border.",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\">ADJUST BUDGET</button>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:8px;padding:10px 16px;font-family:Manrope,Helvetica,sans-serif;font-size:12px;font-weight:400;letter-spacing:0.12em;text-transform:uppercase;color:#0A0F1A;background:transparent;border:1px solid rgba(10,15,26,0.15);transition:border-color .2s,background .2s,transform .2s cubic-bezier(0.16,1,0.3,1)}.ds-btn-ghost:hover{border-color:rgba(10,15,26,0.3);background:rgba(10,15,26,0.04)}.ds-btn-ghost:active{transform:scale(0.98)}"
+    },
+    {
+      "name": "Surface Card",
+      "kind": "card",
+      "refersTo": "surface",
+      "description": "Default white paper surface on cream canvas.",
+      "html": "<div class=\"ds-surface\"><p class=\"ds-eyebrow\">PORTFOLIO</p><h3 class=\"ds-card-title\">Goals Overview</h3><p class=\"ds-muted\">Track progress toward each objective.</p></div>",
+      "css": ".ds-surface{position:relative;border-radius:12px;background:#fff;padding:20px;border:1px solid rgba(10,15,26,0.08);box-shadow:0 1px 1px rgba(10,15,26,0.04),0 8px 28px rgba(10,15,26,0.06)}.ds-eyebrow{margin:0;font-family:Manrope,Helvetica,sans-serif;font-size:12px;font-weight:400;letter-spacing:0.16em;text-transform:uppercase;color:#D4B16D}.ds-card-title{margin:6px 0 0;font-family:Newsreader,Georgia,serif;font-size:1.25rem;font-weight:300;letter-spacing:-0.015em;color:#0A0F1A}.ds-muted{margin:8px 0 0;font-family:Manrope,Helvetica,sans-serif;font-size:14px;font-weight:300;color:#5C574F;line-height:1.5}"
+    },
+    {
+      "name": "Navy Metric Tile",
+      "kind": "card",
+      "refersTo": "surface-navy",
+      "description": "Hero metric island for budget or total saved.",
+      "html": "<div class=\"ds-navy-tile\"><p class=\"ds-navy-label\">MONTHLY BUDGET</p><p class=\"ds-navy-money\">$1,200.00</p><p class=\"ds-navy-sub\">62% allocated</p></div>",
+      "css": ".ds-navy-tile{border-radius:12px;background:#0A0F1A;padding:20px;color:#FDFAF5;box-shadow:0 1px 1px rgba(10,15,26,0.04),0 8px 28px rgba(10,15,26,0.06)}.ds-navy-label{margin:0;font-family:Manrope,Helvetica,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(212,177,109,0.8)}.ds-navy-money{margin:12px 0 0;font-family:IBM Plex Mono,Consolas,monospace;font-size:1.75rem;font-weight:300;letter-spacing:0.02em}.ds-navy-sub{margin:8px 0 0;font-family:Manrope,Helvetica,sans-serif;font-size:12px;color:rgba(253,250,245,0.55)}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Standard input with gold focus ring.",
+      "html": "<label class=\"ds-field-wrap\"><span class=\"ds-field-label\">AMOUNT</span><input class=\"ds-field\" type=\"text\" placeholder=\"0.00\" /></label>",
+      "css": ".ds-field-wrap{display:block}.ds-field-label{display:block;margin-bottom:6px;font-family:Manrope,Helvetica,sans-serif;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5C574F}.ds-field{width:100%;box-sizing:border-box;border-radius:8px;background:#fff;padding:10px 14px;font-family:Manrope,Helvetica,sans-serif;font-size:15px;font-weight:300;color:#0A0F1A;border:1px solid rgba(10,15,26,0.12);outline:none;transition:border-color .15s,box-shadow .15s}.ds-field:focus{border-color:#D4B16D;box-shadow:0 0 0 2px rgba(212,177,109,0.2)}.ds-field::placeholder{color:rgba(92,87,79,0.5)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Private Ledger",
+    "overview": "QUANT looks and feels like a quiet private ledger — composed navy ink on warm cream paper, with gold reserved for signal and ceremony. The system favors light serif display for titles, calm sans for reading, and tabular mono for money. Density is operational but unhurried: surfaces are white cards with soft shadow and hairline ink borders, never nested card stacks or loud fintech chrome.\n\nExpression lives in typography pairing, gold scarcity, and navy fields — not in purple gradients, glow stacks, or pill clusters. Mobile and desktop share the same language; layout compresses, identity does not.",
+    "keyCharacteristics": [
+      "Navy / gold / cream as the only brand triad",
+      "Serif for titles, sans for UI, mono for money, Cinzel for the QUANT mark",
+      "Soft elevation + 1px ink borders (not heavy drop shadows)",
+      "rounded-lg controls, rounded-card (12px) surfaces",
+      "Uppercase tracked labels used sparingly as section kickers"
+    ],
+    "rules": [
+      { "name": "The Scarce Gold Rule", "body": "Gold appears as signal (eyebrow, active state, chart accent, primary CTA). Do not flood backgrounds with gold.", "section": "colors" },
+      { "name": "The Ink-on-Cream Rule", "body": "Body text is navy on cream or cream on navy — never gray-on-color that loses the ledger warmth.", "section": "colors" },
+      { "name": "The Money Mono Rule", "body": "Currency and numeric KPIs use IBM Plex Mono; do not costume body UI in monospace.", "section": "typography" },
+      { "name": "The Flat-Paper Rule", "body": "No zero-offset colored halos. Depth = soft offset shadow + ink hairline.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use eyebrow + serif title + taupe lede for page headers.",
+      "Do put money in IBM Plex Mono with light weight.",
+      "Do keep gold scarce — accents, active states, primary emphasis.",
+      "Do use rounded-lg on buttons/selects to match Log Expense / navy CTAs.",
+      "Do design for phone and desktop with the same identity."
+    ],
+    "donts": [
+      "Don't introduce Inter, purple gradients, or generic SaaS card grids as the page structure.",
+      "Don't nest cards inside cards or wrap every metric in a competing chrome frame.",
+      "Don't use rounded-full pills for primary filters/actions when the system uses rounded-lg.",
+      "Don't invent social proof, testimonials, or brand claims not in PRODUCT.md.",
+      "Don't replace navy/gold/cream without an explicit redesign request."
+    ]
+  }
+}

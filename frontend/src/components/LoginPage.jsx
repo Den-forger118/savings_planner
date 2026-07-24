@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { getFriendlyError, getLoginThrottleInfo } from '../utils/friendlyError';
 import { PATHS } from '../utils/paths';
+import AuthStoryPanel from './AuthStoryPanel';
 
 const LOCK_STORAGE_KEY = 'quant_login_lock';
 
@@ -203,94 +204,82 @@ function LoginPage({ onLogin }) {
   };
 
   return (
-    <div className="page-canvas flex min-h-screen items-center justify-center px-4 py-12">
-      <div className="relative z-10 w-full max-w-[420px]">
-        <div className="mb-10 text-center">
-          <h1 className="font-engraved text-5xl text-primary-dark md:text-6xl">
-            QUANT
-          </h1>
-          <p className="mt-3 font-sans text-xs font-normal uppercase tracking-[0.14em] text-gold">
-            Private Savings Intelligence
-          </p>
-        </div>
+    <AuthStoryPanel variant="login">
+      <div>
+        <p className="font-sans text-xs font-normal uppercase tracking-[0.16em] text-taupe/80">
+          Member Access
+        </p>
+        <h2 className="mt-2 font-serif text-[2.35rem] font-light tracking-[-0.03em] text-primary-dark sm:text-5xl">
+          Welcome back
+        </h2>
+        <p className="mt-3 font-sans text-[15px] font-light leading-relaxed text-taupe">
+          Sign in to review your goals, budget, and expense analytics.
+        </p>
 
-        <div className="surface overflow-hidden">
-          <div className="border-b border-primary-dark/[0.06] bg-navy-sheen px-7 py-5 text-cream">
-            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
-              Member Access
-            </p>
-            <h2 className="mt-1 font-serif text-3xl font-light tracking-[-0.025em]">
-              Welcome back
-            </h2>
+        <form onSubmit={handleSubmit} className="mt-10 space-y-7">
+          <div>
+            <label className="mb-2 block font-sans text-xs font-normal uppercase tracking-[0.14em] text-taupe">
+              Email Address
+            </label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="you@example.com"
+              className="auth-field-underline"
+              disabled={isLocked}
+              autoComplete="email"
+            />
           </div>
 
-          <div className="px-7 py-7">
-            <p className="mb-6 font-sans text-sm leading-relaxed text-taupe">
-              Sign in to review your goals, budget, and expense analytics.
-            </p>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="field-label">Email Address</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="you@example.com"
-                  className="field"
-                  disabled={isLocked}
-                  autoComplete="email"
-                />
-              </div>
-
-              <div>
-                <label className="field-label">Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Enter your password"
-                  className="field"
-                  disabled={isLocked}
-                  autoComplete="current-password"
-                />
-              </div>
-
-              <LoginNotice
-                message={notice?.message}
-                countdown={countdownLabel}
-                locked={isLocked || notice?.locked}
-                tone={notice?.tone || 'error'}
-              />
-
-              <button
-                type="submit"
-                disabled={loading || isLocked}
-                className="btn-navy mt-2 w-full py-3 text-white disabled:opacity-50"
-              >
-                {isLocked
-                  ? 'Sign-in paused'
-                  : loading
-                    ? 'Signing in...'
-                    : 'Sign In'}
-              </button>
-            </form>
-
-            <p className="mt-6 text-center font-sans text-sm text-taupe">
-              Don&apos;t have an account?{' '}
-              <Link
-                to={PATHS.register}
-                className="font-normal text-primary-dark underline decoration-gold/50 underline-offset-4 transition-colors hover:text-gold"
-              >
-                Create one
-              </Link>
-            </p>
+          <div>
+            <label className="mb-2 block font-sans text-xs font-normal uppercase tracking-[0.14em] text-taupe">
+              Password
+            </label>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Enter your password"
+              className="auth-field-underline"
+              disabled={isLocked}
+              autoComplete="current-password"
+            />
           </div>
-        </div>
+
+          <LoginNotice
+            message={notice?.message}
+            countdown={countdownLabel}
+            locked={isLocked || notice?.locked}
+            tone={notice?.tone || 'error'}
+          />
+
+          <button
+            type="submit"
+            disabled={loading || isLocked}
+            className="btn-navy mt-2 w-full py-3.5 disabled:opacity-50"
+          >
+            {isLocked
+              ? 'Sign-in paused'
+              : loading
+                ? 'Signing in...'
+                : 'Sign In'}
+          </button>
+        </form>
+
+        <p className="mt-8 text-center font-sans text-sm text-taupe">
+          Don&apos;t have an account?{' '}
+          <Link
+            to={PATHS.register}
+            className="font-normal text-primary-dark underline decoration-gold/40 underline-offset-4 transition-colors hover:text-gold"
+          >
+            Create one
+          </Link>
+        </p>
       </div>
-    </div>
+    </AuthStoryPanel>
   );
 }
 

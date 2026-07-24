@@ -1,15 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { formatMoney } from '../utils/currency';
 import { getFriendlyError } from '../utils/friendlyError';
 import ErrorBanner from './ErrorBanner';
 
-function BudgetSetup({ userId, currentBudget, isEarnerMode = false, onBudgetSet, currencyCode = 'USD', currencySymbol = '$' }) {
+function BudgetSetup({
+  userId,
+  currentBudget,
+  isEarnerMode = false,
+  onBudgetSet,
+  currencyCode = 'USD',
+  currencySymbol = '$',
+  hideWhenSet = false,
+  editRequest = 0,
+}) {
   const [monthlyBudget, setMonthlyBudget] = useState(currentBudget || '');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const hasBudget = parseFloat(currentBudget) > 0;
+
+  useEffect(() => {
+    if (editRequest > 0) {
+      setIsEditing(true);
+    }
+  }, [editRequest]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,6 +51,10 @@ function BudgetSetup({ userId, currentBudget, isEarnerMode = false, onBudgetSet,
       setLoading(false);
     }
   };
+
+  if (!isEditing && hasBudget && hideWhenSet) {
+    return null;
+  }
 
   if (!isEditing && hasBudget && isEarnerMode) {
     return (

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { getFriendlyError } from '../utils/friendlyError';
 import ErrorBanner from './ErrorBanner';
+import AuthStoryPanel from './AuthStoryPanel';
 import { PATHS } from '../utils/paths';
 
 function RegisterPage({ onRegister }) {
@@ -62,110 +63,117 @@ function RegisterPage({ onRegister }) {
   };
 
   return (
-    <div className="page-canvas flex min-h-screen items-center justify-center px-4 py-12">
-      <div className="relative z-10 w-full max-w-[440px]">
-        <div className="mb-10 text-center">
-          <h1 className="font-engraved text-5xl text-primary-dark md:text-6xl">QUANT</h1>
-          <p className="mt-3 font-sans text-xs font-normal uppercase tracking-[0.14em] text-gold">
-            Private Savings Intelligence
-          </p>
-        </div>
+    <AuthStoryPanel variant="register">
+      <div>
+        <p className="font-sans text-[11px] font-normal uppercase tracking-[0.16em] text-taupe/80">
+          Open Account
+        </p>
+        <h2 className="mt-1.5 font-serif text-[1.85rem] font-light tracking-[-0.03em] text-primary-dark sm:text-[2.1rem]">
+          Get started
+        </h2>
+        <p className="mt-2 max-w-sm font-sans text-[14px] font-light leading-snug text-taupe">
+          Create your account to manage savings goals and expense analytics.
+        </p>
 
-        <div className="surface overflow-hidden">
-          <div className="border-b border-primary-dark/[0.06] bg-navy-sheen px-7 py-5 text-cream">
-            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
-              Open Account
-            </p>
-            <h2 className="mt-1 font-serif text-3xl font-light tracking-[-0.025em]">Get started</h2>
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          <div className="grid grid-cols-2 gap-x-5 gap-y-4">
+            <div>
+              <label className="mb-1.5 block font-sans text-[11px] font-normal uppercase tracking-[0.14em] text-taupe">
+                First Name
+              </label>
+              <input
+                type="text"
+                name="first_name"
+                value={formData.first_name}
+                onChange={handleChange}
+                placeholder="John"
+                className="auth-field-underline"
+                autoComplete="given-name"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block font-sans text-[11px] font-normal uppercase tracking-[0.14em] text-taupe">
+                Last Name
+              </label>
+              <input
+                type="text"
+                name="last_name"
+                value={formData.last_name}
+                onChange={handleChange}
+                placeholder="Doe"
+                className="auth-field-underline"
+                autoComplete="family-name"
+              />
+            </div>
           </div>
 
-          <div className="px-7 py-7">
-            <p className="mb-6 font-sans text-sm leading-relaxed text-taupe">
-              Create your account to manage savings goals and expense analytics.
-            </p>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="field-label">First Name</label>
-                  <input
-                    type="text"
-                    name="first_name"
-                    value={formData.first_name}
-                    onChange={handleChange}
-                    placeholder="John"
-                    className="field"
-                  />
-                </div>
-                <div>
-                  <label className="field-label">Last Name</label>
-                  <input
-                    type="text"
-                    name="last_name"
-                    value={formData.last_name}
-                    onChange={handleChange}
-                    placeholder="Doe"
-                    className="field"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="field-label">Email Address</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="you@example.com"
-                  className="field"
-                />
-              </div>
-
-              <div>
-                <label className="field-label">Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Minimum 8 characters"
-                  className="field"
-                />
-              </div>
-
-              <div>
-                <label className="field-label">Confirm Password</label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="Repeat your password"
-                  className="field"
-                />
-              </div>
-
-              {error && <ErrorBanner message={error} />}
-
-              <button type="submit" disabled={loading} className="btn-navy mt-2 w-full py-3 text-white">
-                {loading ? 'Creating Account...' : 'Create Account'}
-              </button>
-            </form>
-
-            <p className="mt-6 text-center font-sans text-sm text-taupe">
-              Already have an account?{' '}
-              <Link
-                to={PATHS.login}
-                className="font-normal text-primary-dark underline decoration-gold/50 underline-offset-4 transition-colors hover:text-gold"
-              >
-                Sign in
-              </Link>
-            </p>
+          <div>
+            <label className="mb-1.5 block font-sans text-[11px] font-normal uppercase tracking-[0.14em] text-taupe">
+              Email Address
+            </label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="you@example.com"
+              className="auth-field-underline"
+              autoComplete="email"
+            />
           </div>
-        </div>
+
+          <div>
+            <label className="mb-1.5 block font-sans text-[11px] font-normal uppercase tracking-[0.14em] text-taupe">
+              Password
+            </label>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Minimum 8 characters"
+              className="auth-field-underline"
+              autoComplete="new-password"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block font-sans text-[11px] font-normal uppercase tracking-[0.14em] text-taupe">
+              Confirm Password
+            </label>
+            <input
+              type="password"
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              placeholder="Repeat your password"
+              className="auth-field-underline"
+              autoComplete="new-password"
+            />
+          </div>
+
+          {error && <ErrorBanner message={error} />}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn-navy mt-1 w-full rounded-xl py-3 disabled:opacity-50"
+          >
+            {loading ? 'Creating Account...' : 'Create Account'}
+          </button>
+        </form>
+
+        <p className="mt-4 text-center font-sans text-sm text-taupe">
+          Already have an account?{' '}
+          <Link
+            to={PATHS.login}
+            className="font-normal text-primary-dark transition-colors hover:text-gold"
+          >
+            Sign in
+          </Link>
+        </p>
       </div>
-    </div>
+    </AuthStoryPanel>
   );
 }
 

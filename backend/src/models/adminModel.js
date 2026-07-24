@@ -196,11 +196,56 @@ const getPlatformStats = async () => {
     LIMIT 10
   `;
 
+  const monthlyUsersQuery = `
+    SELECT
+      to_char(month_start, 'YYYY-MM') AS month_key,
+      to_char(month_start, 'Mon') AS month_label,
+      COALESCE(u.user_count, 0)::int AS user_count
+    FROM generate_series(
+      date_trunc('month', CURRENT_TIMESTAMP) - INTERVAL '11 months',
+      date_trunc('month', CURRENT_TIMESTAMP),
+      INTERVAL '1 month'
+    ) AS month_start
+    LEFT JOIN (
+      SELECT date_trunc('month', created_at) AS m, COUNT(*)::int AS user_count
+      FROM users
+      WHERE created_at >= date_trunc('month', CURRENT_TIMESTAMP) - INTERVAL '11 months'
+      GROUP BY 1
+    ) u ON u.m = month_start
+    ORDER BY month_start
+  `;
+
+  const monthlyExpensesQuery = `
+    SELECT
+      to_char(month_start, 'YYYY-MM') AS month_key,
+      to_char(month_start, 'Mon') AS month_label,
+      COALESCE(e.expense_total, 0)::float AS expense_total,
+      COALESCE(e.expense_count, 0)::int AS expense_count
+    FROM generate_series(
+      date_trunc('month', CURRENT_TIMESTAMP) - INTERVAL '11 months',
+      date_trunc('month', CURRENT_TIMESTAMP),
+      INTERVAL '1 month'
+    ) AS month_start
+    LEFT JOIN (
+      SELECT
+        date_trunc('month', expense_date::timestamp) AS m,
+        COALESCE(SUM(amount), 0)::float AS expense_total,
+        COUNT(*)::int AS expense_count
+      FROM expenses
+      WHERE expense_date::timestamp >= date_trunc('month', CURRENT_TIMESTAMP) - INTERVAL '11 months'
+      GROUP BY 1
+    ) e ON e.m = month_start
+    ORDER BY month_start
+  `;
+
   try {
-    const [summaryResult, categoriesResult] = await Promise.all([
-      pool.query(summaryQuery),
-      pool.query(categoriesQuery),
-    ]);
+    const [summaryResult, categoriesResult, monthlyUsersResult, monthlyExpensesResult] =
+      await Promise.all([
+        pool.query(summaryQuery),
+        pool.query(categoriesQuery),
+        pool.query(monthlyUsersQuery),
+        pool.query(monthlyExpensesQuery),
+      ]);
 
     const summary = summaryResult.rows[0];
 
@@ -215,6 +260,17 @@ const getPlatformStats = async () => {
         name: row.name,
         expense_count: row.expense_count,
         total_amount: row.total_amount,
+      })),
+      monthly_user_signups: monthlyUsersResult.rows.map((row) => ({
+        month_key: row.month_key,
+        month: row.month_label,
+        users: row.user_count,
+      })),
+      monthly_expense_totals: monthlyExpensesResult.rows.map((row) => ({
+        month_key: row.month_key,
+        month: row.month_label,
+        total: row.expense_total,
+        count: row.expense_count,
       })),
     };
   } catch (err) {

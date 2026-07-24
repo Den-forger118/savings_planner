@@ -80,7 +80,7 @@ const CircularProgress = ({ value, size = 88, strokeWidth = 5 }) => {
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#D4A574"
+          stroke="#D4B16D"
           strokeWidth={strokeWidth}
           strokeDasharray={circumference}
           strokeDashoffset={offset}
@@ -944,6 +944,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [monthlyBudget, setMonthlyBudget] = useState(null);
+  const [budgetEditRequest, setBudgetEditRequest] = useState(0);
   const [expenseRefresh, setExpenseRefresh] = useState(0);
   const [transactionRefresh, setTransactionRefresh] = useState(0);
   const [goalsPage, setGoalsPage] = useState(1);
@@ -1204,20 +1205,29 @@ function App() {
   ];
 
   const renderDashboard = () => (
-    <div className="space-y-10">
-      <section className="flex min-w-0 flex-col gap-5 md:flex-row md:items-end md:justify-between">
+    <div className="space-y-6">
+      <section className="flex min-w-0 flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0">
-          <p className="eyebrow">Analytics</p>
-          <h2 className="page-title">Dashboard</h2>
+          <p className="eyebrow">Operations</p>
+          <h2 className="page-title">Goal &amp; Savings</h2>
           <p className="page-lede">
-            A focused view of savings allocation, goal health, and expense movement.
+            Allocation, goal health, spending movement, and recent ledger activity.
           </p>
         </div>
-        <div className="surface min-w-0 px-5 py-4">
-          <p className="field-label mb-0">Total Portfolio Target</p>
-          <p className="mt-1 break-words font-money text-2xl font-light tracking-[0.02em] text-primary-dark sm:text-3xl">
-            {formatMoney(totalTarget, userCurrency, userCurrencySymbol)}
-          </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="surface min-w-0 px-4 py-3">
+            <p className="field-label mb-0">Portfolio Target</p>
+            <p className="mt-1 break-words font-money text-xl font-light tracking-[0.02em] text-primary-dark sm:text-2xl">
+              {formatMoney(totalTarget, userCurrency, userCurrencySymbol)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(PATHS.savings)}
+            className="btn-navy"
+          >
+            + New Goal
+          </button>
         </div>
       </section>
 
@@ -1228,6 +1238,8 @@ function App() {
         onBudgetSet={handleBudgetSet}
         currencyCode={userCurrency}
         currencySymbol={userCurrencySymbol}
+        hideWhenSet
+        editRequest={budgetEditRequest}
       />
 
       <Dashboard
@@ -1240,8 +1252,9 @@ function App() {
         expenseRefresh={expenseRefresh}
         transactionRefresh={transactionRefresh}
         onViewAllActivity={() => openActivityPage('all')}
+        onAddGoal={() => navigate(PATHS.savings)}
+        onEditBudget={() => setBudgetEditRequest((n) => n + 1)}
       />
-
     </div>
   );
 
@@ -1347,13 +1360,15 @@ function App() {
   );
 
   const renderExpenses = () => (
-    <div className="space-y-8">
-      <section>
-        <p className="eyebrow">Expense Tracker</p>
-        <h2 className="page-title">Capital Outflow</h2>
-        <p className="page-lede">
-          A running ledger of what you&apos;ve spent — log expenses and see your totals by category.
-        </p>
+    <div className="space-y-6">
+      <section className="flex min-w-0 flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0">
+          <p className="eyebrow">Operations</p>
+          <h2 className="page-title">Capital Outflow</h2>
+          <p className="page-lede">
+            Log spend, watch monthly trends, and see where capital leaves the ledger.
+          </p>
+        </div>
       </section>
 
       <ExpenseSummary
