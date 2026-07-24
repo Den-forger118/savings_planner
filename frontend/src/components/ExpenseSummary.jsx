@@ -9,6 +9,12 @@ import ErrorBanner from './ErrorBanner';
 import OdometerNumber from './OdometerNumber';
 import ProgressBar from './ProgressBar';
 
+const MONTHS = [
+  'January', 'February', 'March', 'April',
+  'May', 'June', 'July', 'August',
+  'September', 'October', 'November', 'December',
+];
+
 function ExpenseSummary({
   userId,
   currencyCode = 'USD',
@@ -65,11 +71,7 @@ function ExpenseSummary({
     fetchExpenses();
   }, [fetchExpenses, refreshTrigger]);
 
-  const months = [
-    'January', 'February', 'March', 'April',
-    'May', 'June', 'July', 'August',
-    'September', 'October', 'November', 'December',
-  ];
+  const months = MONTHS;
 
   const totalSpent = parseFloat(data?.total_spent || 0);
   const expenseCount = data?.expense_count || 0;
@@ -83,7 +85,7 @@ function ExpenseSummary({
 
   const insight = useMemo(() => {
     const money = (value) => formatMoney(value, currencyCode, currencySymbol);
-    const monthName = months[selectedMonth - 1];
+    const monthName = MONTHS[selectedMonth - 1];
     if (!data || expenseCount === 0) {
       return {
         title: 'Start tracking outflow',
