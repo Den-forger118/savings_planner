@@ -163,8 +163,7 @@
   }
 
   .nav-rail {
-    @apply fixed inset-y-0 left-0 z-40 hidden w-[17.5rem] flex-col text-cream transition-[width] duration-300 ease-out-expo lg:flex;
-    background-image: linear-gradient(180deg, #18233C 0%, #131B2E 40%, #0A0F1A 100%);
+    @apply fixed inset-y-0 left-0 z-40 hidden w-[17.5rem] flex-col bg-navy-sheen text-cream transition-[width] duration-300 ease-out-expo lg:flex;
     box-shadow: 8px 0 40px rgba(10, 15, 26, 0.18);
   }
 
@@ -746,32 +745,52 @@ html.density-compact .nav-item {
 }
 
 .auth-onboarding-art-stage {
-  min-height: 0;
+  min-height: min(42vh, 360px);
 }
 
+.auth-onboarding-art-glow {
+  background: radial-gradient(
+    ellipse 70% 55% at 40% 55%,
+    rgba(212, 177, 109, 0.14),
+    transparent 68%
+  );
+}
+
+.auth-story-illustration--onboarding,
 .auth-story-illustration--onboarding-fit {
   display: block;
   width: 100%;
-  max-width: 100%;
+  max-width: 118%;
   height: auto;
-  max-height: min(42vh, 360px);
+  max-height: min(54vh, 480px);
+  margin-left: -4%;
   object-fit: contain;
   object-position: left center;
   background: transparent;
+  /* Fade handled by chapter motion; keep base visible once mounted */
+  opacity: 1;
+  animation: none;
   filter:
-    drop-shadow(0 14px 32px rgba(10, 15, 26, 0.3))
-    drop-shadow(0 0 24px rgba(212, 177, 109, 0.1));
+    drop-shadow(0 18px 40px rgba(10, 15, 26, 0.35))
+    drop-shadow(0 0 28px rgba(212, 177, 109, 0.12));
 }
 
 @media (min-width: 1280px) {
   .auth-story-illustration--onboarding-fit {
-    max-height: min(46vh, 400px);
+    max-height: min(58vh, 560px);
+    max-width: 128%;
   }
 }
 
 @media (max-height: 800px) {
   .auth-story-illustration--onboarding-fit {
-    max-height: min(34vh, 280px);
+    max-height: min(44vh, 380px);
+  }
+}
+
+@media (max-height: 700px) {
+  .auth-story-illustration--onboarding-fit {
+    max-height: min(38vh, 300px);
   }
 }
 

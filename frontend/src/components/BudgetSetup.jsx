@@ -58,23 +58,41 @@ function BudgetSetup({
 
   if (!isEditing && hasBudget && isEarnerMode) {
     return (
-      <section className="relative overflow-hidden rounded-card bg-primary-dark p-5 text-cream shadow-soft sm:p-8">
-        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold-light">
-              Monthly Savings Mandate
-            </p>
-            <p className="mt-3 break-words font-money text-3xl font-light tracking-[0.02em] text-gold sm:text-4xl md:text-5xl">
-              {formatMoney(currentBudget, currencyCode, currencySymbol)}
-            </p>
-            <p className="mt-2 max-w-lg font-sans text-sm text-cream/70">
-              Capital reserved for goal allocation each month in Earner mode.
-            </p>
-          </div>
-          <button
-            onClick={() => setIsEditing(true)}
-            className="rounded-lg border-2 border-gold px-6 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold transition-colors hover:bg-gold hover:text-primary-dark"
-          >
+      <section className="surface-navy flex flex-col gap-6 p-5 text-cream md:flex-row md:items-center md:justify-between md:p-6">
+        <div className="min-w-0">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold/80">
+            Monthly Budget
+          </p>
+          <p className="mt-3 break-words font-money text-3xl font-light tracking-[0.02em] sm:text-4xl">
+            {formatMoney(currentBudget, currencyCode, currencySymbol)}
+          </p>
+          <p className="mt-2 max-w-lg font-sans text-sm text-cream/55">
+            Reserved for goal allocation each month in Earner mode.
+          </p>
+        </div>
+        <button type="button" onClick={() => setIsEditing(true)} className="btn-outline-gold min-h-[44px]">
+          Edit Budget
+        </button>
+      </section>
+    );
+  }
+
+  if (!isEditing && hasBudget && !isEarnerMode) {
+    return (
+      <section className="surface overflow-hidden">
+        <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+          <p className="eyebrow">Budget</p>
+          <h3 className="mt-1 card-title">Monthly Budget Saved</h3>
+        </div>
+        <div className="px-5 py-5">
+          <p className="font-money text-2xl font-light tracking-[0.02em] text-primary-dark">
+            {formatMoney(currentBudget, currencyCode, currencySymbol)}
+            <span className="ml-2 font-sans text-sm font-light text-taupe">/ month</span>
+          </p>
+          <p className="mt-3 max-w-2xl font-sans text-sm font-light leading-relaxed text-taupe">
+            Stored but inactive while Non-Earner mode is on. Enable Earner mode to allocate across goals.
+          </p>
+          <button type="button" onClick={() => setIsEditing(true)} className="btn-ghost mt-5 min-h-[44px]">
             Edit Budget
           </button>
         </div>
@@ -82,86 +100,57 @@ function BudgetSetup({
     );
   }
 
-  if (!isEditing && hasBudget && !isEarnerMode) {
-    return (
-      <section className="rounded-lg border-l-4 border-gold bg-white p-8 shadow-sm transition-shadow duration-300 hover:shadow-lg">
-        <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
-          Monthly Budget Saved
-        </p>
-        <h2 className="mt-2 font-money text-2xl font-light tracking-[0.02em] text-primary-dark">
-          {formatMoney(currentBudget, currencyCode, currencySymbol)} / month
-        </h2>
-        <p className="mt-3 max-w-2xl font-sans text-base leading-relaxed text-taupe">
-          Your budget is stored but inactive while Non-Earner mode is on.
-          Enable Earner mode above to unlock smart allocation across goals.
-        </p>
-        <button
-          type="button"
-          onClick={() => setIsEditing(true)}
-          className="mt-6 rounded-lg border-2 border-gold px-6 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold transition-colors hover:bg-gold hover:text-primary-dark"
-        >
-          Edit Budget
-        </button>
-      </section>
-    );
-  }
-
   if (!isEditing && !hasBudget) {
     return (
-      <section className="rounded-lg border-l-4 border-gold bg-white p-8 shadow-sm transition-shadow duration-300 hover:shadow-lg">
-        <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
-          {isEarnerMode ? 'Monthly Budget Required' : 'Non-Earner Mode'}
-        </p>
-        <h2 className="mt-2 font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">
-          {isEarnerMode
-            ? 'Set a monthly budget to use Earner mode.'
-            : "You're in Non-Earner Mode."}
-        </h2>
-        <p className="mt-3 max-w-2xl font-sans text-base leading-relaxed text-taupe">
-          {isEarnerMode
-            ? 'Earner mode needs a monthly savings mandate before it can allocate funds across your goals.'
-            : 'The app shows what you need to save without requiring a fixed income. Set a monthly budget anytime, then enable Earner mode to unlock smart allocation.'}
-        </p>
-        <button
-          type="button"
-          onClick={() => setIsEditing(true)}
-          className="mt-6 rounded-lg bg-gold px-6 py-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light"
-        >
-          Set Monthly Budget
-        </button>
+      <section className="surface overflow-hidden">
+        <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+          <p className="eyebrow">{isEarnerMode ? 'Required' : 'Mode'}</p>
+          <h3 className="mt-1 card-title">
+            {isEarnerMode ? 'Set a Monthly Budget' : 'Non-Earner Mode'}
+          </h3>
+        </div>
+        <div className="px-5 py-5">
+          <p className="max-w-2xl font-sans text-sm font-light leading-relaxed text-taupe">
+            {isEarnerMode
+              ? 'Earner mode needs a monthly savings amount before it can allocate across your goals.'
+              : 'Track what you need to save without a fixed income. Set a budget anytime, then enable Earner mode for allocation.'}
+          </p>
+          <button type="button" onClick={() => setIsEditing(true)} className="btn-primary mt-5 min-h-[44px]">
+            Set Monthly Budget
+          </button>
+        </div>
       </section>
     );
   }
 
   return (
-    <section className="rounded-lg border-t-4 border-gold bg-white p-8 shadow-sm transition-shadow duration-300 hover:shadow-lg">
-      <div className="mb-6">
-        <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
-          Savings Mandate
-        </p>
-        <h2 className="mt-2 font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">
-          Set Monthly Budget
-        </h2>
-        <p className="mt-2 font-sans text-base text-taupe">
+    <section className="surface overflow-hidden">
+      <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+        <p className="eyebrow">Budget</p>
+        <h3 className="mt-1 card-title">Set Monthly Budget</h3>
+        <p className="mt-1 font-sans text-sm text-taupe">
           Define the monthly amount available for your savings strategy.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5 px-5 py-5">
         <div>
-          <label className="mb-2 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
+          <label className="field-label" htmlFor="monthly-budget-input">
             Monthly Budget
           </label>
           <div className="flex items-center gap-3">
-            <span className="font-money text-3xl font-light tracking-[0.02em] text-gold">{currencySymbol}</span>
+            <span className="font-money text-2xl font-light tracking-[0.02em] text-primary-dark">
+              {currencySymbol}
+            </span>
             <input
+              id="monthly-budget-input"
               type="number"
               value={monthlyBudget}
               onChange={(e) => setMonthlyBudget(e.target.value)}
               placeholder="500.00"
               step="0.01"
               min="0"
-              className="w-full rounded-lg border-2 border-gray-200 px-4 py-3 font-sans text-base transition-colors focus:border-gold focus:outline-none"
+              className="field"
             />
           </div>
         </div>
@@ -172,15 +161,15 @@ function BudgetSetup({
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 rounded-lg bg-gold px-6 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
+            className="btn-navy min-h-[44px] flex-1 disabled:opacity-50"
           >
-            {loading ? 'Processing...' : 'Set Budget'}
+            {loading ? 'Saving…' : 'Set Budget'}
           </button>
           {hasBudget && (
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              className="rounded-lg border-2 border-gold px-6 py-4 font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold transition-colors hover:bg-gold hover:text-primary-dark"
+              className="btn-ghost min-h-[44px]"
             >
               Cancel
             </button>

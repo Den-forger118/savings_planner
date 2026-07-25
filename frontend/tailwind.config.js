@@ -48,7 +48,7 @@ module.exports = {
         'app-grain':
           'radial-gradient(ellipse 80% 50% at 10% -10%, rgba(212, 177, 109, 0.12), transparent 55%), radial-gradient(ellipse 60% 40% at 100% 0%, rgba(10, 15, 26, 0.05), transparent 50%)',
         'navy-sheen':
-          'radial-gradient(120% 80% at 50% 0%, #25375A 0%, #131B2E 50%, #0A0F1A 100%)',
+          'linear-gradient(180deg, #18233C 0%, #131B2E 40%, #0A0F1A 100%)',
         'gold-divider':
           'linear-gradient(to bottom, #7B612C 0%, #F3E2AA 35%, #CFA95B 70%, #5C451D 100%)',
       },

@@ -98,7 +98,7 @@ function CurrencyPicker({ value, onChange }) {
 
 function OnboardingPage({ user, onComplete }) {
   const [stepIndex, setStepIndex] = useState(0);
-  const [transitioning, setTransitioning] = useState(false);
+  const [direction, setDirection] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -127,11 +127,8 @@ function OnboardingPage({ user, onComplete }) {
   const suggestedBudget = incomeValue > 0 ? (incomeValue * 0.2).toFixed(2) : '0.00';
 
   const goToStep = (nextIndex) => {
-    setTransitioning(true);
-    setTimeout(() => {
-      setStepIndex(nextIndex);
-      setTransitioning(false);
-    }, 180);
+    setDirection(nextIndex >= stepIndex ? 1 : -1);
+    setStepIndex(nextIndex);
   };
 
   const goNext = () => {
@@ -560,6 +557,7 @@ function OnboardingPage({ user, onComplete }) {
       stepIndex={stepIndex}
       totalSteps={totalSteps}
       progress={progress}
+      direction={direction}
       ProgressBarComponent={(
         <ProgressBar
           value={progress}
@@ -570,25 +568,19 @@ function OnboardingPage({ user, onComplete }) {
         />
       )}
     >
-      <div
-        className={`transition-all duration-300 ${
-          transitioning ? 'translate-y-1 opacity-0' : 'translate-y-0 opacity-100'
-        }`}
-      >
-        {error && <ErrorBanner className="mb-6" message={error} />}
+      {error && <ErrorBanner className="mb-6" message={error} />}
 
-        {stepIndex > 0 && currentStepId !== STEP_IDS.complete && (
-          <button
-            type="button"
-            onClick={goBack}
-            className="mb-6 flex items-center gap-1 font-sans text-sm text-taupe transition-colors hover:text-primary-dark"
-          >
-            ← Back
-          </button>
-        )}
+      {stepIndex > 0 && currentStepId !== STEP_IDS.complete && (
+        <button
+          type="button"
+          onClick={goBack}
+          className="mb-6 flex items-center gap-1 font-sans text-sm text-taupe transition-colors hover:text-primary-dark"
+        >
+          ← Back
+        </button>
+      )}
 
-        {renderStep()}
-      </div>
+      {renderStep()}
     </OnboardingChapterShell>
   );
 }

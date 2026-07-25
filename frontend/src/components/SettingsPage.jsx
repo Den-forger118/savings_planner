@@ -19,10 +19,10 @@ const Icon = ({ name, className = '' }) => (
 );
 
 const SETTINGS_TABS = [
-  { id: 'profile', label: 'Profile & Preferences', icon: 'person' },
-  { id: 'financial', label: 'Financial Engine', icon: 'account_balance' },
+  { id: 'profile', label: 'Profile', icon: 'person' },
+  { id: 'financial', label: 'Financial', icon: 'account_balance' },
   { id: 'security', label: 'Security', icon: 'shield' },
-  { id: 'data', label: 'Data & Portability', icon: 'database' },
+  { id: 'data', label: 'Data', icon: 'database' },
   { id: 'trash', label: 'Trash', icon: 'delete' },
   { id: 'help', label: 'Help', icon: 'help' },
 ];
@@ -366,7 +366,7 @@ function SettingsPage({
     });
   };
 
-  const panelClass = 'surface settings-panel p-6';
+  const panelClass = 'surface overflow-hidden';
 
   const handleHelpNavigate = (page) => {
     if (page === 'settings') {
@@ -376,15 +376,25 @@ function SettingsPage({
     onNavigate?.(page);
   };
 
+  const memberName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Member';
+
   return (
-    <div className="space-y-8">
-      <section>
-        <p className="eyebrow">Control Room</p>
-        <h2 className="page-title">Private Settings</h2>
-        <p className="page-lede">
-          Configure your ledger currency, financial engine, security posture, and data portability —
-          built for private banking-grade savings intelligence.
-        </p>
+    <div className="mb-10 space-y-5">
+      <section className="flex min-w-0 flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0">
+          <p className="eyebrow">Preferences</p>
+          <h2 className="page-title">Account Settings</h2>
+          <p className="page-lede">
+            Currency, savings mode, security, and data for your QUANT ledger.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="btn-ghost min-h-[44px] w-full sm:w-auto"
+        >
+          Sign Out
+        </button>
       </section>
 
       {(message || error) && (
@@ -397,8 +407,65 @@ function SettingsPage({
         )
       )}
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
-        <nav className="surface space-y-1 p-2">
+      {/* Summary strip — mirrors dashboard metrics */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
+        <div className="surface-navy flex min-h-[120px] flex-col justify-between p-5 text-cream lg:col-span-3">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold/80">
+            Savings Mode
+          </p>
+          <div className="mt-3">
+            <p className="font-serif text-xl font-light tracking-[-0.015em]">
+              {isEarnerMode ? 'Earner' : 'Non-Earner'}
+            </p>
+            <p className="mt-1.5 font-sans text-xs text-cream/55">
+              {isEarnerMode && hasBudget
+                ? `Budget ${formatMoney(monthlyBudget, currency, currencySymbol)}`
+                : isEarnerMode
+                  ? 'Set a budget to allocate'
+                  : 'Track goals without fixed income'}
+            </p>
+          </div>
+        </div>
+
+        <div className="stat-tile flex min-h-[120px] flex-col justify-between p-5 lg:col-span-4">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
+            Member
+          </p>
+          <div className="mt-3 min-w-0">
+            <p className="truncate font-serif text-xl font-light text-primary-dark">{memberName}</p>
+            <p className="mt-1 truncate font-sans text-xs text-taupe">{user.email}</p>
+          </div>
+        </div>
+
+        <div className="stat-tile flex min-h-[120px] flex-col justify-between p-5 lg:col-span-3">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
+            Display Currency
+          </p>
+          <div className="mt-3">
+            <p className="font-money text-2xl font-light tracking-[0.02em] text-primary-dark">
+              {formatMoney(12450.75, currency, currencySymbol)}
+            </p>
+            <p className="mt-1.5 font-sans text-xs text-taupe">
+              {currency} · {currencySymbol}
+            </p>
+          </div>
+        </div>
+
+        <div className="stat-tile flex min-h-[120px] flex-col justify-between p-5 lg:col-span-2">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
+            Density
+          </p>
+          <div className="mt-3">
+            <p className="font-serif text-xl font-light capitalize text-primary-dark">{uiDensity}</p>
+            <p className="mt-1.5 font-sans text-xs text-taupe">
+              {uiDensity === 'compact' ? 'Dense ledger' : 'Spacious cards'}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <nav className="surface h-fit space-y-1 p-2 xl:col-span-3">
           {SETTINGS_TABS.map((tab) => {
             const active = activeTab === tab.id;
             return (
@@ -406,55 +473,62 @@ function SettingsPage({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left font-sans text-sm font-normal transition-colors ${
+                className={`flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3.5 py-2.5 text-left font-sans text-sm font-normal tracking-[0.02em] transition-all duration-200 ease-out-expo ${
                   active
-                    ? 'bg-primary-dark text-cream'
-                    : 'text-taupe hover:bg-cream/60 hover:text-primary-dark'
+                    ? 'bg-primary-dark text-cream shadow-soft'
+                    : 'text-taupe hover:bg-cream/80 hover:text-primary-dark'
                 }`}
               >
-                <Icon name={tab.icon} className="text-lg" />
+                <Icon name={tab.icon} className={`text-lg ${active ? 'text-gold' : ''}`} />
                 {tab.label}
               </button>
             );
           })}
         </nav>
 
-        <div className="space-y-6">
+        <div className="space-y-4 xl:col-span-9">
           {activeTab === 'profile' && (
             <>
               <section className={panelClass}>
-                <h3 className="font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">Member Profile</h3>
-                <p className="mt-1 font-sans text-sm text-taupe">Your private ledger identity</p>
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Member Profile</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">Your ledger identity</p>
+                </div>
+                <div className="grid gap-5 px-5 py-5 sm:grid-cols-2">
                   <div>
-                    <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">Name</p>
-                    <p className="mt-1 font-sans text-primary-dark">{user.first_name} {user.last_name}</p>
+                    <p className="field-label">Name</p>
+                    <p className="font-sans text-[15px] font-light text-primary-dark">{memberName}</p>
                   </div>
                   <div>
-                    <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">Email</p>
-                    <p className="mt-1 font-sans text-primary-dark">{user.email}</p>
+                    <p className="field-label">Email</p>
+                    <p className="break-all font-sans text-[15px] font-light text-primary-dark">
+                      {user.email}
+                    </p>
                   </div>
                 </div>
               </section>
 
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Display Currency</h3>
-                <p className="mt-1 font-sans text-sm text-taupe">
-                  All amounts across your ledger will format in this currency.
-                </p>
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Display Currency</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Formats amounts across your ledger.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-end">
                   <div className="flex-1">
-                    <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
+                    <label className="field-label" htmlFor="settings-currency">
                       Currency
                     </label>
                     <select
+                      id="settings-currency"
                       value={currency}
                       onChange={(e) => {
                         const next = getCurrencyByCode(e.target.value);
                         setCurrency(next.code);
                         setCurrencySymbol(next.symbol);
                       }}
-                      className="w-full rounded-lg border border-cream bg-white px-3 py-2.5 font-sans text-sm focus:border-gold focus:outline-none"
+                      className="field"
                     >
                       {ONBOARDING_CURRENCIES.map((item) => (
                         <option key={item.code} value={item.code}>
@@ -463,9 +537,9 @@ function SettingsPage({
                       ))}
                     </select>
                   </div>
-                  <div className="rounded-lg border border-gold/30 bg-cream/40 px-4 py-2.5">
-                    <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">Preview</p>
-                    <p className="mt-0.5 font-money text-xl font-light tracking-[0.02em] text-gold">
+                  <div className="rounded-lg border border-primary-dark/10 bg-cream/50 px-4 py-3">
+                    <p className="field-label mb-0">Preview</p>
+                    <p className="mt-1 font-money text-xl font-light tracking-[0.02em] text-primary-dark">
                       {formatMoney(12450.75, currency, currencySymbol)}
                     </p>
                   </div>
@@ -473,10 +547,14 @@ function SettingsPage({
               </section>
 
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Visual Tuning</h3>
-                <div className="mt-5">
-                  <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">UI Density</p>
-                  <div className="mt-2 grid max-w-md grid-cols-2 gap-2">
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Visual Tuning</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Choose how dense your ledger surfaces feel.
+                  </p>
+                </div>
+                <div className="px-5 py-5">
+                  <div className="grid max-w-md grid-cols-2 gap-3">
                     {[
                       { id: 'classic', label: 'Classic', desc: 'Spacious cards' },
                       { id: 'compact', label: 'Compact', desc: 'Dense ledger' },
@@ -485,14 +563,14 @@ function SettingsPage({
                         key={option.id}
                         type="button"
                         onClick={() => selectDensity(option.id)}
-                        className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                        className={`min-h-[72px] rounded-lg border px-3.5 py-3 text-left transition-colors duration-200 ease-out-expo ${
                           uiDensity === option.id
-                            ? 'border-gold bg-cream/60'
-                            : 'border-cream hover:border-gold/50'
+                            ? 'border-gold bg-gold/10'
+                            : 'border-primary-dark/12 bg-white hover:border-gold/50'
                         }`}
                       >
                         <p className="font-sans text-sm font-normal text-primary-dark">{option.label}</p>
-                        <p className="font-sans text-xs text-taupe">{option.desc}</p>
+                        <p className="mt-1 font-sans text-xs text-taupe">{option.desc}</p>
                       </button>
                     ))}
                   </div>
@@ -500,25 +578,25 @@ function SettingsPage({
               </section>
 
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Intelligence Thresholds</h3>
-                <p className="mt-1 font-sans text-sm text-taupe">
-                  Configure when your ledger should surface runway and feasibility alerts.
-                </p>
-                <div className="mt-4 space-y-4">
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Alert Thresholds</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    When runway and feasibility should surface.
+                  </p>
+                </div>
+                <div className="space-y-5 px-5 py-5">
                   <div>
-                    <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-                      Budget Runway Alerts
-                    </p>
+                    <p className="field-label">Budget Runway Alerts</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {RUNWAY_OPTIONS.map((pct) => (
                         <button
                           key={pct}
                           type="button"
                           onClick={() => toggleRunwayThreshold(pct)}
-                          className={`rounded-full border px-3 py-1 font-sans text-xs font-normal transition-colors ${
+                          className={`min-h-[40px] rounded-lg border px-3.5 py-2 font-money text-sm font-light transition-colors duration-200 ease-out-expo ${
                             alertPrefs.budget_runway.includes(pct)
                               ? 'border-primary-dark bg-primary-dark text-cream'
-                              : 'border-cream text-taupe hover:border-primary-dark/40 hover:text-primary-dark'
+                              : 'border-primary-dark/12 text-taupe hover:border-primary-dark/30 hover:text-primary-dark'
                           }`}
                         >
                           {pct}%
@@ -526,7 +604,7 @@ function SettingsPage({
                       ))}
                     </div>
                   </div>
-                  <label className="flex cursor-pointer items-center gap-3">
+                  <label className="flex cursor-pointer items-start gap-3">
                     <input
                       type="checkbox"
                       checked={alertPrefs.feasibility_decay}
@@ -534,9 +612,9 @@ function SettingsPage({
                         ...prev,
                         feasibility_decay: e.target.checked,
                       }))}
-                      className="h-4 w-4 rounded border-cream text-gold focus:ring-gold"
+                      className="mt-0.5 h-4 w-4 rounded border-primary-dark/20 text-gold focus:ring-gold"
                     />
-                    <span className="font-sans text-sm text-primary-dark">
+                    <span className="font-sans text-sm font-light leading-relaxed text-primary-dark">
                       Alert when a goal drops from Achievable to Underfunded
                     </span>
                   </label>
@@ -547,9 +625,9 @@ function SettingsPage({
                 type="button"
                 onClick={handleSaveProfile}
                 disabled={saving}
-                className="btn-navy disabled:opacity-60"
+                className="btn-navy min-h-[44px] disabled:opacity-60"
               >
-                {saving ? 'Saving…' : 'Save Profile & Preferences'}
+                {saving ? 'Saving…' : 'Save Preferences'}
               </button>
             </>
           )}
@@ -573,99 +651,110 @@ function SettingsPage({
               />
 
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Fiscal Year</h3>
-                <p className="mt-1 font-sans text-sm text-taupe">
-                  Set when your financial cycle begins for reporting and runway calculations.
-                </p>
-                <select
-                  value={fiscalStartMonth}
-                  onChange={(e) => setFiscalStartMonth(Number(e.target.value))}
-                  className="mt-4 w-full max-w-xs rounded-lg border border-cream bg-white px-3 py-2.5 font-sans text-sm focus:border-gold focus:outline-none"
-                >
-                  {FISCAL_MONTHS.map((month, index) => (
-                    <option key={month} value={index + 1}>{month}</option>
-                  ))}
-                </select>
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Fiscal Year</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    When your reporting cycle begins.
+                  </p>
+                </div>
+                <div className="px-5 py-5">
+                  <label className="field-label" htmlFor="settings-fiscal">
+                    Start Month
+                  </label>
+                  <select
+                    id="settings-fiscal"
+                    value={fiscalStartMonth}
+                    onChange={(e) => setFiscalStartMonth(Number(e.target.value))}
+                    className="field max-w-xs"
+                  >
+                    {FISCAL_MONTHS.map((month, index) => (
+                      <option key={month} value={index + 1}>{month}</option>
+                    ))}
+                  </select>
+                </div>
               </section>
 
               <section className={panelClass}>
-                <div className="flex items-start justify-between gap-4">
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4 md:flex md:items-start md:justify-between md:gap-4">
                   <div>
-                    <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Category Ledger</h3>
+                    <h3 className="card-title">Category Ledger</h3>
                     <p className="mt-1 font-sans text-sm text-taupe">
-                      Customize expense categories and their signature colours.
+                      Expense categories and their colours.
                     </p>
                   </div>
-                  <Icon name="category" className="text-2xl text-gold" />
+                  <Icon name="category" className="mt-2 hidden text-2xl text-gold md:mt-0 md:block" />
                 </div>
 
-                {categoriesLoading ? (
-                  <p className="mt-6 font-sans text-sm text-taupe">Loading categories…</p>
-                ) : (
-                  <div className="mt-5 space-y-2">
-                    {categories.map((cat) => (
-                      <div
-                        key={cat.category_id}
-                        className="flex flex-wrap items-center gap-3 rounded-lg border border-cream/80 bg-cream/20 px-3 py-2"
-                      >
-                        <input
-                          type="color"
-                          value={cat.colour || '#D4B16D'}
-                          onChange={(e) => handleUpdateCategory(cat.category_id, { color: e.target.value })}
-                          className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent"
-                          aria-label={`Colour for ${cat.name}`}
-                        />
-                        <input
-                          type="text"
-                          defaultValue={cat.name}
-                          onBlur={(e) => {
-                            if (e.target.value.trim() && e.target.value !== cat.name) {
-                              handleUpdateCategory(cat.category_id, { name: e.target.value.trim() });
-                            }
-                          }}
-                          className="min-w-[120px] flex-1 rounded border border-transparent bg-transparent px-2 py-1 font-sans text-sm font-normal text-primary-dark focus:border-gold focus:outline-none"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div className="px-5 py-5">
+                  {categoriesLoading ? (
+                    <p className="font-sans text-sm text-taupe">Loading categories…</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {categories.map((cat) => (
+                        <div
+                          key={cat.category_id}
+                          className="flex flex-wrap items-center gap-3 rounded-lg border border-primary-dark/[0.08] bg-cream/30 px-3 py-2.5"
+                        >
+                          <input
+                            type="color"
+                            value={cat.colour || '#D4B16D'}
+                            onChange={(e) => handleUpdateCategory(cat.category_id, { color: e.target.value })}
+                            className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent"
+                            aria-label={`Colour for ${cat.name}`}
+                          />
+                          <input
+                            type="text"
+                            defaultValue={cat.name}
+                            onBlur={(e) => {
+                              if (e.target.value.trim() && e.target.value !== cat.name) {
+                                handleUpdateCategory(cat.category_id, { name: e.target.value.trim() });
+                              }
+                            }}
+                            className="min-w-[120px] flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 font-sans text-sm font-normal text-primary-dark focus:border-gold focus:outline-none"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-                <form onSubmit={handleCreateCategory} className="mt-4 flex flex-wrap items-end gap-3 border-t border-cream pt-4">
-                  <div className="flex-1 min-w-[140px]">
-                    <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-                      New Category
-                    </label>
-                    <input
-                      type="text"
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      placeholder="e.g. Angel Investing"
-                      className="w-full rounded-lg border border-cream px-3 py-2 font-sans text-sm focus:border-gold focus:outline-none"
-                    />
-                  </div>
-                  <input
-                    type="color"
-                    value={newCategoryColor}
-                    onChange={(e) => setNewCategoryColor(e.target.value)}
-                    className="h-10 w-12 cursor-pointer rounded border border-cream"
-                    aria-label="Category colour"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-lg border-2 border-primary-dark px-4 py-2 font-sans text-sm font-normal text-primary-dark transition-colors hover:bg-primary-dark hover:text-cream"
+                  <form
+                    onSubmit={handleCreateCategory}
+                    className="mt-5 flex flex-wrap items-end gap-3 border-t border-primary-dark/[0.06] pt-5"
                   >
-                    Add
-                  </button>
-                </form>
+                    <div className="min-w-[140px] flex-1">
+                      <label className="field-label" htmlFor="new-category-name">
+                        New Category
+                      </label>
+                      <input
+                        id="new-category-name"
+                        type="text"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        placeholder="e.g. Angel Investing"
+                        className="field"
+                      />
+                    </div>
+                    <input
+                      type="color"
+                      value={newCategoryColor}
+                      onChange={(e) => setNewCategoryColor(e.target.value)}
+                      className="h-11 w-12 cursor-pointer rounded-lg border border-primary-dark/12"
+                      aria-label="Category colour"
+                    />
+                    <button type="submit" className="btn-ghost min-h-[44px]">
+                      Add
+                    </button>
+                  </form>
+                </div>
               </section>
 
               <button
                 type="button"
                 onClick={() => persistPreferences({ fiscal_start_month: fiscalStartMonth })}
                 disabled={saving}
-                className="rounded-lg bg-primary-dark px-6 py-3 font-sans text-sm font-normal text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
+                className="btn-navy min-h-[44px] disabled:opacity-60"
               >
-                Save Fiscal Settings
+                {saving ? 'Saving…' : 'Save Fiscal Settings'}
               </button>
             </>
           )}
@@ -673,69 +762,79 @@ function SettingsPage({
           {activeTab === 'security' && (
             <>
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Active Session</h3>
-                <p className="mt-1 font-sans text-sm text-taupe">
-                  Your session is secured with a signed token. End all sessions to clear local credentials.
-                </p>
-                <div className="mt-4 rounded-lg border border-cream bg-cream/30 px-4 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Active Session</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Signed token on this device. Sign out clears local credentials.
+                  </p>
+                </div>
+                <div className="px-5 py-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary-dark/[0.08] bg-cream/40 px-4 py-3.5">
                     <div>
                       <p className="font-sans text-sm font-normal text-primary-dark">This device</p>
-                      <p className="font-sans text-xs text-taupe">
+                      <p className="mt-0.5 font-sans text-xs text-taupe">
                         {tokenExpiry
                           ? `Expires ${tokenExpiry.toLocaleString()}`
                           : 'Session active'}
                       </p>
                     </div>
-                    <Icon name="devices" className="text-gold text-xl" />
+                    <Icon name="devices" className="text-xl text-gold" />
                   </div>
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="btn-outline-gold mt-4 min-h-[44px]"
+                  >
+                    Log Out of All Devices
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="mt-4 rounded-lg border-2 border-gold px-4 py-2 font-sans text-sm font-normal text-primary-dark transition-colors hover:bg-gold"
-                >
-                  Log Out of All Devices
-                </button>
               </section>
 
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Password Rotation</h3>
-                <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4 max-w-md">
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Password</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Rotate your password. Minimum 8 characters.
+                  </p>
+                </div>
+                <form onSubmit={handlePasswordSubmit} className="max-w-md space-y-4 px-5 py-5">
                   <div>
-                    <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
+                    <label className="field-label" htmlFor="current-password">
                       Current Password
                     </label>
                     <input
+                      id="current-password"
                       type="password"
                       value={passwordForm.currentPassword}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                      className="w-full rounded-lg border border-cream px-3 py-2.5 font-sans text-sm focus:border-gold focus:outline-none"
+                      className="field"
                       required
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
+                    <label className="field-label" htmlFor="new-password">
                       New Password
                     </label>
                     <input
+                      id="new-password"
                       type="password"
                       value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                      className="w-full rounded-lg border border-cream px-3 py-2.5 font-sans text-sm focus:border-gold focus:outline-none"
+                      className="field"
                       required
                       minLength={8}
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
+                    <label className="field-label" htmlFor="confirm-password">
                       Confirm New Password
                     </label>
                     <input
+                      id="confirm-password"
                       type="password"
                       value={passwordForm.confirmPassword}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                      className="w-full rounded-lg border border-cream px-3 py-2.5 font-sans text-sm focus:border-gold focus:outline-none"
+                      className="field"
                       required
                       minLength={8}
                     />
@@ -743,7 +842,7 @@ function SettingsPage({
                   <button
                     type="submit"
                     disabled={passwordSaving}
-                    className="rounded-md bg-primary-dark px-3.5 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
+                    className="btn-navy min-h-[44px] disabled:opacity-60"
                   >
                     {passwordSaving ? 'Updating…' : 'Update Password'}
                   </button>
@@ -755,129 +854,136 @@ function SettingsPage({
           {activeTab === 'data' && (
             <>
               <section className={panelClass}>
-                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Export Financial Statement</h3>
-                <p className="mt-1 font-sans text-sm text-taupe">
-                  Download your complete goals, transactions, expenses, and categories — true data ownership.
-                </p>
-                <div className="mt-5 flex flex-wrap gap-2">
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Export Statement</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Download goals, transactions, expenses, and categories.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3 px-5 py-5">
                   <button
                     type="button"
                     onClick={() => downloadExport('json')}
                     disabled={exportLoading}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-primary-dark px-3 py-1.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
+                    className="btn-navy inline-flex min-h-[44px] items-center gap-2 disabled:opacity-60"
                   >
-                    <Icon name="data_object" className="text-sm" />
+                    <Icon name="data_object" className="text-base" />
                     Export JSON
                   </button>
                   <button
                     type="button"
                     onClick={() => downloadExport('csv')}
                     disabled={exportLoading}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-primary-dark px-3 py-1.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-60"
+                    className="btn-ghost inline-flex min-h-[44px] items-center gap-2 disabled:opacity-60"
                   >
-                    <Icon name="table" className="text-sm" />
+                    <Icon name="table" className="text-base" />
                     Export CSV
                   </button>
                 </div>
               </section>
 
-              <section className={`${panelClass} border-red-200/60`}>
-                <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Soft Reset</h3>
-                <p className="mt-1 font-sans text-sm text-taupe">
-                  Archive your current cycle and begin a fresh savings mandate. Export your statement first —
-                  soft reset will be available in a future release.
-                </p>
-                <button
-                  type="button"
-                  disabled
-                  className="mt-4 cursor-not-allowed rounded-lg border border-cream px-4 py-2 font-sans text-sm text-taupe opacity-60"
-                >
-                  Soft Reset (Coming Soon)
-                </button>
+              <section className={panelClass}>
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Soft Reset</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Archive the current cycle and begin fresh. Export first — available in a future release.
+                  </p>
+                </div>
+                <div className="px-5 py-5">
+                  <button
+                    type="button"
+                    disabled
+                    className="btn-ghost min-h-[44px] cursor-not-allowed opacity-50"
+                  >
+                    Soft Reset (Coming Soon)
+                  </button>
+                </div>
               </section>
             </>
           )}
 
           {activeTab === 'trash' && (
             <section className={panelClass}>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex flex-col gap-3 border-b border-primary-dark/[0.06] px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h3 className="font-serif text-xl font-light tracking-[-0.015em] text-primary-dark">Trash</h3>
+                  <h3 className="card-title">Trash</h3>
                   <p className="mt-1 font-sans text-sm text-taupe">
-                    Deleted goals are kept here until you restore them or empty the trash.
+                    Restore deleted goals or empty trash permanently.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={handleEmptyTrash}
                   disabled={!trashGoals.length || trashActionId === 'empty'}
-                  className="rounded-md border border-red-200 px-4 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-red-700 transition-colors hover:bg-red-50 disabled:opacity-40"
+                  className="btn-ghost min-h-[44px] border-red-200/80 text-red-800 hover:border-red-300 hover:bg-red-50 disabled:opacity-40"
                 >
                   {trashActionId === 'empty' ? 'Emptying…' : 'Empty Trash'}
                 </button>
               </div>
 
-              {trashLoading ? (
-                <p className="mt-6 font-sans text-sm text-taupe">Loading trash…</p>
-              ) : trashGoals.length === 0 ? (
-                <div className="mt-6 rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center">
-                  <Icon name="delete" className="text-3xl text-taupe/40" />
-                  <p className="mt-2 font-serif text-lg font-light tracking-[-0.015em] text-primary-dark">Trash is empty</p>
-                  <p className="mt-1 font-sans text-sm text-taupe">
-                    When you delete a goal, it will appear here.
-                  </p>
-                </div>
-              ) : (
-                <ul className="mt-6 divide-y divide-gray-100 rounded-lg border border-gray-200">
-                  {trashGoals.map((goal) => (
-                    <li
-                      key={goal.goal_id}
-                      className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-serif text-lg font-light tracking-[-0.015em] text-primary-dark">
-                          {goal.name}
-                        </p>
-                        <p className="mt-0.5 font-sans text-xs text-taupe">
-                          Saved{' '}
-                          <span className="font-money font-light text-primary-dark">
-                            {formatMoney(goal.saved_amount, currency, currencySymbol)}
-                          </span>
-                          {' · '}
-                          Target{' '}
-                          <span className="font-money font-light text-primary-dark">
-                            {formatMoney(goal.target_amount, currency, currencySymbol)}
-                          </span>
-                          {goal.deleted_at && (
-                            <>
-                              {' · '}
-                              Deleted {new Date(goal.deleted_at).toLocaleDateString()}
-                            </>
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleRestoreGoal(goal.goal_id)}
-                          disabled={trashActionId === goal.goal_id}
-                          className="rounded-md bg-primary-dark px-3 py-1.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream transition-colors hover:bg-primary-dark-alt disabled:opacity-50"
-                        >
-                          Restore
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handlePermanentDelete(goal.goal_id, goal.name)}
-                          disabled={trashActionId === goal.goal_id}
-                          className="rounded-md border border-red-200 px-3 py-1.5 font-sans text-xs font-normal uppercase tracking-[0.12em] text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
-                        >
-                          Delete Forever
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <div className="px-5 py-5">
+                {trashLoading ? (
+                  <p className="font-sans text-sm text-taupe">Loading trash…</p>
+                ) : trashGoals.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-primary-dark/12 px-4 py-10 text-center">
+                    <Icon name="delete" className="text-3xl text-taupe/40" />
+                    <p className="mt-2 font-serif text-lg font-light text-primary-dark">Trash is empty</p>
+                    <p className="mt-1 font-sans text-sm text-taupe">
+                      Deleted goals will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-primary-dark/[0.06] overflow-hidden rounded-lg border border-primary-dark/[0.08]">
+                    {trashGoals.map((goal) => (
+                      <li
+                        key={goal.goal_id}
+                        className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-serif text-lg font-light tracking-[-0.015em] text-primary-dark">
+                            {goal.name}
+                          </p>
+                          <p className="mt-0.5 font-sans text-xs text-taupe">
+                            Saved{' '}
+                            <span className="font-money font-light text-primary-dark">
+                              {formatMoney(goal.saved_amount, currency, currencySymbol)}
+                            </span>
+                            {' · '}
+                            Target{' '}
+                            <span className="font-money font-light text-primary-dark">
+                              {formatMoney(goal.target_amount, currency, currencySymbol)}
+                            </span>
+                            {goal.deleted_at && (
+                              <>
+                                {' · '}
+                                Deleted {new Date(goal.deleted_at).toLocaleDateString()}
+                              </>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleRestoreGoal(goal.goal_id)}
+                            disabled={trashActionId === goal.goal_id}
+                            className="btn-navy min-h-[40px] px-3 py-2 disabled:opacity-50"
+                          >
+                            Restore
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handlePermanentDelete(goal.goal_id, goal.name)}
+                            disabled={trashActionId === goal.goal_id}
+                            className="btn-ghost min-h-[40px] border-red-200/80 px-3 py-2 text-red-800 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            Delete Forever
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </section>
           )}
 

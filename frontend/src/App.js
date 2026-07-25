@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { Routes, Route, Navigate, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
 import api from './services/api';
@@ -34,7 +34,8 @@ const parseAmount = (value) => {
   return Number.isFinite(amount) ? amount : 0;
 };
 
-const CircularProgress = ({ value, size = 88, strokeWidth = 5 }) => {
+const CircularProgress = ({ value, size = 88, strokeWidth = 6 }) => {
+  const gradientId = `goal-ring-${useId().replace(/:/g, '')}`;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const target = Math.min(100, Math.max(0, Number(value) || 0));
@@ -67,12 +68,27 @@ const CircularProgress = ({ value, size = 88, strokeWidth = 5 }) => {
   return (
     <div className="relative shrink-0 self-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
+        <defs>
+          <linearGradient
+            id={gradientId}
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="100%"
+            gradientUnits="objectBoundingBox"
+          >
+            <stop offset="0%" stopColor="#F8F4EC" />
+            <stop offset="28%" stopColor="#F4E0A5" />
+            <stop offset="62%" stopColor="#D4B16D" />
+            <stop offset="100%" stopColor="#0A0F1A" />
+          </linearGradient>
+        </defs>
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#E8E4DC"
+          stroke="rgba(10, 15, 26, 0.08)"
           strokeWidth={strokeWidth}
         />
         <circle
@@ -80,7 +96,7 @@ const CircularProgress = ({ value, size = 88, strokeWidth = 5 }) => {
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#D4B16D"
+          stroke={`url(#${gradientId})`}
           strokeWidth={strokeWidth}
           strokeDasharray={circumference}
           strokeDashoffset={offset}
@@ -1504,7 +1520,7 @@ function App() {
         <Routes>
           <Route
             element={
-              <div className="mx-auto w-full min-w-0 max-w-[1180px]">
+              <div className="mx-auto w-full min-w-0 max-w-[1320px]">
                 <AnimatedOutlet />
               </div>
             }

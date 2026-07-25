@@ -32,16 +32,14 @@ function EarnerModeToggle({ userId, isEarner, hasBudget, onModeChange }) {
   };
 
   return (
-    <section className="rounded-lg border border-cream bg-white p-8 shadow-sm">
-      <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+    <section className="surface overflow-hidden">
+      <div className="flex flex-col gap-6 p-5 md:flex-row md:items-start md:justify-between md:p-6">
         <div className="max-w-xl">
-          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
-            Savings Mode
-          </p>
-          <h3 className="mt-2 font-serif text-2xl font-light tracking-[-0.02em] text-primary-dark">
+          <p className="eyebrow">Savings Mode</p>
+          <h3 className="mt-1 card-title">
             {isEarner ? 'Earner Mode' : 'Non-Earner Mode'}
           </h3>
-          <p className="mt-3 font-sans text-sm leading-relaxed text-taupe">
+          <p className="mt-3 font-sans text-sm font-light leading-relaxed text-taupe">
             {isEarner
               ? 'Your monthly budget is split across goals with allocation, feasibility checks, and funding recommendations.'
               : 'Track what you need to save for each goal without tying plans to a fixed monthly income.'}
@@ -72,13 +70,17 @@ function EarnerModeToggle({ userId, isEarner, hasBudget, onModeChange }) {
               }`}
             />
           </button>
-          <p className="font-sans text-xs font-semibold uppercase tracking-[0.12em] text-taupe">
+          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
             {loading ? 'Saving…' : isEarner ? 'Earner' : 'Non-Earner'}
           </p>
         </div>
       </div>
 
-      {error && <ErrorBanner className="mt-4" message={error} />}
+      {error && (
+        <div className="border-t border-primary-dark/[0.06] px-5 py-4">
+          <ErrorBanner message={error} />
+        </div>
+      )}
     </section>
   );
 }

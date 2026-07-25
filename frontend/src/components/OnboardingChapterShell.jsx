@@ -2,10 +2,44 @@
  * Onboarding chapter plates — gold line-art infographics per step.
  */
 
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+
+const EASE_LUXURY = [0.22, 1, 0.36, 1];
+
+const chapterVariants = {
+  enter: (dir) => ({
+    opacity: 0,
+    y: dir >= 0 ? 22 : -16,
+  }),
+  center: {
+    opacity: 1,
+    y: 0,
+  },
+  exit: (dir) => ({
+    opacity: 0,
+    y: dir >= 0 ? -14 : 18,
+  }),
+};
+
+const formVariants = {
+  enter: (dir) => ({
+    opacity: 0,
+    y: dir >= 0 ? 18 : -14,
+  }),
+  center: {
+    opacity: 1,
+    y: 0,
+  },
+  exit: (dir) => ({
+    opacity: 0,
+    y: dir >= 0 ? -10 : 14,
+  }),
+};
+
 function ChapterArt({ src, className = '' }) {
   return (
     <img
-      src={`${src}?v=1`}
+      src={`${src}?v=3`}
       alt=""
       aria-hidden="true"
       className={`auth-story-illustration auth-story-illustration--onboarding ${className}`}
@@ -67,14 +101,24 @@ function OnboardingChapterShell({
   stepIndex,
   totalSteps,
   progress,
+  direction = 1,
   ProgressBarComponent,
   children,
 }) {
   const chapter = ONBOARDING_CHAPTERS[stepId] || ONBOARDING_CHAPTERS.welcome;
+  const reduceMotion = useReducedMotion();
+
+  const transition = reduceMotion
+    ? { duration: 0 }
+    : { duration: 0.52, ease: EASE_LUXURY };
+
+  const formTransition = reduceMotion
+    ? { duration: 0 }
+    : { duration: 0.48, ease: EASE_LUXURY };
 
   return (
-    <div className="relative min-h-screen w-full lg:grid lg:grid-cols-2">
-      <aside className="auth-story relative flex flex-col justify-between overflow-hidden bg-primary-dark px-8 py-10 text-cream sm:px-12 lg:min-h-screen lg:px-14 lg:py-12 xl:px-16">
+    <div className="relative min-h-screen w-full bg-primary-dark lg:grid lg:grid-cols-2">
+      <aside className="auth-story relative flex flex-col justify-between overflow-hidden px-8 py-10 text-cream sm:px-12 lg:min-h-screen lg:px-14 lg:py-12 xl:px-16">
         <div className="auth-story-glow pointer-events-none absolute inset-0" aria-hidden="true" />
 
         <div className="relative z-10 shrink-0">
@@ -84,24 +128,37 @@ function OnboardingChapterShell({
           </p>
         </div>
 
-        <div className="relative z-10 my-6 flex min-h-0 flex-1 flex-col justify-center lg:my-0" key={stepId}>
-          <p className="font-sans text-xs font-normal uppercase tracking-[0.16em] text-gold">
-            Chapter {chapter.roman}
-          </p>
-          <h1 className="mt-3 max-w-md font-serif text-3xl font-light leading-snug tracking-[-0.02em] text-cream sm:text-[2.35rem]">
-            {chapter.title}
-          </h1>
-          <p className="mt-3 max-w-md font-sans text-[15px] font-light leading-relaxed text-cream/60">
-            {chapter.lede}
-          </p>
+        <div className="relative z-10 my-4 flex min-h-0 flex-1 flex-col lg:my-0">
+          <AnimatePresence mode="wait" custom={direction}>
+            <motion.div
+              key={stepId}
+              custom={direction}
+              variants={chapterVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={transition}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <p className="font-sans text-xs font-normal uppercase tracking-[0.16em] text-gold">
+                Chapter {chapter.roman}
+              </p>
+              <h1 className="mt-3 max-w-md font-serif text-3xl font-light leading-snug tracking-[-0.02em] text-cream sm:text-[2.35rem]">
+                {chapter.title}
+              </h1>
+              <p className="mt-3 max-w-md font-sans text-[15px] font-light leading-relaxed text-cream/60">
+                {chapter.lede}
+              </p>
 
-          <div className="auth-onboarding-art-stage relative mt-6 hidden min-h-0 flex-1 items-center sm:flex lg:mt-8">
-            <div className="auth-register-art-glow pointer-events-none absolute inset-0" aria-hidden="true" />
-            <ChapterArt
-              src={chapter.artSrc}
-              className="auth-story-illustration--onboarding-fit relative z-10"
-            />
-          </div>
+              <div className="auth-onboarding-art-stage relative mt-4 hidden min-h-0 flex-1 items-center sm:flex lg:mt-6">
+                <div className="auth-onboarding-art-glow pointer-events-none absolute inset-0" aria-hidden="true" />
+                <ChapterArt
+                  src={chapter.artSrc}
+                  className="auth-story-illustration--onboarding-fit relative z-10"
+                />
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         <div className="relative z-10 shrink-0 space-y-3">
@@ -115,8 +172,21 @@ function OnboardingChapterShell({
         </div>
       </aside>
 
-      <section className="flex min-h-0 flex-1 items-center justify-center bg-white px-5 py-10 sm:px-8 lg:min-h-screen lg:px-14 lg:py-14 xl:px-20">
-        <div className="w-full max-w-[480px]">{children}</div>
+      <section className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-white px-5 py-10 sm:px-8 lg:min-h-screen lg:px-14 lg:py-14 xl:px-20">
+        <AnimatePresence mode="wait" custom={direction}>
+          <motion.div
+            key={stepId}
+            custom={direction}
+            variants={formVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={formTransition}
+            className="w-full max-w-[480px]"
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
       </section>
     </div>
   );
