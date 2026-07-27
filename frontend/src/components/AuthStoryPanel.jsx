@@ -13,8 +13,8 @@ function LoginStoryArt({ className = '' }) {
       aria-hidden="true"
     >
       <defs>
-        <filter id="login-glow" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="6" result="blur" />
+        <filter id="login-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="5" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
@@ -57,9 +57,33 @@ function LoginStoryArt({ className = '' }) {
       </g>
 
       <g className="auth-seal" filter="url(#login-glow)">
-        <circle cx="180" cy="108" r="28" stroke="#D4B16D" strokeWidth="1.5" fill="rgba(10,15,26,0.65)" />
-        <circle cx="180" cy="108" r="20" stroke="rgba(232,199,122,0.5)" strokeWidth="1.1" />
-        <circle cx="180" cy="108" r="12" stroke="rgba(244,224,165,0.35)" strokeWidth="0.9" />
+        <circle
+          className="auth-seal-halo"
+          cx="180"
+          cy="108"
+          r="28"
+          stroke="#D4B16D"
+          strokeWidth="1.2"
+          fill="none"
+        />
+        <circle
+          className="auth-seal-ring auth-seal-ring--outer"
+          cx="180"
+          cy="108"
+          r="28"
+          stroke="#D4B16D"
+          strokeWidth="1.5"
+          fill="rgba(10,15,26,0.65)"
+        />
+        <circle
+          className="auth-seal-ring auth-seal-ring--inner"
+          cx="180"
+          cy="108"
+          r="16"
+          stroke="rgba(244,224,165,0.45)"
+          strokeWidth="1"
+          fill="none"
+        />
         <text
           x="180"
           y="113"
@@ -129,7 +153,7 @@ function LoginStoryArt({ className = '' }) {
 function RegisterStoryArt({ className = '' }) {
   return (
     <img
-      src="/illustrations/login-ledger-scene.png?v=2"
+      src="/illustrations/login-ledger-scene.png?v=3"
       alt=""
       aria-hidden="true"
       className={`auth-story-illustration auth-story-illustration--register ${className}`}

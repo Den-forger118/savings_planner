@@ -464,8 +464,8 @@ function FeatureGuide({ isEarnerMode = false, onNavigate, embedded = false }) {
         </ol>
       </section>
 
-      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[240px_minmax(0,1fr)]">
-        <nav className="xl:sticky xl:top-24 xl:self-start">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <nav className="lg:sticky lg:top-24 lg:z-10 lg:self-start">
           <p className="mb-3 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
             On this page
           </p>

@@ -9,6 +9,7 @@ import ActivityLedger from './components/ActivityLedger';
 import Pagination from './components/Pagination';
 import GoalActions from './components/GoalActions';
 import ConfirmDialog from './components/ConfirmDialog';
+import HoldGoalDialog from './components/HoldGoalDialog';
 import ExpenseSummary from './components/ExpenseSummary';
 import SettingsPage from './components/SettingsPage';
 import OnboardingPage from './pages/OnboardingPage';
@@ -29,12 +30,38 @@ const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
 );
 
+/** Deposit (green) / withdrawal (coral) transfer mark for navy footers. */
+const TransactionIcon = ({ className = 'h-5 w-5' }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    aria-hidden="true"
+  >
+    <path
+      d="M4 8.5h12.5M13 5.5l3.5 3-3.5 3"
+      stroke="#6BBF8A"
+      strokeWidth="2.1"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M20 15.5H7.5M11 12.5l-3.5 3 3.5 3"
+      stroke="#E08A7A"
+      strokeWidth="2.1"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 const parseAmount = (value) => {
   const amount = parseFloat(value);
   return Number.isFinite(amount) ? amount : 0;
 };
 
-const CircularProgress = ({ value, size = 88, strokeWidth = 6 }) => {
+const CircularProgress = ({ value, size = 96, strokeWidth = 7, caption = 'Complete' }) => {
   const gradientId = `goal-ring-${useId().replace(/:/g, '')}`;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -77,10 +104,11 @@ const CircularProgress = ({ value, size = 88, strokeWidth = 6 }) => {
             y2="100%"
             gradientUnits="objectBoundingBox"
           >
-            <stop offset="0%" stopColor="#F8F4EC" />
-            <stop offset="28%" stopColor="#F4E0A5" />
-            <stop offset="62%" stopColor="#D4B16D" />
-            <stop offset="100%" stopColor="#0A0F1A" />
+            <stop offset="0%" stopColor="#0A0F1A" />
+            <stop offset="32%" stopColor="#1A2438" />
+            <stop offset="58%" stopColor="#25375A" />
+            <stop offset="82%" stopColor="#D4B16D" />
+            <stop offset="100%" stopColor="#F8F4EC" />
           </linearGradient>
         </defs>
         <circle
@@ -104,10 +132,15 @@ const CircularProgress = ({ value, size = 88, strokeWidth = 6 }) => {
           className="progress-ring-fg"
         />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="font-money text-base font-light tracking-[0.02em] text-primary-dark">
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
+        <span className="font-money text-lg font-light leading-none tracking-[0.02em] text-primary-dark">
           {Math.round(target)}%
         </span>
+        {caption ? (
+          <span className="mt-1 font-sans text-[10px] font-normal uppercase tracking-[0.1em] text-taupe">
+            {caption}
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -124,7 +157,6 @@ function GoalPortfolioCard({
   const goalActionsRef = useRef(null);
   const menuRef = useRef(null);
   const infoRef = useRef(null);
-  const statusPopoverRef = useRef(null);
   const editPanelRef = useRef(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -132,7 +164,6 @@ function GoalPortfolioCard({
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [goalSuggestions, setGoalSuggestions] = useState(null);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [openPopover, setOpenPopover] = useState(null);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [txAmount, setTxAmount] = useState('');
   const [txType, setTxType] = useState('deposit');
@@ -145,9 +176,7 @@ function GoalPortfolioCard({
   const [selectedFrequency, setSelectedFrequency] = useState('Monthly');
 
   const completion = Math.min(100, Math.max(0, parseAmount(goal.percentage_complete)));
-  const monthlyNeeded = parseAmount(goal.savings_needed?.monthly);
   const allocated = parseAmount(goal.allocated_monthly_amount);
-  const shortfall = Math.max(0, monthlyNeeded - allocated);
   const surplusDeficit = parseAmount(goal.surplus_deficit);
   const isComplete = goal.is_complete === true;
   const isPaused = goal.is_paused === true;
@@ -157,24 +186,6 @@ function GoalPortfolioCard({
   const isExactlyOnTrack = surplusDeficit === 0;
   const isAhead = goal.is_surplus && surplusDeficit > 0;
   const isBehindSchedule = !isExactlyOnTrack && !isAhead;
-  const isUnderfunded = isEarnerMode && goal.is_feasible === false;
-  const showWarningIcon = isBehindSchedule || !goal.on_track || isUnderfunded;
-
-  const statusTooltipText = (() => {
-    if (showWarningIcon) {
-      const issues = [];
-      if (isBehindSchedule || !goal.on_track) issues.push('Behind schedule');
-      if (isUnderfunded) issues.push(`Underfunded (${money(shortfall)}/mo short)`);
-      return issues.join(' · ');
-    }
-    if (isAhead) {
-      return `On track · ${money(surplusDeficit)} ahead of schedule`;
-    }
-    if (isEarnerMode && goal.is_feasible) {
-      return 'On track · Achievable with current funding';
-    }
-    return 'On track';
-  })();
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -189,20 +200,6 @@ function GoalPortfolioCard({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    if (!openPopover) return undefined;
-
-    const handleClickOutside = (event) => {
-      const inStatus = statusPopoverRef.current?.contains(event.target);
-      if (!inStatus) {
-        setOpenPopover(null);
-      }
-    };
-
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [openPopover]);
 
   useEffect(() => {
     if (!isEditing) return undefined;
@@ -315,32 +312,29 @@ function GoalPortfolioCard({
 
     if (action === 'delete') {
       goalActionsRef.current?.deleteGoal();
-      return;
     }
+  };
 
-    if (action === 'transaction') {
-      resetTransactionForm();
-      setShowTransactionModal(true);
-      return;
-    }
-
-    if (action === 'pause' || action === 'resume') {
-      requestPauseToggle();
-    }
+  const openTransactionModal = () => {
+    resetTransactionForm();
+    setShowTransactionModal(true);
   };
 
   const requestPauseToggle = () => {
     setPauseConfirmOpen(true);
   };
 
-  const handlePauseToggle = async () => {
+  const handlePauseToggle = async ({ pausedAt } = {}) => {
     const nextPaused = !isPaused;
     setPauseLoading(true);
 
     try {
-      const response = await api.patch(`/goals/${goal.goal_id}/pause`, {
-        is_paused: nextPaused,
-      });
+      const payload = { is_paused: nextPaused };
+      if (nextPaused && pausedAt) {
+        payload.paused_at = pausedAt;
+      }
+
+      const response = await api.patch(`/goals/${goal.goal_id}/pause`, payload);
       // Close confirm first so remaining goal cards are visible while amounts roll
       setPauseConfirmOpen(false);
       window.requestAnimationFrame(() => {
@@ -375,22 +369,9 @@ function GoalPortfolioCard({
   };
 
   const menuItems = [
-    ...(!isComplete
-      ? [{
-          id: isPaused ? 'resume' : 'pause',
-          label: isPaused ? 'Resume Goal' : 'Put on Hold',
-          icon: isPaused ? 'play_arrow' : 'pause_circle',
-        }]
-      : []),
     { id: 'edit', label: 'Edit', icon: 'edit' },
     { id: 'delete', label: 'Delete', icon: 'delete', danger: true },
-    { id: 'transaction', label: 'Record Transaction', icon: 'add_circle' },
   ];
-
-  const toggleStatusPopover = (event) => {
-    event.stopPropagation();
-    setOpenPopover((current) => (current === 'status' ? null : 'status'));
-  };
 
   const frequencyCells = [
     ['Daily', goal.savings_needed?.daily],
@@ -401,6 +382,37 @@ function GoalPortfolioCard({
   const selectedFrequencyAmount = frequencyCells.find(
     ([label]) => label === selectedFrequency
   )?.[1];
+  const budgetShare = parseAmount(goal.allocation_percentage);
+  const deadlineLabel = goal.deadline
+    ? new Date(goal.deadline).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null;
+  const headerMeta = (() => {
+    if (isComplete && goal.completed_at) {
+      return `Completed ${new Date(goal.completed_at).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })}`;
+    }
+    if (isOnHold) {
+      return `On hold since ${
+        goal.paused_at
+          ? new Date(goal.paused_at).toLocaleDateString(undefined, {
+              day: 'numeric',
+              month: 'short',
+            })
+          : '—'
+      }`;
+    }
+    if (deadlineLabel) {
+      return `Target by ${deadlineLabel}`;
+    }
+    return '\u00A0';
+  })();
 
   return (
     <article
@@ -409,207 +421,135 @@ function GoalPortfolioCard({
       {isComplete && (
         <div
           className="pointer-events-none absolute right-3 top-3 z-10 rotate-[-12deg] rounded-lg border-4 border-gold bg-primary-dark/80 px-2.5 py-1 opacity-90"
-          title="Completed — use the menu to edit or correct transactions"
+          title="Completed — use Edit in the menu to correct transactions"
         >
           <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
             Complete ✓
           </p>
         </div>
       )}
-      {isOnHold && (
-        <div
-          className="pointer-events-none absolute right-3 top-3 z-10 rotate-[-12deg] rounded-lg border-4 border-taupe/40 bg-primary-dark/80 px-2.5 py-1 opacity-90"
-          title="On hold — resume from the menu to include in budget allocation again"
-        >
-          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream">
-            On Hold
-          </p>
-        </div>
-      )}
 
-      <div className="rounded-t-[0.75rem] bg-navy-sheen px-4 py-3.5 text-cream">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/60">
-              Private Objective
-            </p>
-            <h3 className={`mt-1 truncate font-serif text-xl font-light leading-snug tracking-[-0.02em] ${isComplete || isOnHold ? 'pr-24' : ''}`}>
+      <div className="ledger-card-band shrink-0 px-4 py-3 text-cream">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 pt-0.5">
+            <h3
+              className={`truncate font-serif text-[1.35rem] font-light leading-none tracking-[-0.02em] ${
+                isComplete ? 'pr-24' : ''
+              }`}
+              title={goal.name}
+            >
               {goal.name}
             </h3>
-            {isComplete && goal.completed_at && (
-              <p className="mt-0.5 font-sans text-xs text-cream/70">
-                Completed {new Date(goal.completed_at).toLocaleDateString()}
-              </p>
-            )}
-            {isOnHold && goal.paused_at && (
-              <p className="mt-0.5 font-sans text-xs text-cream/70">
-                On hold since {new Date(goal.paused_at).toLocaleDateString()}
-              </p>
-            )}
+            <p
+              className={`mt-2 truncate font-sans text-xs font-light leading-snug ${
+                isOnHold ? 'text-gold' : 'text-cream/55'
+              }`}
+            >
+              {headerMeta}
+            </p>
           </div>
 
-          <div className="relative z-30 flex shrink-0 items-start gap-1.5">
-            {!isComplete && !isPaused && (
-              <div className="group/status relative" ref={statusPopoverRef}>
-                {showWarningIcon ? (
-                  <button
-                    type="button"
-                    onClick={toggleStatusPopover}
-                    aria-label={statusTooltipText}
-                    className="flex h-8 w-8 items-center justify-center"
-                  >
-                    <span className="animate-pulse cursor-pointer font-serif text-2xl font-light tracking-[-0.02em] text-orange-400">!</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={toggleStatusPopover}
-                    aria-label={statusTooltipText}
-                    className="flex h-8 w-8 items-center justify-center font-serif text-xl font-light tracking-[-0.015em] text-gold transition-colors hover:text-gold-light"
-                  >
-                    ✓
-                  </button>
-                )}
-
-                {openPopover !== 'status' && (
-                  <div
-                    role="tooltip"
-                    className="pointer-events-none absolute right-0 top-full z-[60] mt-2 hidden w-max max-w-[220px] rounded-lg bg-primary-dark px-3 py-2 shadow-lift group-hover/status:block"
-                  >
-                    <div className="absolute -top-1 right-3 h-2.5 w-2.5 rotate-45 bg-primary-dark" />
-                    <p className="relative whitespace-normal break-words font-sans text-xs leading-relaxed text-cream">
-                      {statusTooltipText}
-                    </p>
-                  </div>
-                )}
-
-                {openPopover === 'status' && (
-                  <div
-                    className={`absolute right-0 top-full z-[60] mt-2 w-[220px] rounded-lg p-4 shadow-lift ${
-                      showWarningIcon
-                        ? 'bg-primary-dark text-cream'
-                        : 'border border-gold bg-primary-dark text-cream'
-                    }`}
-                  >
-                    <div
-                      className={`absolute -top-1.5 right-3 h-3 w-3 rotate-45 ${
-                        showWarningIcon ? 'bg-primary-dark' : 'border-l border-t border-gold bg-primary-dark'
-                      }`}
-                    />
-                    {isBehindSchedule || !goal.on_track ? (
-                      <>
-                        <p className="font-sans text-xs font-normal">
-                          ⚠ You&apos;re {money(Math.abs(surplusDeficit))} behind schedule.
-                        </p>
-                        <p className="mt-1 font-sans text-xs text-cream/80">
-                          Save an extra {money(parseAmount(goal.extra_per_day_to_catch_up))}/day to catch up.
-                        </p>
-                        {isUnderfunded && (
-                          <p className="mt-2 font-sans text-xs text-cream/80">
-                            Allocation is {money(shortfall)}/month below what&apos;s needed.
-                          </p>
-                        )}
-                      </>
-                    ) : isAhead ? (
-                      <>
-                        <p className="font-sans text-xs font-normal">
-                          ✓ You&apos;re {money(surplusDeficit)} ahead.
-                        </p>
-                        <p className="mt-1 font-sans text-xs text-cream/80">
-                          You can skip saving for {parseAmount(goal.days_can_skip).toFixed(1)} days.
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="relative font-sans text-xs font-normal">✓ You&apos;re on track.</p>
-                        {isEarnerMode && goal.is_feasible && (
-                          <p className="relative mt-1 font-sans text-xs text-cream/80">
-                            Current funding covers this goal&apos;s monthly need.
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
+          <div className="relative z-30 flex shrink-0 flex-col items-end gap-1.5">
             <div className="relative shrink-0" ref={menuRef}>
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen((open) => !open)}
-                  aria-label="Goal actions"
-                  className="p-1 text-cream/80 transition-colors hover:bg-cream/10 hover:text-cream"
-                >
-                  <Icon name="more_vert" className="text-lg" />
-                </button>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((open) => !open)}
+                aria-label="Goal actions"
+                className="p-1 text-cream/80 transition-colors hover:bg-cream/10 hover:text-cream"
+              >
+                <Icon name="more_horiz" className="text-lg" />
+              </button>
 
-                {menuOpen && (
-                  <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg">
-                    {menuItems.map(({ id, label, icon, danger }) => (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => handleMenuAction(id)}
-                        className={`flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-sm transition-colors hover:bg-cream/50 ${
-                          danger ? 'text-red-700 hover:bg-red-50' : 'text-primary-dark'
-                        }`}
-                      >
-                        <Icon name={icon} className="text-base" />
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {menuOpen && (
+                <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                  {menuItems.map(({ id, label, icon, danger }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => handleMenuAction(id)}
+                      className={`flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-sm transition-colors hover:bg-cream/50 ${
+                        danger ? 'text-red-700 hover:bg-red-50' : 'text-primary-dark'
+                      }`}
+                    >
+                      <Icon name={icon} className="text-base" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {!isComplete && (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isPaused}
+                aria-label={isPaused ? 'Resume goal' : 'Put goal on hold'}
+                title={isPaused ? 'On hold — click to resume' : 'Put on hold'}
+                disabled={pauseLoading}
+                onClick={requestPauseToggle}
+                className={`relative h-5 w-9 rounded-full transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold disabled:cursor-wait disabled:opacity-50 ${
+                  isPaused ? 'bg-gold' : 'bg-cream/25'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm ring-1 ring-black/5 transition-[left] duration-200 ease-out ${
+                    isPaused ? 'left-[18px]' : 'left-0.5'
+                  }`}
+                />
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className={`flex flex-1 flex-col gap-3 p-4 ${!isComplete && !isPaused ? '' : 'rounded-b-lg'}`}>
-        <div className="flex items-center gap-2.5">
-          <CircularProgress value={isComplete ? 100 : completion} />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-stretch gap-4 px-4 py-4">
+          <div className="flex shrink-0 items-center">
+            <CircularProgress
+              value={isComplete ? 100 : completion}
+              caption="Complete"
+            />
+          </div>
 
           <div className="min-w-0 flex-1">
-            <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-              Goal Status
-            </p>
-            <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-1">
-              <div>
-                <p className="font-sans text-xs font-normal uppercase tracking-[0.08em] text-taupe">
+            <div className="grid h-full grid-cols-2 grid-rows-2">
+              <div className="border-b border-r border-primary-dark/10 py-2 pr-3">
+                <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe">
                   Target
                 </p>
-                <p className="font-money text-sm font-light leading-tight text-primary-dark">
+                <p className="mt-0.5 font-money text-sm font-light leading-tight text-primary-dark">
                   {money(goal.target_amount)}
                 </p>
               </div>
-              <div>
-                <p className="font-sans text-xs font-normal uppercase tracking-[0.08em] text-taupe">
+              <div className="border-b border-primary-dark/10 py-2 pl-3">
+                <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe">
                   Saved
                 </p>
-                <p className="font-money text-sm font-light leading-tight text-primary-dark">
+                <p className="mt-0.5 font-money text-sm font-light leading-tight text-primary-dark">
                   <OdometerNumber
                     value={goal.saved_amount}
                     prefix={user.currency_symbol || '$'}
                   />
                 </p>
               </div>
-              <div>
-                <p className="font-sans text-xs font-normal uppercase tracking-[0.08em] text-taupe">
+              <div className="border-r border-primary-dark/10 py-2 pr-3">
+                <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe">
                   Remaining
                 </p>
-                <p className="font-money text-sm font-light leading-tight text-primary-dark">
+                <p className="mt-0.5 font-money text-sm font-light leading-tight text-primary-dark">
                   <OdometerNumber
                     value={goal.remaining_amount}
                     prefix={user.currency_symbol || '$'}
                   />
                 </p>
               </div>
-              <div>
-                <p className="font-sans text-xs font-normal uppercase tracking-[0.08em] text-taupe">
+              <div className="py-2 pl-3">
+                <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe">
                   Days Left
                 </p>
-                <p className="font-money text-sm font-light leading-tight text-primary-dark">
+                <p className="mt-0.5 font-money text-sm font-light leading-tight text-primary-dark">
                   {goal.days_remaining}
                 </p>
               </div>
@@ -617,51 +557,53 @@ function GoalPortfolioCard({
           </div>
         </div>
 
-        {!isComplete && !isPaused && (
-          <div className="border-t border-cream/80 pt-2">
-            <div className="border border-cream bg-cream/30 p-2">
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-                  {selectedFrequency} Savings Needed
-                </p>
-                <p className="font-money text-sm font-light text-primary-dark">
-                  <OdometerNumber
-                    value={parseAmount(selectedFrequencyAmount)}
-                    prefix={user.currency_symbol || '$'}
-                  />
-                </p>
-              </div>
+        <div className={`border-t border-primary-dark/10 px-4 py-4 ${isComplete || isPaused ? 'pointer-events-none opacity-50' : ''}`}>
+          <div className="border border-cream bg-cream/30 p-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-taupe/70">
+                {selectedFrequency} Savings Needed
+              </p>
+              <p className="font-money text-sm font-light text-primary-dark">
+                <OdometerNumber
+                  value={parseAmount(selectedFrequencyAmount)}
+                  prefix={user.currency_symbol || '$'}
+                />
+              </p>
+            </div>
 
-              <div
-                className="mt-2 grid grid-cols-4 gap-px border border-cream bg-cream"
-                role="group"
-                aria-label="Savings frequency"
-              >
-                {frequencyCells.map(([label]) => {
-                  const isSelected = selectedFrequency === label;
+            <div
+              className="mt-2 grid grid-cols-4 gap-px border border-cream bg-cream"
+              role="group"
+              aria-label="Savings frequency"
+            >
+              {frequencyCells.map(([label]) => {
+                const isSelected = selectedFrequency === label;
 
-                  return (
-                    <button
-                      key={label}
-                      type="button"
-                      aria-pressed={isSelected}
-                      onClick={() => setSelectedFrequency(label)}
-                      className={`px-1.5 py-1.5 font-sans text-xs font-normal uppercase tracking-[0.08em] transition-colors ${
-                        isSelected
-                          ? 'bg-primary-dark text-cream'
-                          : 'bg-white text-taupe hover:bg-cream/70 hover:text-primary-dark'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-pressed={isSelected}
+                    disabled={isComplete || isPaused}
+                    onClick={() => setSelectedFrequency(label)}
+                    className={`px-1.5 py-1.5 font-sans text-[9px] font-normal uppercase tracking-[0.08em] transition-colors disabled:cursor-default ${
+                      isSelected
+                        ? 'bg-primary-dark text-cream'
+                        : 'bg-white text-taupe hover:bg-cream/70 hover:text-primary-dark'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
-        )}
+        </div>
 
-        <div ref={editPanelRef}>
+        <div
+          ref={editPanelRef}
+          className={`mt-auto ${isEditing ? 'border-t border-primary-dark/10 px-4 py-3' : ''}`}
+        >
           <GoalActions
             ref={goalActionsRef}
             goal={goal}
@@ -679,125 +621,173 @@ function GoalPortfolioCard({
             }}
           />
         </div>
-
       </div>
 
-      {!isComplete && !isPaused && (
-        <div className="mt-auto rounded-b-[0.75rem] bg-navy-sheen px-4 py-3.5 text-cream">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              {isEarnerMode ? (
-                <>
-                  <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/60">
-                    Monthly Allocation
-                  </p>
-                  <p className="mt-0.5 font-money text-lg font-light leading-tight tracking-[0.02em]">
-                    <OdometerNumber
-                      value={allocated}
-                      prefix={user.currency_symbol || '$'}
-                    />
-                  </p>
-                  <p className="mt-0.5 font-sans text-xs text-cream/60">
-                    {goal.is_feasible
-                      ? 'Achievable with current funding'
-                      : (
-                        <>
-                          Shortfall:{' '}
-                          <OdometerNumber
-                            value={shortfall}
-                            prefix={user.currency_symbol || '$'}
-                            className="inline-flex"
-                          />
-                          /month
-                        </>
-                      )}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-cream/60">
-                    Pace Check
-                  </p>
-                  <p className="mt-0.5 font-serif text-lg font-light leading-tight tracking-[-0.02em]">
-                    {isBehindSchedule || !goal.on_track
-                      ? 'Needs attention'
-                      : isAhead
-                        ? 'Ahead of pace'
-                        : 'On track'}
-                  </p>
-                  <p className="mt-0.5 font-sans text-xs text-cream/60">
-                    {isBehindSchedule || !goal.on_track
-                      ? (
-                        <>
-                          Save an extra{' '}
-                          <OdometerNumber
-                            value={parseAmount(goal.extra_per_day_to_catch_up)}
-                            prefix={user.currency_symbol || '$'}
-                            className="inline-flex"
-                          />
-                          /day to catch up
-                        </>
-                      )
-                      : isAhead
-                        ? `You can skip saving for ${parseAmount(goal.days_can_skip).toFixed(1)} days`
-                        : 'Keep your current saving rhythm'}
-                  </p>
-                </>
-              )}
+      <div className="ledger-card-band mt-auto shrink-0 border-t border-primary-dark/20 px-4 py-3.5 text-cream">
+        {isPaused && !isComplete ? (
+          <p className="text-center font-sans text-xs font-normal uppercase tracking-[0.16em] text-gold">
+            On hold
+          </p>
+        ) : isComplete ? (
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-cream/60">
+                Status
+              </p>
+              <p className="mt-0.5 font-serif text-lg font-light leading-tight tracking-[-0.02em]">
+                Complete
+              </p>
             </div>
+          </div>
+        ) : isEarnerMode ? (
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] grid-rows-[auto_auto] gap-x-3">
+              <p className="border-r border-cream/15 pr-3 font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-cream/60">
+                Monthly Allocation
+              </p>
+              <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-cream/60">
+                Budget Share
+              </p>
+              <div aria-hidden="true" />
 
-            <div className="relative shrink-0" ref={infoRef}>
-              <button
-                type="button"
-                onClick={fetchSuggestions}
-                aria-label="View improvement suggestions"
-                className="p-1 text-cream/80 transition-colors hover:bg-cream/10 hover:text-cream"
-              >
-                <Icon name="info" className="text-lg" />
-              </button>
-
-              {suggestionsOpen && (
-                <div className="absolute bottom-full right-0 z-[60] mb-2 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-xl">
-                  <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-                    Suggestions
-                  </p>
-                  {suggestionsLoading ? (
-                    <p className="font-sans text-xs text-taupe">Loading...</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {goalSuggestions?.issues?.length > 0 && (
-                        <ul className="space-y-1">
-                          {goalSuggestions.issues.map((issue, index) => (
-                            <li key={index} className="font-sans text-xs text-red-700">
-                              {issue}
-                            </li>
+              <div className="mt-0.5 flex items-center gap-1 border-r border-cream/15 pr-3">
+                <p className="font-money text-base font-light leading-none tracking-[0.02em]">
+                  <OdometerNumber
+                    value={allocated}
+                    prefix={user.currency_symbol || '$'}
+                  />
+                </p>
+                <div className="relative flex items-center" ref={infoRef}>
+                  <button
+                    type="button"
+                    onClick={fetchSuggestions}
+                    aria-label="View improvement suggestions"
+                    className="flex items-center justify-center p-0.5 text-cream/70 transition-colors hover:text-cream"
+                  >
+                    <Icon name="info" className="text-base leading-none" />
+                  </button>
+                  {suggestionsOpen && (
+                    <div className="absolute bottom-full left-0 z-[60] mb-2 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-xl">
+                      <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
+                        Suggestions
+                      </p>
+                      {suggestionsLoading ? (
+                        <p className="font-sans text-xs text-taupe">Loading...</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {goalSuggestions?.issues?.length > 0 && (
+                            <ul className="space-y-1">
+                              {goalSuggestions.issues.map((issue, index) => (
+                                <li key={index} className="font-sans text-xs text-red-700">
+                                  {issue}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {goalSuggestions?.recommendations?.map((tip, index) => (
+                            <p key={index} className="font-sans text-xs leading-relaxed text-primary-dark">
+                              {tip}
+                            </p>
                           ))}
-                        </ul>
-                      )}
-                      {goalSuggestions?.recommendations?.map((tip, index) => (
-                        <p key={index} className="font-sans text-xs leading-relaxed text-primary-dark">
-                          {tip}
-                        </p>
-                      ))}
-                      {!goalSuggestions?.issues?.length && !goalSuggestions?.recommendations?.length && (
-                        <p className="font-sans text-xs text-taupe">No suggestions available.</p>
+                          {!goalSuggestions?.issues?.length && !goalSuggestions?.recommendations?.length && (
+                            <p className="font-sans text-xs text-taupe">No suggestions available.</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
-              )}
+              </div>
+              <div className="mt-0.5 flex items-center">
+                <p className="font-money text-base font-light leading-none tracking-[0.02em]">
+                  {budgetShare.toFixed(0)}%
+                </p>
+              </div>
+              <div className="mt-0.5 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={openTransactionModal}
+                  aria-label="Log transaction"
+                  className="flex items-center justify-center rounded-md p-0.5 opacity-90 transition-opacity hover:opacity-100"
+                >
+                  <TransactionIcon className="h-6 w-6" />
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-cream/60">
+                  Pace Check
+                </p>
+                <p className="mt-0.5 font-serif text-lg font-light leading-tight tracking-[-0.02em]">
+                  {isBehindSchedule || !goal.on_track
+                    ? 'Needs attention'
+                    : isAhead
+                      ? 'Ahead of pace'
+                      : 'On track'}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <div className="relative" ref={infoRef}>
+                  <button
+                    type="button"
+                    onClick={fetchSuggestions}
+                    aria-label="View improvement suggestions"
+                    className="flex items-center justify-center p-1 text-cream/80 transition-colors hover:bg-cream/10 hover:text-cream"
+                  >
+                    <Icon name="info" className="text-lg leading-none" />
+                  </button>
+                  {suggestionsOpen && (
+                    <div className="absolute bottom-full right-0 z-[60] mb-2 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-xl">
+                      <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
+                        Suggestions
+                      </p>
+                      {suggestionsLoading ? (
+                        <p className="font-sans text-xs text-taupe">Loading...</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {goalSuggestions?.issues?.length > 0 && (
+                            <ul className="space-y-1">
+                              {goalSuggestions.issues.map((issue, index) => (
+                                <li key={index} className="font-sans text-xs text-red-700">
+                                  {issue}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {goalSuggestions?.recommendations?.map((tip, index) => (
+                            <p key={index} className="font-sans text-xs leading-relaxed text-primary-dark">
+                              {tip}
+                            </p>
+                          ))}
+                          {!goalSuggestions?.issues?.length && !goalSuggestions?.recommendations?.length && (
+                            <p className="font-sans text-xs text-taupe">No suggestions available.</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={openTransactionModal}
+                  aria-label="Log transaction"
+                  className="flex items-center justify-center rounded-md p-0.5 opacity-90 transition-opacity hover:opacity-100"
+                >
+                  <TransactionIcon className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+        )}
+      </div>
 
       {showTransactionModal && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
           role="presentation"
           onClick={closeTransactionModal}
         >
-          <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-ink/40 backdrop-blur-[3px]" />
 
           <div
             role="dialog"
@@ -807,33 +797,29 @@ function GoalPortfolioCard({
             onClick={(event) => event.stopPropagation()}
           >
             <div className="modal-header">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
-                    Goal Ledger
-                  </p>
-                  <h2 id="record-transaction-title" className="mt-0.5 font-serif text-xl font-light leading-tight">
-                    Record Transaction
-                  </h2>
-                  <p className="mt-0.5 font-sans text-xs text-cream/60">{goal.name}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeTransactionModal}
-                  aria-label="Close"
-                  className="p-1 text-cream/80 transition-colors hover:bg-cream/10 hover:text-cream"
-                >
-                  <Icon name="close" className="text-lg" />
-                </button>
+              <div className="min-w-0">
+                <h2 id="record-transaction-title" className="modal-title">
+                  Record Transaction
+                </h2>
+                <p className="mt-1 truncate font-sans text-sm font-light text-taupe">{goal.name}</p>
               </div>
+              <button
+                type="button"
+                onClick={closeTransactionModal}
+                aria-label="Close"
+                disabled={txLoading}
+                className="modal-close"
+              >
+                <Icon name="close" className="text-xl" />
+              </button>
             </div>
 
-            <form onSubmit={handleTransactionSubmit} className="space-y-3.5 px-5 py-5">
-              <div className="grid grid-cols-2 gap-0.5 rounded-lg border border-primary-dark/10 bg-ivory p-0.5">
+            <form onSubmit={handleTransactionSubmit} className="modal-body">
+              <div className="grid grid-cols-2 gap-0.5 rounded-lg border border-primary-dark/10 bg-cream/60 p-0.5">
                 <button
                   type="button"
                   onClick={() => setTxType('deposit')}
-                  className={`rounded-md px-3 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-colors ${
+                  className={`rounded-md px-3 py-2.5 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-colors ${
                     txType === 'deposit'
                       ? 'bg-primary-dark text-cream'
                       : 'text-taupe hover:text-primary-dark'
@@ -844,7 +830,7 @@ function GoalPortfolioCard({
                 <button
                   type="button"
                   onClick={() => setTxType('withdrawal')}
-                  className={`rounded-md px-3 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-colors ${
+                  className={`rounded-md px-3 py-2.5 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-colors ${
                     txType === 'withdrawal'
                       ? 'bg-primary-dark text-cream'
                       : 'text-taupe hover:text-primary-dark'
@@ -857,32 +843,29 @@ function GoalPortfolioCard({
               <div>
                 <label
                   htmlFor={`tx-amount-${goal.goal_id}`}
-                  className="field-label"
+                  className="modal-label"
                 >
                   Amount
                 </label>
-                <div className="flex items-center gap-2">
-                  <span className="font-money text-lg font-light tracking-[0.02em] text-primary-dark">{user.currency_symbol || '$'}</span>
-                  <input
-                    id={`tx-amount-${goal.goal_id}`}
-                    type="number"
-                    value={txAmount}
-                    onChange={(event) => setTxAmount(event.target.value)}
-                    placeholder="100.00"
-                    step="0.01"
-                    min="0"
-                    autoFocus
-                    className="field font-money"
-                  />
-                </div>
+                <input
+                  id={`tx-amount-${goal.goal_id}`}
+                  type="number"
+                  value={txAmount}
+                  onChange={(event) => setTxAmount(event.target.value)}
+                  placeholder={`${user.currency_symbol || '$'}100.00`}
+                  step="0.01"
+                  min="0"
+                  autoFocus
+                  className="modal-field font-money"
+                />
               </div>
 
               <div>
                 <label
                   htmlFor={`tx-note-${goal.goal_id}`}
-                  className="mb-1.5 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe"
+                  className="modal-label"
                 >
-                  Note <span className="font-normal normal-case tracking-normal text-taupe">(optional)</span>
+                  Note <span className="font-light text-taupe">(optional)</span>
                 </label>
                 <input
                   id={`tx-note-${goal.goal_id}`}
@@ -890,45 +873,29 @@ function GoalPortfolioCard({
                   value={txNote}
                   onChange={(event) => setTxNote(event.target.value)}
                   placeholder="e.g., Monthly savings"
-                  className="w-full rounded-md border border-gray-200 px-3 py-2 font-sans text-sm transition-colors focus:border-primary-dark focus:outline-none"
+                  className="modal-field"
                 />
               </div>
 
               {txError && <ErrorBanner message={txError} />}
 
-              <div className="flex flex-col-reverse gap-2 border-t border-gray-100 pt-3.5 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={closeTransactionModal}
-                  disabled={txLoading}
-                  className="rounded-md border border-gray-200 px-4 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={txLoading}
-                  className="rounded-md bg-gold px-4 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-gold-light disabled:opacity-50"
-                >
-                  {txLoading ? 'Recording...' : 'Confirm'}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={txLoading}
+                className="modal-submit"
+              >
+                {txLoading ? 'Recording…' : 'Confirm'}
+              </button>
             </form>
           </div>
         </div>,
         document.body
       )}
 
-      <ConfirmDialog
+      <HoldGoalDialog
         open={pauseConfirmOpen}
-        title={isPaused ? `Resume "${goal.name}"?` : `Put "${goal.name}" on hold?`}
-        message={
-          isPaused
-            ? 'Your budget will be recalculated across active goals.'
-            : 'It will be removed from budget allocation until you resume it.'
-        }
-        confirmLabel={isPaused ? 'Resume Goal' : 'Put on Hold'}
-        tone="warning"
+        mode={isPaused ? 'resume' : 'hold'}
+        isEarner={isEarnerMode}
         loading={pauseLoading}
         onConfirm={handlePauseToggle}
         onCancel={() => {
@@ -1342,7 +1309,7 @@ function App() {
         ) : (
           <>
             <div
-              className={`grid grid-cols-1 items-start gap-12 md:grid-cols-2 lg:gap-14 xl:grid-cols-3 ${
+              className={`grid grid-cols-1 items-stretch gap-8 md:grid-cols-2 lg:gap-10 xl:grid-cols-3 ${
                 paginatedGoals.length === 1 ? 'py-2 sm:py-4' : ''
               }`}
             >
@@ -1520,7 +1487,7 @@ function App() {
         <Routes>
           <Route
             element={
-              <div className="mx-auto w-full min-w-0 max-w-[1320px]">
+              <div className="mx-auto w-full min-w-0 max-w-[1480px]">
                 <AnimatedOutlet />
               </div>
             }

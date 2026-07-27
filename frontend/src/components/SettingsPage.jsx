@@ -465,7 +465,7 @@ function SettingsPage({
       </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <nav className="surface h-fit space-y-1 p-2 xl:col-span-3">
+        <nav className="surface h-fit space-y-1 p-2 xl:sticky xl:top-24 xl:col-span-3 xl:self-start xl:z-10">
           {SETTINGS_TABS.map((tab) => {
             const active = activeTab === tab.id;
             return (

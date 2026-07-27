@@ -106,11 +106,11 @@ function CreateGoalForm({
 
       {isOpen && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
           role="presentation"
           onClick={closeModal}
         >
-          <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-ink/40 backdrop-blur-[3px]" />
 
           <div
             role="dialog"
@@ -120,29 +120,23 @@ function CreateGoalForm({
             onClick={(event) => event.stopPropagation()}
           >
             <div className="modal-header">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold">
-                    New Objective
-                  </p>
-                  <h2 id="create-goal-title" className="mt-0.5 font-serif text-xl font-light leading-tight">
-                    Create a Goal
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  aria-label="Close"
-                  className="p-1 text-cream/80 transition-colors hover:bg-cream/10 hover:text-cream"
-                >
-                  <Icon name="close" className="text-lg" />
-                </button>
-              </div>
+              <h2 id="create-goal-title" className="modal-title">
+                Create a Goal
+              </h2>
+              <button
+                type="button"
+                onClick={closeModal}
+                aria-label="Close"
+                disabled={loading}
+                className="modal-close"
+              >
+                <Icon name="close" className="text-xl" />
+              </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3.5 px-5 py-5">
+            <form onSubmit={handleSubmit} className="modal-body">
               <div>
-                <label htmlFor="goal-name" className="field-label">
+                <label htmlFor="goal-name" className="modal-label">
                   Goal Name
                 </label>
                 <input
@@ -153,32 +147,29 @@ function CreateGoalForm({
                   onChange={handleChange}
                   placeholder="e.g., Summer Vacation, Car Down Payment"
                   autoFocus
-                  className="field"
+                  className="modal-field"
                 />
               </div>
 
               <div>
-                <label htmlFor="goal-amount" className="field-label">
+                <label htmlFor="goal-amount" className="modal-label">
                   Target Amount
                 </label>
-                <div className="flex items-center gap-2">
-                  <span className="font-money text-lg font-light tracking-[0.02em] text-primary-dark">{currencySymbol}</span>
-                  <input
-                    id="goal-amount"
-                    type="number"
-                    name="targetAmount"
-                    value={formData.targetAmount}
-                    onChange={handleChange}
-                    placeholder="5000.00"
-                    step="0.01"
-                    min="0"
-                    className="field"
-                  />
-                </div>
+                <input
+                  id="goal-amount"
+                  type="number"
+                  name="targetAmount"
+                  value={formData.targetAmount}
+                  onChange={handleChange}
+                  placeholder={`${currencySymbol}5000.00`}
+                  step="0.01"
+                  min="0"
+                  className="modal-field"
+                />
               </div>
 
               <div>
-                <label htmlFor="goal-deadline" className="field-label">
+                <label htmlFor="goal-deadline" className="modal-label">
                   Target Deadline
                 </label>
                 <input
@@ -187,29 +178,19 @@ function CreateGoalForm({
                   name="deadline"
                   value={formData.deadline}
                   onChange={handleChange}
-                  className="field"
+                  className="modal-field"
                 />
               </div>
 
               {error && <ErrorBanner message={error} />}
 
-              <div className="flex flex-col-reverse gap-2 border-t border-primary-dark/[0.08] pt-4 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  disabled={loading}
-                  className="btn-ghost"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-primary"
-                >
-                  {loading ? 'Creating...' : 'Create Goal'}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="modal-submit"
+              >
+                {loading ? 'Creating…' : 'Create Goal'}
+              </button>
             </form>
           </div>
         </div>

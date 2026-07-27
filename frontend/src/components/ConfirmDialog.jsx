@@ -1,22 +1,15 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
+const Icon = ({ name, className = '' }) => (
+  <span className={`material-symbols-outlined ${className}`}>{name}</span>
+);
+
 const TONE_STYLES = {
-  default: {
-    confirm: 'bg-gold text-primary-dark hover:bg-gold-light',
-    accent: 'bg-gold',
-    eyebrow: 'Confirmation',
-  },
-  warning: {
-    confirm: 'bg-gold text-primary-dark hover:bg-gold-light',
-    accent: 'bg-gold',
-    eyebrow: 'Confirm action',
-  },
-  danger: {
-    confirm: 'bg-red-700 text-white hover:bg-red-800',
-    accent: 'bg-red-600',
-    eyebrow: 'Confirm action',
-  },
+  default: 'modal-submit',
+  warning: 'modal-submit',
+  danger:
+    'w-full rounded-lg bg-red-700 px-4 py-3.5 font-sans text-sm font-normal text-white transition-colors hover:bg-red-800 disabled:opacity-50',
 };
 
 /**
@@ -26,8 +19,8 @@ const TONE_STYLES = {
  * @param {string} title
  * @param {string|React.ReactNode} message
  * @param {string} [confirmLabel='Confirm']
- * @param {string} [cancelLabel='Cancel']
- * @param {boolean} [hideCancel=false] — single-button alert mode
+ * @param {string} [cancelLabel='Cancel'] — unused visually; cancel via close / backdrop
+ * @param {boolean} [hideCancel=false] — single-button alert mode (same chrome either way)
  * @param {'default'|'warning'|'danger'} [tone='default']
  * @param {boolean} [loading=false]
  * @param {() => void} onConfirm
@@ -38,8 +31,8 @@ function ConfirmDialog({
   title,
   message,
   confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
-  hideCancel = false,
+  cancelLabel: _cancelLabel = 'Cancel',
+  hideCancel: _hideCancel = false,
   tone = 'default',
   loading = false,
   onConfirm,
@@ -68,7 +61,7 @@ function ConfirmDialog({
     return null;
   }
 
-  const styles = TONE_STYLES[tone] || TONE_STYLES.default;
+  const confirmClass = TONE_STYLES[tone] || TONE_STYLES.default;
 
   return createPortal(
     <div
@@ -85,51 +78,37 @@ function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-message"
-        className="modal-shell max-w-sm"
+        className="modal-shell"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className={`h-1 ${styles.accent}`} />
-
-        <div className="px-5 pt-5">
-          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe/60">
-            {styles.eyebrow}
-          </p>
-          <h2
-            id="confirm-dialog-title"
-            className="mt-1 font-serif text-xl font-light leading-tight text-primary-dark"
-          >
+        <div className="modal-header">
+          <h2 id="confirm-dialog-title" className="modal-title">
             {title}
           </h2>
+          <button
+            type="button"
+            aria-label="Close"
+            disabled={loading}
+            onClick={onCancel}
+            className="modal-close"
+          >
+            <Icon name="close" className="text-xl" />
+          </button>
         </div>
 
-        <div className="px-5 pb-5 pt-3">
-          <div
-            id="confirm-dialog-message"
-            className="font-sans text-sm leading-relaxed text-taupe"
-          >
+        <div className="modal-body">
+          <div id="confirm-dialog-message" className="modal-message">
             {typeof message === 'string' ? <p>{message}</p> : message}
           </div>
 
-          <div className="mt-5 flex gap-2">
-            {!hideCancel && (
-              <button
-                type="button"
-                disabled={loading}
-                onClick={onCancel}
-                className="btn-ghost flex-1"
-              >
-                {cancelLabel}
-              </button>
-            )}
-            <button
-              type="button"
-              disabled={loading}
-              onClick={onConfirm}
-              className={`${hideCancel ? 'w-full' : 'flex-1'} rounded-lg px-4 py-2.5 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-all duration-200 ease-out-expo disabled:opacity-50 ${styles.confirm}`}
-            >
-              {loading ? 'Please wait…' : confirmLabel}
-            </button>
-          </div>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onConfirm}
+            className={confirmClass}
+          >
+            {loading ? 'Please wait…' : confirmLabel}
+          </button>
         </div>
       </div>
     </div>,

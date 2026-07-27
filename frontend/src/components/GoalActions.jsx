@@ -218,7 +218,7 @@ const GoalActions = forwardRef(function GoalActions(
 
               <div>
                 <label className="mb-2 block font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-                  Target Amount ({currencySymbol})
+                  Target Amount
                 </label>
                 <input
                   type="number"
@@ -227,6 +227,7 @@ const GoalActions = forwardRef(function GoalActions(
                   onChange={handleChange}
                   min="0.01"
                   step="0.01"
+                  placeholder={`${currencySymbol}0.00`}
                   className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 font-sans text-sm transition-colors focus:border-gold focus:outline-none"
                 />
               </div>

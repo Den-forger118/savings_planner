@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -565,25 +565,47 @@ function GoalsLineGraph({ userId, goals: liveGoals, refreshKey = 0 }) {
           onMouseLeave={clearHover}
         >
           <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-            <LineChart
+            <AreaChart
               data={chartData}
-              margin={{ top: 8, right: 12, left: mode === 'dollars' ? 8 : 0, bottom: 0 }}
+              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
               onMouseMove={handleChartMouseMove}
               onMouseLeave={clearHover}
             >
-              <CartesianGrid strokeDasharray="3 3" vertical stroke="#E8DFC8" horizontal={false} />
+              <defs>
+                {visibleGoals.map((goal) => (
+                  <linearGradient
+                    key={`fill-${goal.goal_id}`}
+                    id={`goalAreaFill-${goal.goal_id}`}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="0%" stopColor={goal.color} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={goal.color} stopOpacity={0.02} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid
+                strokeDasharray="3 6"
+                vertical={false}
+                stroke="rgba(10, 15, 26, 0.08)"
+              />
               <XAxis
                 dataKey="displayDate"
-                tick={{ fill: '#4E4B46', fontSize: 10, fontFamily: 'Manrope, Helvetica, sans-serif' }}
+                tick={{ fill: '#5C574F', fontSize: 11, fontFamily: 'Manrope, Helvetica, sans-serif' }}
                 axisLine={false}
                 tickLine={false}
                 interval="preserveStartEnd"
+                dy={6}
               />
               <YAxis
                 hide={mode === 'dollars'}
                 domain={mode === 'percent' ? [0, 100] : yDomain}
-                tick={{ fill: '#4E4B46', fontSize: 10, fontFamily: 'IBM Plex Mono, Consolas, monospace' }}
+                tick={{ fill: '#5C574F', fontSize: 11, fontFamily: 'IBM Plex Mono, Consolas, monospace' }}
                 tickFormatter={(v) => (mode === 'percent' ? `${v}%` : `$${v}`)}
+                axisLine={false}
+                tickLine={false}
                 width={mode === 'percent' ? 40 : 48}
               />
               <Tooltip
@@ -599,33 +621,42 @@ function GoalsLineGraph({ userId, goals: liveGoals, refreshKey = 0 }) {
                   />
                 )}
               />
-              {visibleGoals.map((goal) => (
-                <Line
-                  key={goal.goal_id}
-                  type="monotone"
-                  dataKey={`g_${goal.goal_id}`}
-                  name={goal.goal_name}
-                  stroke={goal.color}
-                  strokeWidth={
-                    hoveredGoalId === goal.goal_id || focusedGoalId === goal.goal_id ? 3.5 : 2
-                  }
-                  strokeOpacity={
-                    (hoveredGoalId && hoveredGoalId !== goal.goal_id)
-                    || (focusedGoalId && focusedGoalId !== goal.goal_id)
-                      ? 0.25
-                      : 1
-                  }
-                  dot={false}
-                  activeDot={{
-                    r: hoveredGoalId === goal.goal_id ? 6 : 4,
-                    fill: goal.color,
-                    stroke: '#1A2340',
-                    strokeWidth: 2,
-                  }}
-                  connectNulls
-                />
-              ))}
-            </LineChart>
+              {visibleGoals.map((goal) => {
+                const isDimmed =
+                  (hoveredGoalId && hoveredGoalId !== goal.goal_id)
+                  || (focusedGoalId && focusedGoalId !== goal.goal_id);
+                const isEmphasized =
+                  hoveredGoalId === goal.goal_id || focusedGoalId === goal.goal_id;
+
+                return (
+                  <Area
+                    key={goal.goal_id}
+                    type="monotone"
+                    dataKey={`g_${goal.goal_id}`}
+                    name={goal.goal_name}
+                    stroke={goal.color}
+                    strokeWidth={isEmphasized ? 3 : 2}
+                    strokeOpacity={isDimmed ? 0.25 : 1}
+                    fill={`url(#goalAreaFill-${goal.goal_id})`}
+                    fillOpacity={isDimmed ? 0.15 : 1}
+                    dot={{
+                      r: 3,
+                      fill: '#0A0F1A',
+                      stroke: goal.color,
+                      strokeWidth: 1.5,
+                      strokeOpacity: isDimmed ? 0.25 : 1,
+                    }}
+                    activeDot={{
+                      r: isEmphasized ? 5 : 4,
+                      fill: goal.color,
+                      stroke: '#0A0F1A',
+                      strokeWidth: 1,
+                    }}
+                    connectNulls
+                  />
+                );
+              })}
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       )}

@@ -39,7 +39,7 @@ const formVariants = {
 function ChapterArt({ src, className = '' }) {
   return (
     <img
-      src={`${src}?v=3`}
+      src={`${src}?v=6`}
       alt=""
       aria-hidden="true"
       className={`auth-story-illustration auth-story-illustration--onboarding ${className}`}
@@ -90,6 +90,7 @@ export const ONBOARDING_CHAPTERS = {
     title: 'Epilogue',
     lede: 'The seal is set. Your dashboard is ready.',
     artSrc: '/illustrations/onboarding-complete.png',
+    artFitClass: 'auth-story-illustration--onboarding-epilogue',
   },
 };
 
@@ -154,7 +155,7 @@ function OnboardingChapterShell({
                 <div className="auth-onboarding-art-glow pointer-events-none absolute inset-0" aria-hidden="true" />
                 <ChapterArt
                   src={chapter.artSrc}
-                  className="auth-story-illustration--onboarding-fit relative z-10"
+                  className={`auth-story-illustration--onboarding-fit relative z-10 ${chapter.artFitClass || ''}`}
                 />
               </div>
             </motion.div>

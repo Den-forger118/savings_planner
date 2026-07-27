@@ -138,21 +138,16 @@ function BudgetSetup({
           <label className="field-label" htmlFor="monthly-budget-input">
             Monthly Budget
           </label>
-          <div className="flex items-center gap-3">
-            <span className="font-money text-2xl font-light tracking-[0.02em] text-primary-dark">
-              {currencySymbol}
-            </span>
-            <input
-              id="monthly-budget-input"
-              type="number"
-              value={monthlyBudget}
-              onChange={(e) => setMonthlyBudget(e.target.value)}
-              placeholder="500.00"
-              step="0.01"
-              min="0"
-              className="field"
-            />
-          </div>
+          <input
+            id="monthly-budget-input"
+            type="number"
+            value={monthlyBudget}
+            onChange={(e) => setMonthlyBudget(e.target.value)}
+            placeholder={`${currencySymbol}500.00`}
+            step="0.01"
+            min="0"
+            className="field"
+          />
         </div>
 
         {error && <ErrorBanner message={error} />}

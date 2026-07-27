@@ -21,7 +21,12 @@ function AnimatedOutlet() {
       <motion.div
         key={location.pathname + location.search}
         initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          // Clear transform after settle so position:sticky works in page content
+          transitionEnd: { y: 0, transform: 'none' },
+        }}
         exit={{ opacity: 0, y: -8 }}
         transition={{ duration: 0.38, ease: EASE_LUXURY }}
         className="w-full min-w-0"

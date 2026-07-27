@@ -325,8 +325,7 @@ function OnboardingPage({ user, onComplete }) {
             <p className="mt-3 font-sans text-[15px] font-light leading-relaxed text-taupe">
               We&apos;ll suggest a healthy savings rate. You set the final amount.
             </p>
-            <div className="mt-8 flex items-center gap-2">
-              <span className="font-money text-3xl font-light tracking-[0.02em] text-gold">$</span>
+            <div className="mt-8">
               <input
                 type="number"
                 min="0"
@@ -334,7 +333,7 @@ function OnboardingPage({ user, onComplete }) {
                 value={data.monthly_income}
                 onChange={(e) => setData((prev) => ({ ...prev, monthly_income: e.target.value }))}
                 className="w-full border-b-2 border-primary-dark bg-transparent py-2 font-money text-4xl font-light tracking-[0.02em] text-primary-dark focus:border-gold focus:outline-none"
-                placeholder="0.00"
+                placeholder="$0.00"
               />
             </div>
             {incomeValue > 0 && (
@@ -366,7 +365,6 @@ function OnboardingPage({ user, onComplete }) {
               This total is distributed across your goals automatically.
             </p>
             <div className="mt-8 flex items-center gap-2">
-              <span className="font-money text-3xl font-light tracking-[0.02em] text-gold">$</span>
               <input
                 type="number"
                 min="0"
@@ -374,6 +372,7 @@ function OnboardingPage({ user, onComplete }) {
                 value={data.monthly_budget || suggestedBudget}
                 onChange={(e) => setData((prev) => ({ ...prev, monthly_budget: e.target.value }))}
                 className="w-full border-b-2 border-primary-dark bg-transparent py-2 font-money text-4xl font-light tracking-[0.02em] text-primary-dark focus:border-gold focus:outline-none"
+                placeholder="$0.00"
               />
               <span className="shrink-0 font-sans text-sm text-taupe">/month</span>
             </div>
@@ -445,19 +444,15 @@ function OnboardingPage({ user, onComplete }) {
               </div>
               <div>
                 <label className="field-label">Target Amount</label>
-                <div className="flex items-center gap-2">
-                  <span className="font-money text-lg font-light tracking-[0.02em] text-gold">
-                    {data.currency_symbol}
-                  </span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={goalForm.targetAmount}
-                    onChange={(e) => setGoalForm((prev) => ({ ...prev, targetAmount: e.target.value }))}
-                    className="field"
-                  />
-                </div>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={goalForm.targetAmount}
+                  onChange={(e) => setGoalForm((prev) => ({ ...prev, targetAmount: e.target.value }))}
+                  className="field"
+                  placeholder={`${data.currency_symbol || '$'}0.00`}
+                />
               </div>
               <div>
                 <label className="field-label">Deadline</label>
