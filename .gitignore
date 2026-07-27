@@ -40,5 +40,9 @@ logs/
 .impeccable/live/*.png
 # impeccable-ignore-end
 
+# Planned / local-only specs (not for remote)
+GOAL_SIMULATOR.md
+GOAL_PRIORITY.md
+
 backend/package-lock.json
 frontend/package-lock.json

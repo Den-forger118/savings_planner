@@ -159,7 +159,7 @@ const updateGoal = async (goalId, name, targetAmount, deadline, priority) => {
   }
 };
 
-const setGoalPaused = async (goalId, isPaused) => {
+const setGoalPaused = async (goalId, isPaused, pausedAt = null) => {
   const existingGoal = await getGoalById(goalId);
 
   if (!existingGoal) {
@@ -170,18 +170,32 @@ const setGoalPaused = async (goalId, isPaused) => {
     throwValidationError('Completed goals cannot be paused');
   }
 
+  let pausedAtValue = null;
+
+  if (isPaused) {
+    if (pausedAt) {
+      const parsed = toDateOnly(pausedAt);
+      if (!parsed) {
+        throwValidationError('A valid on-hold date is required');
+      }
+      pausedAtValue = parsed.toISOString();
+    } else {
+      pausedAtValue = new Date().toISOString();
+    }
+  }
+
   const query = `
     UPDATE saving_goals
     SET
       is_paused = $2,
-      paused_at = CASE WHEN $2 THEN NOW() ELSE NULL END
+      paused_at = $3
     WHERE goal_id = $1
       AND deleted_at IS NULL
     RETURNING ${GOAL_FIELDS}
   `;
 
   try {
-    const result = await pool.query(query, [goalId, isPaused]);
+    const result = await pool.query(query, [goalId, isPaused, pausedAtValue]);
     return result.rows[0];
   } catch (err) {
     if (err.statusCode) {

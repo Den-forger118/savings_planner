@@ -246,31 +246,19 @@ router.patch('/:id/pause', async (req, res) => {
 
     const { id } = req.params;
 
-    const { is_paused: isPaused } = req.body;
-
-
+    const { is_paused: isPaused, paused_at: pausedAt = null } = req.body;
 
     if (typeof isPaused !== 'boolean') {
-
       return res.status(400).json({ error: 'is_paused must be a boolean' });
-
     }
-
-
 
     const existingGoal = await goalModel.getGoalById(id);
 
-
-
     if (!existingGoal) {
-
       return res.status(404).json({ error: 'Goal not found' });
-
     }
 
-
-
-    const goal = await goalModel.setGoalPaused(id, isPaused);
+    const goal = await goalModel.setGoalPaused(id, isPaused, pausedAt);
 
     const budgetContext = await getUserBudgetContext(existingGoal.user_id);
 
