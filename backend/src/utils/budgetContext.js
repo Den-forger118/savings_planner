@@ -30,6 +30,7 @@ const buildGoalResponse = (goal, allocatedGoals, mode = 'earner') => {
 
   return {
     ...breakdown,
+    priority: Number.parseInt(goal.priority, 10) || 1,
     allocated_monthly_amount: mode === 'earner' ? breakdown.allocated_monthly_amount : null,
     is_feasible: mode === 'earner' ? breakdown.is_feasible : null,
     allocation_percentage: mode === 'earner' ? allocatedGoal?.allocation_percentage ?? 0 : null,

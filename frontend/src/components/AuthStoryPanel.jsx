@@ -168,6 +168,16 @@ const STORIES = {
     lede: 'Goals, allocations, and history—exactly as you left them.',
     Art: LoginStoryArt,
   },
+  forgot: {
+    title: 'Recover access.',
+    lede: 'We’ll send a reset link to the email on your ledger—if the account exists.',
+    Art: LoginStoryArt,
+  },
+  reset: {
+    title: 'Choose a new key.',
+    lede: 'Set a new password and return to your private ledger.',
+    Art: LoginStoryArt,
+  },
   register: {
     title: 'Open a private account.',
     lede: 'No noise. A clear path from intention to saved capital—goals, allocations, and a ledger that stays yours.',

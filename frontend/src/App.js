@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
-import { Routes, Route, Navigate, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
+import { Routes, Route, Navigate, NavLink, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import api from './services/api';
 import BudgetSetup from './components/BudgetSetup';
 import CreateGoalForm from './components/CreateGoalForm';
@@ -16,6 +16,8 @@ import OnboardingPage from './pages/OnboardingPage';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
+import ForgotPasswordPage from './components/ForgotPasswordPage';
+import ResetPasswordPage from './components/ResetPasswordPage';
 import AnimatedOutlet, { ScreenTransition } from './components/AnimatedOutlet';
 import { formatMoney } from './utils/currency';
 import { getFriendlyError, isServerUnavailable } from './utils/friendlyError';
@@ -23,8 +25,21 @@ import ServerErrorPage from './components/ServerErrorPage';
 import ErrorBanner from './components/ErrorBanner';
 import OdometerNumber from './components/OdometerNumber';
 import { PATHS, pathForPageId } from './utils/paths';
+import { canMoveGoal, folioIndexInGroup, goalStatusRank, insertGoalAt, moveGoalInGroup, toRoman } from './utils/goalPriority';
 
 const GOALS_PER_PAGE = 12;
+const REORDER_HOLD_MS = 300;
+const REORDER_MOUSE_MOVE_PX = 7;
+const REORDER_TOUCH_CANCEL_PX = 12;
+const REORDER_IGNORE_SELECTOR =
+  'button, a, input, select, textarea, label, [role="switch"], [role="dialog"], [data-no-reorder]';
+
+const goalIdFromPoint = (x, y) => {
+  const node = document.elementFromPoint(x, y);
+  const card = node instanceof Element ? node.closest('[data-goal-id]') : null;
+  const id = Number.parseInt(card?.dataset?.goalId, 10);
+  return Number.isInteger(id) ? id : null;
+};
 
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
@@ -150,6 +165,13 @@ function GoalPortfolioCard({
   goal,
   user,
   setGoals,
+  folioRoman,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
+  isDragging = false,
+  isDropTarget = false,
   onGoalUpdated,
   onGoalDeleted,
   onTransactionRecorded,
@@ -310,6 +332,16 @@ function GoalPortfolioCard({
       return;
     }
 
+    if (action === 'move_up') {
+      onMoveUp?.();
+      return;
+    }
+
+    if (action === 'move_down') {
+      onMoveDown?.();
+      return;
+    }
+
     if (action === 'delete') {
       goalActionsRef.current?.deleteGoal();
     }
@@ -368,8 +400,15 @@ function GoalPortfolioCard({
     }
   };
 
+  const canReorder = Boolean(canMoveUp || canMoveDown);
   const menuItems = [
     { id: 'edit', label: 'Edit', icon: 'edit' },
+    ...(canReorder
+      ? [
+          { id: 'move_up', label: 'Move up', icon: 'arrow_upward', disabled: !canMoveUp },
+          { id: 'move_down', label: 'Move down', icon: 'arrow_downward', disabled: !canMoveDown },
+        ]
+      : []),
     { id: 'delete', label: 'Delete', icon: 'delete', danger: true },
   ];
 
@@ -416,7 +455,11 @@ function GoalPortfolioCard({
 
   return (
     <article
-      className={`ledger-card ${isComplete || isOnHold ? 'opacity-70 grayscale-[30%]' : ''}`}
+      data-goal-id={goal.goal_id}
+      aria-grabbed={isDragging || undefined}
+      className={`ledger-card ${isComplete || isOnHold ? 'opacity-70 grayscale-[30%]' : ''} ${
+        canReorder ? 'is-reorderable' : ''
+      } ${isDragging ? 'is-dragging' : ''} ${isDropTarget ? 'is-drop-target' : ''}`}
     >
       {isComplete && (
         <div
@@ -429,13 +472,22 @@ function GoalPortfolioCard({
         </div>
       )}
 
-      <div className="ledger-card-band shrink-0 px-4 py-3 text-cream">
+      <div
+        data-reorder-handle={canReorder ? true : undefined}
+        className="ledger-card-band ledger-card-handle shrink-0 px-4 py-3 text-cream"
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1 pt-0.5">
+            {folioRoman ? (
+              <p className="font-sans text-[10px] font-normal uppercase tracking-[0.16em] text-gold">
+                <span className="sr-only">Priority </span>
+                {folioRoman}
+              </p>
+            ) : null}
             <h3
               className={`truncate font-serif text-[1.35rem] font-light leading-none tracking-[-0.02em] ${
-                isComplete ? 'pr-24' : ''
-              }`}
+                folioRoman ? 'mt-1.5' : ''
+              } ${isComplete ? 'pr-24' : ''}`}
               title={goal.name}
             >
               {goal.name}
@@ -449,7 +501,10 @@ function GoalPortfolioCard({
             </p>
           </div>
 
-          <div className="relative z-30 flex shrink-0 flex-col items-end gap-1.5">
+          <div
+            data-no-reorder
+            className="relative z-30 flex shrink-0 flex-col items-end gap-1.5"
+          >
             <div className="relative shrink-0" ref={menuRef}>
               <button
                 type="button"
@@ -461,14 +516,19 @@ function GoalPortfolioCard({
               </button>
 
               {menuOpen && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg">
-                  {menuItems.map(({ id, label, icon, danger }) => (
+                <div className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                  {menuItems.map(({ id, label, icon, danger, disabled }) => (
                     <button
                       key={id}
                       type="button"
+                      disabled={disabled}
                       onClick={() => handleMenuAction(id)}
-                      className={`flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-sm transition-colors hover:bg-cream/50 ${
-                        danger ? 'text-red-700 hover:bg-red-50' : 'text-primary-dark'
+                      className={`flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-sm transition-colors ${
+                        disabled
+                          ? 'cursor-not-allowed text-primary-dark/40'
+                          : danger
+                            ? 'text-red-700 hover:bg-red-50'
+                            : 'text-primary-dark hover:bg-cream/50'
                       }`}
                     >
                       <Icon name={icon} className="text-base" />
@@ -602,6 +662,7 @@ function GoalPortfolioCard({
 
         <div
           ref={editPanelRef}
+          data-no-reorder={isEditing ? true : undefined}
           className={`mt-auto ${isEditing ? 'border-t border-primary-dark/10 px-4 py-3' : ''}`}
         >
           <GoalActions
@@ -919,6 +980,7 @@ function GoalPortfolioCard({
 
 function App() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const activityGoalFilter = searchParams.get('goal') || 'all';
 
@@ -931,6 +993,12 @@ function App() {
   const [expenseRefresh, setExpenseRefresh] = useState(0);
   const [transactionRefresh, setTransactionRefresh] = useState(0);
   const [goalsPage, setGoalsPage] = useState(1);
+  const [reorderError, setReorderError] = useState(null);
+  const [draggingGoalId, setDraggingGoalId] = useState(null);
+  const [dropTargetId, setDropTargetId] = useState(null);
+  const pendingReorderRef = useRef(null);
+  const activeReorderRef = useRef(null);
+  const dropTargetIdRef = useRef(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('quant_sidebar_collapsed') === '1';
@@ -944,14 +1012,9 @@ function App() {
   const userCurrency = user?.currency || 'USD';
   const userCurrencySymbol = user?.currency_symbol || '$';
 
-  const applyDensity = (density) => {
-    document.documentElement.classList.toggle('density-compact', density === 'compact');
-  };
-
   const handleUserUpdate = (updatedUser) => {
     localStorage.setItem('user', JSON.stringify(updatedUser));
     setUser(updatedUser);
-    applyDensity(updatedUser.ui_density || 'classic');
   };
 
   const handleTransactionRecorded = (responseData) => {
@@ -994,7 +1057,7 @@ function App() {
   };
 
   const fetchData = useCallback(async () => {
-    if (!user?.user_id) return;
+    if (!user?.user_id) return [];
 
     try {
       const goalsResponse = await api.get(
@@ -1004,14 +1067,16 @@ function App() {
       setMonthlyBudget(normalizeAmount(goalsResponse.data.monthly_budget));
       setIsEarnerMode(goalsResponse.data.mode === 'earner');
       setLoading(false);
+      return goalsResponse.data.goals || [];
     } catch (err) {
       setError(err);
       setLoading(false);
+      return [];
     }
   }, [user?.user_id]);
 
   useEffect(() => {
-    document.documentElement.classList.remove('theme-midnight');
+    document.documentElement.classList.remove('theme-midnight', 'density-compact');
 
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
@@ -1019,7 +1084,6 @@ function App() {
     if (savedToken && savedUser) {
       const parsedUser = JSON.parse(savedUser);
       setUser(parsedUser);
-      applyDensity(parsedUser.ui_density || 'classic');
     } else {
       setLoading(false);
     }
@@ -1038,7 +1102,6 @@ function App() {
     localStorage.setItem('user', JSON.stringify(updatedUser));
     setUser(updatedUser);
     setIsEarnerMode(updatedUser.mode === 'earner' || updatedUser.is_earner);
-    applyDensity(updatedUser.ui_density || 'classic');
     setLoading(true);
     navigate(PATHS.dashboard, { replace: true });
   };
@@ -1084,12 +1147,169 @@ function App() {
   const hasBudget = parseAmount(monthlyBudget) > 0;
 
   const handleGoalCreated = () => {
-    // Refresh after create so sibling goal allocations can odometer to new shares
-    window.requestAnimationFrame(() => {
-      fetchData();
-      setGoalsPage(1);
+    window.requestAnimationFrame(async () => {
+      const nextGoals = await fetchData();
+      if (!Array.isArray(nextGoals) || nextGoals.length === 0) return;
+      const lastActiveIndex = nextGoals.reduce(
+        (lastIndex, goal, index) => (
+          !goal.is_complete && !goal.is_paused ? index : lastIndex
+        ),
+        -1
+      );
+      const focusIndex = lastActiveIndex >= 0 ? lastActiveIndex : nextGoals.length - 1;
+      setGoalsPage(Math.floor(focusIndex / GOALS_PER_PAGE) + 1);
     });
   };
+
+  const persistGoalGroupOrder = async (nextGoals, rank) => {
+    const previous = goals;
+    setReorderError(null);
+    setGoals(nextGoals);
+
+    try {
+      const response = await api.patch('/goals/reorder', {
+        ordered_ids: nextGoals
+          .filter((goal) => goalStatusRank(goal) === rank)
+          .map((goal) => goal.goal_id),
+      });
+      if (Array.isArray(response.data.goals)) {
+        setGoals(response.data.goals);
+      }
+    } catch (err) {
+      setGoals(previous);
+      setReorderError(getFriendlyError(err, 'We couldn’t save that order. Please try again.'));
+    }
+  };
+
+  const handleMoveGoal = (goalId, direction) => {
+    const nextGoals = moveGoalInGroup(goals, goalId, direction);
+    if (nextGoals === goals) return;
+    const current = goals.find((goal) => Number(goal.goal_id) === Number(goalId));
+    if (!current) return;
+    persistGoalGroupOrder(nextGoals, goalStatusRank(current));
+  };
+
+  const handleReorderDrop = (draggedId, targetId) => {
+    if (Number(draggedId) === Number(targetId)) return;
+    const nextGoals = insertGoalAt(goals, draggedId, targetId);
+    if (nextGoals === goals) return;
+    const dragged = goals.find((goal) => Number(goal.goal_id) === Number(draggedId));
+    if (!dragged) return;
+    persistGoalGroupOrder(nextGoals, goalStatusRank(dragged));
+  };
+
+  const clearPendingReorder = () => {
+    if (pendingReorderRef.current?.timer) {
+      window.clearTimeout(pendingReorderRef.current.timer);
+    }
+    pendingReorderRef.current = null;
+  };
+
+  const beginActiveReorder = (id, pointerId, grid) => {
+    clearPendingReorder();
+    activeReorderRef.current = { id, pointerId };
+    setDraggingGoalId(id);
+    document.body.classList.add('is-reordering-goals');
+    try {
+      grid?.setPointerCapture(pointerId);
+    } catch {
+      /* capture is best-effort */
+    }
+  };
+
+  const endActiveReorder = (clientX, clientY) => {
+    const session = activeReorderRef.current;
+    activeReorderRef.current = null;
+    dropTargetIdRef.current = null;
+    setDraggingGoalId(null);
+    setDropTargetId(null);
+    document.body.classList.remove('is-reordering-goals');
+    if (!session) return;
+    const targetId = goalIdFromPoint(clientX, clientY);
+    if (targetId && targetId !== session.id) {
+      handleReorderDrop(session.id, targetId);
+    }
+  };
+
+  const handleGoalsGridPointerDown = (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (activeReorderRef.current) return;
+    if (event.target instanceof Element && event.target.closest(REORDER_IGNORE_SELECTOR)) return;
+    if (!(event.target instanceof Element) || !event.target.closest('[data-reorder-handle]')) return;
+
+    const card = event.target instanceof Element ? event.target.closest('[data-goal-id]') : null;
+    if (!card) return;
+
+    const id = Number.parseInt(card.dataset.goalId, 10);
+    if (!Number.isInteger(id)) return;
+    if (!canMoveGoal(goals, id, -1) && !canMoveGoal(goals, id, 1)) return;
+
+    const grid = event.currentTarget;
+    const isTouch = event.pointerType === 'touch' || event.pointerType === 'pen';
+
+    if (event.detail >= 2 && !isTouch) {
+      event.preventDefault();
+      beginActiveReorder(id, event.pointerId, grid);
+      return;
+    }
+
+    pendingReorderRef.current = {
+      id,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      isTouch,
+      timer: window.setTimeout(() => {
+        beginActiveReorder(id, event.pointerId, grid);
+      }, REORDER_HOLD_MS),
+    };
+  };
+
+  const handleGoalsGridPointerMove = (event) => {
+    const pending = pendingReorderRef.current;
+    if (pending && pending.pointerId === event.pointerId && !activeReorderRef.current) {
+      const distance = Math.hypot(event.clientX - pending.startX, event.clientY - pending.startY);
+      if (pending.isTouch) {
+        if (distance > REORDER_TOUCH_CANCEL_PX) {
+          clearPendingReorder();
+        }
+      } else if (distance > REORDER_MOUSE_MOVE_PX) {
+        beginActiveReorder(pending.id, event.pointerId, event.currentTarget);
+      }
+    }
+
+    const session = activeReorderRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+
+    event.preventDefault();
+    const overId = goalIdFromPoint(event.clientX, event.clientY);
+    const nextOver = overId && overId !== session.id ? overId : null;
+    if (dropTargetIdRef.current !== nextOver) {
+      dropTargetIdRef.current = nextOver;
+      setDropTargetId(nextOver);
+    }
+  };
+
+  const handleGoalsGridPointerUp = (event) => {
+    if (pendingReorderRef.current?.pointerId === event.pointerId) {
+      clearPendingReorder();
+    }
+    if (activeReorderRef.current?.pointerId !== event.pointerId) return;
+
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      /* ignore */
+    }
+    endActiveReorder(event.clientX, event.clientY);
+  };
+
+  useEffect(() => () => {
+    if (pendingReorderRef.current?.timer) {
+      window.clearTimeout(pendingReorderRef.current.timer);
+    }
+    document.body.classList.remove('is-reordering-goals');
+  }, []);
 
   const handleGoalUpdated = (updatedGoals) => {
     setGoals(updatedGoals);
@@ -1103,6 +1323,22 @@ function App() {
     fetchData();
   };
 
+  if (
+    location.pathname === PATHS.forgotPassword ||
+    location.pathname === PATHS.resetPassword
+  ) {
+    return (
+      <Routes>
+        <Route path={PATHS.forgotPassword} element={
+          <ScreenTransition screenKey="forgot"><ForgotPasswordPage /></ScreenTransition>
+        } />
+        <Route path={PATHS.resetPassword} element={
+          <ScreenTransition screenKey="reset"><ResetPasswordPage /></ScreenTransition>
+        } />
+      </Routes>
+    );
+  }
+
   if (!user) {
     return (
       <Routes>
@@ -1111,6 +1347,12 @@ function App() {
         } />
         <Route path={PATHS.login} element={
           <ScreenTransition screenKey="login"><LoginPage onLogin={handleLogin} /></ScreenTransition>
+        } />
+        <Route path={PATHS.forgotPassword} element={
+          <ScreenTransition screenKey="forgot"><ForgotPasswordPage /></ScreenTransition>
+        } />
+        <Route path={PATHS.resetPassword} element={
+          <ScreenTransition screenKey="reset"><ResetPasswordPage /></ScreenTransition>
         } />
         <Route path="*" element={<Navigate to={PATHS.login} replace />} />
       </Routes>
@@ -1264,6 +1506,9 @@ function App() {
           <div className="min-w-0">
             <p className="eyebrow">Savings Goals</p>
             <h2 className="page-title">Objective Ledger</h2>
+            <p className="page-lede">
+              First in the folio is highest intent. Drag a card from its navy heading to set order.
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -1296,8 +1541,19 @@ function App() {
               variant="discrete"
               onGoalCreated={handleGoalCreated}
             />
+            <button
+              type="button"
+              className="btn-ghost h-10"
+              onClick={() => navigate(`${PATHS.settings}?tab=simulator`)}
+            >
+              What-if planner
+            </button>
           </div>
         </div>
+
+        {reorderError && (
+          <ErrorBanner message={reorderError} />
+        )}
 
         {goals.length === 0 ? (
           <div className="surface px-5 py-8 text-center">
@@ -1311,7 +1567,11 @@ function App() {
             <div
               className={`grid grid-cols-1 items-stretch gap-8 md:grid-cols-2 lg:gap-10 xl:grid-cols-3 ${
                 paginatedGoals.length === 1 ? 'py-2 sm:py-4' : ''
-              }`}
+              } ${draggingGoalId ? 'touch-none' : ''}`}
+              onPointerDown={handleGoalsGridPointerDown}
+              onPointerMove={handleGoalsGridPointerMove}
+              onPointerUp={handleGoalsGridPointerUp}
+              onPointerCancel={handleGoalsGridPointerUp}
             >
               {paginatedGoals.map(goal => (
                 <GoalPortfolioCard
@@ -1319,6 +1579,13 @@ function App() {
                   goal={goal}
                   user={user}
                   setGoals={setGoals}
+                  folioRoman={toRoman(folioIndexInGroup(goals, goal.goal_id))}
+                  canMoveUp={canMoveGoal(goals, goal.goal_id, -1)}
+                  canMoveDown={canMoveGoal(goals, goal.goal_id, 1)}
+                  onMoveUp={() => handleMoveGoal(goal.goal_id, -1)}
+                  onMoveDown={() => handleMoveGoal(goal.goal_id, 1)}
+                  isDragging={Number(draggingGoalId) === Number(goal.goal_id)}
+                  isDropTarget={Number(dropTargetId) === Number(goal.goal_id)}
                   onGoalUpdated={handleGoalUpdated}
                   onGoalDeleted={handleGoalDeleted}
                   onTransactionRecorded={handleTransactionRecorded}
@@ -1385,9 +1652,9 @@ function App() {
       onBudgetSet={handleBudgetSet}
       onEarnerModeChange={handleEarnerModeChange}
       onLogout={handleLogout}
-      onDensityChange={applyDensity}
       onNavigate={selectPage}
       onGoalsChange={setGoals}
+      onGoalCreated={handleGoalCreated}
     />
   );
 
@@ -1494,6 +1761,10 @@ function App() {
           >
             <Route path={PATHS.dashboard} element={renderDashboard()} />
             <Route path={PATHS.savings} element={renderSavingsGoals()} />
+            <Route
+              path="/simulator"
+              element={<Navigate to={`${PATHS.settings}?tab=simulator`} replace />}
+            />
             <Route path={PATHS.activity} element={renderActivity()} />
             <Route path={PATHS.expenses} element={renderExpenses()} />
             <Route path={PATHS.settings} element={renderSettings()} />

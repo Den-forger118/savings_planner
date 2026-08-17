@@ -1,4 +1,5 @@
 const pool = require('../dbcon');
+const { DISPLAY_ORDER_SQL, goalStatusRank } = require('../utils/goalOrder');
 
 const throwValidationError = (message) => {
   const error = new Error(message);
@@ -14,6 +15,19 @@ const toDateOnly = (value) => {
   }
 
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+};
+
+const resolvePriority = (priority, fallback = 1) => {
+  if (priority === undefined || priority === null || priority === '') {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(priority, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    throwValidationError('Priority must be a positive integer');
+  }
+
+  return parsed;
 };
 
 const normalizeGoalInput = ({ name, targetAmount, deadline, priority }) => {
@@ -42,7 +56,7 @@ const normalizeGoalInput = ({ name, targetAmount, deadline, priority }) => {
     normalizedName: String(name).trim(),
     normalizedTargetAmount: Number.parseFloat(targetAmount),
     normalizedDeadline: deadlineDate.toISOString().slice(0, 10),
-    normalizedPriority: priority ?? 1,
+    normalizedPriority: resolvePriority(priority, 1),
   };
 };
 
@@ -51,13 +65,29 @@ const GOAL_FIELDS = `
   deadline, priority, created_at, is_complete, completed_at, is_paused, paused_at, deleted_at
 `;
 
+const getNextPriorityInGroup = async (userId, { isComplete = false, isPaused = false } = {}, client = pool) => {
+  const result = await client.query(
+    `
+      SELECT COALESCE(MAX(priority), 0) + 1 AS next_priority
+      FROM saving_goals
+      WHERE user_id = $1
+        AND deleted_at IS NULL
+        AND is_complete = $2
+        AND is_paused = $3
+    `,
+    [userId, Boolean(isComplete), Boolean(isPaused)]
+  );
+
+  return Number.parseInt(result.rows[0].next_priority, 10) || 1;
+};
+
 const getGoalsByUserId = async (userId) => {
   const query = `
     SELECT ${GOAL_FIELDS}
     FROM saving_goals
     WHERE user_id = $1
       AND deleted_at IS NULL
-    ORDER BY created_at DESC, goal_id DESC
+    ORDER BY ${DISPLAY_ORDER_SQL}
   `;
 
   try {
@@ -101,41 +131,57 @@ const getGoalById = async (goalId, { includeDeleted = false } = {}) => {
   }
 };
 
-const createGoal = async (userId, name, targetAmount, deadline, priority = 1) => {
+const createGoal = async (userId, name, targetAmount, deadline) => {
   const {
     normalizedName,
     normalizedTargetAmount,
     normalizedDeadline,
-    normalizedPriority,
-  } = normalizeGoalInput({ name, targetAmount, deadline, priority });
+  } = normalizeGoalInput({ name, targetAmount, deadline });
 
-  const query = `
-    INSERT INTO saving_goals (user_id, name, target_amount, deadline, priority)
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING ${GOAL_FIELDS}
-  `;
+  const client = await pool.connect();
 
   try {
-    const result = await pool.query(query, [
+    await client.query('BEGIN');
+    const nextPriority = await getNextPriorityInGroup(
       userId,
-      normalizedName,
-      normalizedTargetAmount,
-      normalizedDeadline,
-      normalizedPriority,
-    ]);
+      { isComplete: false, isPaused: false },
+      client
+    );
+
+    const result = await client.query(
+      `
+        INSERT INTO saving_goals (user_id, name, target_amount, deadline, priority)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING ${GOAL_FIELDS}
+      `,
+      [userId, normalizedName, normalizedTargetAmount, normalizedDeadline, nextPriority]
+    );
+
+    await client.query('COMMIT');
     return result.rows[0];
   } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.statusCode) {
+      throw err;
+    }
     throw new Error(`Error creating goal: ${err.message}`);
+  } finally {
+    client.release();
   }
 };
 
 const updateGoal = async (goalId, name, targetAmount, deadline, priority) => {
+  const existingGoal = await getGoalById(goalId);
+  if (!existingGoal) {
+    return null;
+  }
+
   const {
     normalizedName,
     normalizedTargetAmount,
     normalizedDeadline,
-    normalizedPriority,
-  } = normalizeGoalInput({ name, targetAmount, deadline, priority });
+  } = normalizeGoalInput({ name, targetAmount, deadline });
+  const nextPriority = resolvePriority(priority, existingGoal.priority);
 
   const query = `
     UPDATE saving_goals
@@ -151,11 +197,70 @@ const updateGoal = async (goalId, name, targetAmount, deadline, priority) => {
       normalizedName,
       normalizedTargetAmount,
       normalizedDeadline,
-      normalizedPriority,
+      nextPriority,
     ]);
     return result.rows[0];
   } catch (err) {
     throw new Error(`Error updating goal: ${err.message}`);
+  }
+};
+
+const replaceGoalPriorities = async (userId, orderedIds) => {
+  const userGoals = await getGoalsByUserId(userId);
+  const byId = new Map(userGoals.map((goal) => [Number(goal.goal_id), goal]));
+  const payloadGoals = orderedIds.map((id) => byId.get(Number(id)));
+
+  if (payloadGoals.some((goal) => !goal)) {
+    throwValidationError('One or more goals were not found');
+  }
+
+  const ranks = new Set(payloadGoals.map(goalStatusRank));
+  if (ranks.size !== 1) {
+    throwValidationError('Goals can only be reordered within the same status group');
+  }
+
+  const groupRank = [...ranks][0];
+  const groupIds = userGoals
+    .filter((goal) => goalStatusRank(goal) === groupRank)
+    .map((goal) => Number(goal.goal_id))
+    .sort((a, b) => a - b);
+  const payloadIds = [...orderedIds].map(Number).sort((a, b) => a - b);
+
+  if (
+    groupIds.length !== payloadIds.length ||
+    groupIds.some((id, index) => id !== payloadIds[index])
+  ) {
+    throwValidationError('Reorder must include every goal in that status group');
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    for (let index = 0; index < orderedIds.length; index += 1) {
+      const result = await client.query(
+        `
+          UPDATE saving_goals
+          SET priority = $1
+          WHERE goal_id = $2
+            AND user_id = $3
+            AND deleted_at IS NULL
+        `,
+        [index + 1, orderedIds[index], userId]
+      );
+
+      if (result.rowCount !== 1) {
+        throwValidationError('One or more goals could not be reordered');
+      }
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 };
 
@@ -224,20 +329,53 @@ const deleteGoal = async (goalId) => {
 };
 
 const restoreGoal = async (goalId, userId) => {
-  const query = `
-    UPDATE saving_goals
-    SET deleted_at = NULL
-    WHERE goal_id = $1
-      AND user_id = $2
-      AND deleted_at IS NOT NULL
-    RETURNING ${GOAL_FIELDS}
-  `;
+  const client = await pool.connect();
 
   try {
-    const result = await pool.query(query, [goalId, userId]);
+    await client.query('BEGIN');
+
+    const existing = await client.query(
+      `
+        SELECT ${GOAL_FIELDS}
+        FROM saving_goals
+        WHERE goal_id = $1
+          AND user_id = $2
+          AND deleted_at IS NOT NULL
+      `,
+      [goalId, userId]
+    );
+
+    const trashed = existing.rows[0];
+    if (!trashed) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    const nextPriority = await getNextPriorityInGroup(
+      userId,
+      { isComplete: trashed.is_complete, isPaused: trashed.is_paused },
+      client
+    );
+
+    const result = await client.query(
+      `
+        UPDATE saving_goals
+        SET deleted_at = NULL, priority = $3
+        WHERE goal_id = $1
+          AND user_id = $2
+          AND deleted_at IS NOT NULL
+        RETURNING ${GOAL_FIELDS}
+      `,
+      [goalId, userId, nextPriority]
+    );
+
+    await client.query('COMMIT');
     return result.rows[0];
   } catch (err) {
+    await client.query('ROLLBACK');
     throw new Error(`Error restoring goal: ${err.message}`);
+  } finally {
+    client.release();
   }
 };
 
@@ -280,6 +418,7 @@ module.exports = {
   getGoalById,
   createGoal,
   updateGoal,
+  replaceGoalPriorities,
   setGoalPaused,
   deleteGoal,
   restoreGoal,

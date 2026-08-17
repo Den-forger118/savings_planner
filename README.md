@@ -211,6 +211,72 @@ docker exec -it savings_planner_db psql -U postgres -d quant -c "UPDATE users SE
 
 Log out and log back in so your session picks up `is_admin: true`.
 
+## Email (Gmail App Password)
+
+QUANT sends mail through Gmail SMTP with an **App Password** — the same free Google approach used on FoodFusion. You need this for:
+
+- A sign-in notice after a successful login
+- Password reset links from **Forgot password?**
+
+### 1. Turn on 2-Step Verification
+
+1. Open [Google Account → Security](https://myaccount.google.com/security)
+2. Sign in with the Gmail you want QUANT to send from
+3. Enable **2-Step Verification** (required before App Passwords appear)
+
+### 2. Create an App Password
+
+1. Open [App Passwords](https://myaccount.google.com/apppasswords)
+2. Choose **Mail** and a device name such as `QUANT`
+3. Google shows a **16-character password** (spaces are fine; they are ignored)
+4. Copy it. You will not see it again.
+
+Do **not** use your normal Gmail password. Railway / Vercel will reject or Google will block it.
+
+### 3. Add variables on Railway (backend)
+
+In the **backend** service → **Variables**:
+
+```env
+GMAIL_USER=you@gmail.com
+GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+MAIL_FROM=QUANT <you@gmail.com>
+FRONTEND_URL=https://your-app.vercel.app
+```
+
+`FRONTEND_URL` must be your live Vercel URL (no trailing slash). Reset emails link to:
+
+```text
+https://your-app.vercel.app/reset-password?token=...
+```
+
+Redeploy the backend after saving.
+
+### 4. Local Docker (optional)
+
+Put the same values in `backend/.env` (already loaded by Compose):
+
+```env
+GMAIL_USER=you@gmail.com
+GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+FRONTEND_URL=http://localhost:8080
+```
+
+Then restart:
+
+```bash
+docker compose up -d --build backend
+```
+
+### How to test
+
+1. Sign in — you should get a **New QUANT sign-in** email
+2. On the login page, click **Forgot password?** and submit your email
+3. Open the link (expires in 1 hour) and set a new password
+4. Sign in with the new password
+
+If mail is not configured, login still works; the server logs `Gmail is not configured` and skips the email. Reset requests still succeed on the UI (same generic message) so accounts cannot be enumerated.
+
 ### Admin API
 
 - `GET /api/admin/users?search=&sort=created_at&order=desc`

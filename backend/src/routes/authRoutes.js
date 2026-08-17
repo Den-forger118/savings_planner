@@ -1,9 +1,22 @@
+const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../dbcon');
 const { formatAuthUser } = require('../utils/authUser');
+const userModel = require('../models/userModel');
+const {
+  FRONTEND_URL,
+  sendLoginNotice,
+  sendPasswordResetEmail,
+} = require('../utils/mailer');
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+
+function hashResetToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
 const MAX_FAILED_ATTEMPTS = 3;
 const LOCK_DURATION_MS = 5 * 60 * 1000;
@@ -192,11 +205,123 @@ router.post('/login', async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
+    void sendLoginNotice(user);
+
     res.json({
       message: 'Login successful',
       user: formatAuthUser(user),
       token
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+const FORGOT_ACK =
+  'If an account exists for that email, a reset link is on its way.';
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const normalizedEmail = String(req.body?.email || '').trim().toLowerCase();
+    if (!normalizedEmail) {
+      return res.status(400).json({ error: 'Please provide your email address' });
+    }
+
+    const result = await pool.query(
+      'SELECT user_id, first_name, last_name, email, is_active FROM users WHERE LOWER(email) = $1',
+      [normalizedEmail]
+    );
+    const user = result.rows[0];
+
+    if (!user || user.is_active === false) {
+      return res.json({ message: FORGOT_ACK });
+    }
+
+    const recent = await pool.query(
+      `SELECT created_at
+       FROM password_reset_tokens
+       WHERE user_id = $1
+         AND used_at IS NULL
+         AND created_at > NOW() - INTERVAL '2 minutes'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [user.user_id]
+    );
+
+    if (recent.rows.length > 0) {
+      return res.json({ message: FORGOT_ACK });
+    }
+
+    await pool.query(
+      `UPDATE password_reset_tokens
+       SET used_at = NOW()
+       WHERE user_id = $1
+         AND used_at IS NULL`,
+      [user.user_id]
+    );
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = hashResetToken(rawToken);
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+
+    await pool.query(
+      `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+       VALUES ($1, $2, $3)`,
+      [user.user_id, tokenHash, expiresAt.toISOString()]
+    );
+
+    const resetUrl = `${FRONTEND_URL}/reset-password?token=${rawToken}`;
+    void sendPasswordResetEmail(user, resetUrl);
+
+    return res.json({ message: FORGOT_ACK });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const rawToken = String(req.body?.token || '').trim();
+    const password = String(req.body?.password || '');
+
+    if (!rawToken || !password) {
+      return res.status(400).json({ error: 'Reset token and new password are required' });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const tokenHash = hashResetToken(rawToken);
+    const result = await pool.query(
+      `SELECT token_id, user_id, expires_at, used_at
+       FROM password_reset_tokens
+       WHERE token_hash = $1`,
+      [tokenHash]
+    );
+    const row = result.rows[0];
+
+    if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) {
+      return res.status(400).json({
+        error: 'This reset link is invalid or has expired. Request a new one.',
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    await userModel.updatePassword(row.user_id, passwordHash);
+    await clearLoginLock(row.user_id);
+
+    await pool.query(
+      `UPDATE password_reset_tokens
+       SET used_at = NOW()
+       WHERE user_id = $1
+         AND used_at IS NULL`,
+      [row.user_id]
+    );
+
+    return res.json({ message: 'Password updated. You can sign in with your new password.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

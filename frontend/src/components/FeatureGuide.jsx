@@ -161,9 +161,9 @@ const GUIDE_SECTIONS = [
         where: 'Savings Goals → Objective Ledger grid.',
         who: 'All members.',
         how: [
-          'Open Savings Goals to see all cards.',
-          'Read the progress bar and schedule banner (ahead, behind, or on track).',
-          'Use the ⋮ menu for edit, delete, record transaction, cadence, or performance views.',
+          'Open Savings Goals to see all cards. First in the grid is highest intent.',
+          'Drag from the navy heading to set order: left-click and drag, double-click then drag, or press and hold. Move up / Move down also lives in the ⋮ menu.',
+          'Roman numerals on the navy header mark rank within active, on hold, and complete.',
         ],
       },
       {
@@ -243,6 +243,32 @@ const GUIDE_SECTIONS = [
         how: [
           'Record at least one transaction on the goal.',
           'Open ⋮ → Savings Performance to expand the chart inline.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'simulator',
+    title: 'Goal Simulator',
+    icon: 'query_stats',
+    intro: 'A what-if planner for targets that do not yet have a ledger date. Scenarios never take a budget share.',
+    features: [
+      {
+        id: 'what-if-planner',
+        title: 'What-if Planner',
+        icon: 'query_stats',
+        badge: 'All modes',
+        page: 'simulator',
+        what: 'An explorer that solves cadence or estimated completion from a target, optional saved amount, and one known: a deadline, a contribution, or a horizon. Compare up to three scenarios.',
+        why: 'Wanting $X someday is real. Putting undated goals on the live ledger would invent a monthly need and distort earner allocation.',
+        where: 'Settings → Simulator. From Savings Goals you can also open What-if planner.',
+        who: 'Anyone exploring a target before it is ready to be a goal — earner and non-earner alike.',
+        how: [
+          'Open Settings and choose Simulator.',
+          'Enter a target (and optional amount already saved).',
+          'Pick Deadline, Contribution, Horizon, or Compare.',
+          'Read the navy result: remaining to save plus daily / weekly / monthly cadence. Nothing here is allocated.',
+          'Turn this into a goal with a required deadline if you want it on the Objective Ledger.',
         ],
       },
     ],

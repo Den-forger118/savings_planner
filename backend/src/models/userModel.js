@@ -4,7 +4,7 @@ const pool = require('../dbcon');
 const createUser = async (firstname, lastname, email, passwordHash) => {
   const query = `INSERT INTO users (first_name, last_name, email, password_hash)
                  VALUES ($1, $2, $3, $4)
-                 RETURNING user_id, first_name, last_name, email, monthly_budget, is_earner, currency, theme, ui_density, fiscal_start_month, preferences, created_at`;
+                 RETURNING user_id, first_name, last_name, email, monthly_budget, is_earner, currency, theme, fiscal_start_month, created_at`;
 
   try {
     const result = await pool.query(query, [firstname, lastname, email, passwordHash]);
@@ -18,7 +18,7 @@ const createUser = async (firstname, lastname, email, passwordHash) => {
 // get user by id
 const USER_PUBLIC_FIELDS = `
   user_id, first_name, last_name, email, monthly_budget, monthly_income, is_earner,
-  is_admin, is_active, currency, currency_symbol, theme, ui_density, fiscal_start_month, preferences,
+  is_admin, is_active, currency, currency_symbol, theme, fiscal_start_month,
   onboarding_complete, created_at
 `;
 
@@ -81,9 +81,7 @@ const updatePreferences = async (userId, prefs) => {
     currency,
     currency_symbol: currencySymbol,
     theme,
-    ui_density: uiDensity,
     fiscal_start_month: fiscalStartMonth,
-    preferences,
   } = prefs;
 
   const query = `
@@ -92,9 +90,7 @@ const updatePreferences = async (userId, prefs) => {
       currency = COALESCE($2, currency),
       currency_symbol = COALESCE($3, currency_symbol),
       theme = COALESCE($4, theme),
-      ui_density = COALESCE($5, ui_density),
-      fiscal_start_month = COALESCE($6, fiscal_start_month),
-      preferences = COALESCE($7, preferences)
+      fiscal_start_month = COALESCE($5, fiscal_start_month)
     WHERE user_id = $1
     RETURNING ${USER_PUBLIC_FIELDS}
   `;
@@ -105,9 +101,7 @@ const updatePreferences = async (userId, prefs) => {
       currency || null,
       currencySymbol || null,
       theme || null,
-      uiDensity || null,
       fiscalStartMonth || null,
-      preferences ? JSON.stringify(preferences) : null,
     ]);
     return result.rows[0];
   } catch (err) {

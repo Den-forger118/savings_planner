@@ -5,6 +5,7 @@ const transactionModel = require('../models/transactionModel');
 const expenseModel = require('../models/expenseModel');
 const calculationModel = require('../models/calculationModel');
 const { getUserBudgetContext, buildGoalResponse } = require('../utils/budgetContext');
+const { sortGoalsDisplayOrder } = require('../utils/goalOrder');
 
 const SORT_COLUMNS = {
   user_id: 'u.user_id',
@@ -77,16 +78,9 @@ const getUserDetail = async (userId) => {
     ? calculationModel.calculateAutoAllocations(rawGoals, budgetContext.allocationBudget)
     : [];
 
-  const goals = rawGoals
-    .map((goal) => buildGoalResponse(goal, allocatedGoals, budgetContext.mode))
-    .sort((a, b) => {
-      const rank = (goal) => {
-        if (goal.is_complete) return 2;
-        if (goal.is_paused) return 1;
-        return 0;
-      };
-      return rank(a) - rank(b);
-    });
+  const goals = sortGoalsDisplayOrder(
+    rawGoals.map((goal) => buildGoalResponse(goal, allocatedGoals, budgetContext.mode))
+  );
 
   const [transactions, expenses] = await Promise.all([
     transactionModel.getTransactionsWithGoalByUserId(userId),

@@ -93,7 +93,7 @@ router.put('/:userId/budget', async (req, res) => {
       return res.status(400).json({ error: 'Please provide a valid monthly_budget' });
     }
     
-    const query = 'UPDATE users SET monthly_budget = $2 WHERE user_id = $1 RETURNING user_id, first_name, last_name, email, monthly_budget, is_earner, currency, theme, ui_density, fiscal_start_month, preferences, created_at';
+    const query = 'UPDATE users SET monthly_budget = $2 WHERE user_id = $1 RETURNING user_id, first_name, last_name, email, monthly_budget, is_earner, currency, theme, fiscal_start_month, created_at';
     const result = await pool.query(query, [userId, monthly_budget]);
     
     if (!result.rows[0]) {

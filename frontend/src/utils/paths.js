@@ -9,12 +9,15 @@ export const PATHS = {
   activity: '/activity',
   settings: '/settings',
   admin: '/admin',
+  forgotPassword: '/forgot-password',
+  resetPassword: '/reset-password',
 };
 
 /** Map legacy page ids (nav / FeatureGuide) → paths */
 export const PAGE_ID_TO_PATH = {
   dashboard: PATHS.dashboard,
   savings: PATHS.savings,
+  simulator: `${PATHS.settings}?tab=simulator`,
   expenses: PATHS.expenses,
   activity: PATHS.activity,
   settings: PATHS.settings,

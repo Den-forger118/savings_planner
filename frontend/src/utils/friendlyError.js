@@ -40,8 +40,8 @@ const KNOWN_PATTERNS = [
     message: 'Your session has ended. Please sign in again to continue.',
   },
   {
-    test: /admin access/i,
-    message: 'This area is reserved for administrators.',
+    test: /reset link is invalid|has expired|request a new one/i,
+    message: 'This reset link is invalid or has expired. Request a new one.',
   },
   {
     test: /set a monthly budget before enabling earner/i,

@@ -10,17 +10,7 @@ const { getUserBudgetContext, buildGoalResponse } = require('../utils/budgetCont
 
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 
-
-
-const sortGoalsDisplayOrder = (goals) => goals.sort((a, b) => {
-  const rank = (goal) => {
-    if (goal.is_complete) return 2;
-    if (goal.is_paused) return 1;
-    return 0;
-  };
-
-  return rank(a) - rank(b);
-});
+const { sortGoalsDisplayOrder } = require('../utils/goalOrder');
 
 
 
@@ -188,7 +178,7 @@ router.post('/', async (req, res) => {
 
   try {
 
-    const { userId, name, targetAmount, deadline, priority } = req.body;
+    const { userId, name, targetAmount, deadline } = req.body;
 
 
 
@@ -206,7 +196,7 @@ router.post('/', async (req, res) => {
 
     const budgetContext = await getUserBudgetContext(userId);
 
-    const goal = await goalModel.createGoal(userId, name, targetAmount, deadline, priority);
+    const goal = await goalModel.createGoal(userId, name, targetAmount, deadline);
 
     const userGoals = await goalModel.getGoalsByUserId(userId);
 
@@ -237,6 +227,46 @@ router.post('/', async (req, res) => {
 });
 
 
+
+// PATCH /api/goals/reorder - persist manual display order within one status group
+router.patch('/reorder', async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const orderedIds = req.body?.ordered_ids;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+      return res.status(400).json({ error: 'ordered_ids must be a non-empty array' });
+    }
+
+    const parsedIds = orderedIds.map((id) => Number(id));
+    const uniqueIds = [...new Set(parsedIds)];
+    if (uniqueIds.length !== parsedIds.length || parsedIds.some((id) => !Number.isInteger(id) || id < 1)) {
+      return res.status(400).json({ error: 'ordered_ids must be unique positive integers' });
+    }
+
+    await goalModel.replaceGoalPriorities(userId, parsedIds);
+
+    const budgetContext = await getUserBudgetContext(userId);
+    const userGoals = await goalModel.getGoalsByUserId(userId);
+    const allocatedGoals = budgetContext.mode === 'earner'
+      ? calculationModel.calculateAutoAllocations(userGoals, budgetContext.allocationBudget)
+      : [];
+    const goalsWithCalculations = sortGoalsDisplayOrder(
+      userGoals.map((userGoal) => buildGoalResponse(userGoal, allocatedGoals, budgetContext.mode))
+    );
+
+    res.json({
+      message: 'Goal order updated',
+      goals: goalsWithCalculations,
+    });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
 
 // PATCH /api/goals/:id/pause - pause or resume a goal and recalculate allocations
 

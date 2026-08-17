@@ -10,9 +10,7 @@ const formatAuthUser = (user) => ({
   currency: user.currency || 'USD',
   currency_symbol: user.currency_symbol || '$',
   theme: user.theme || 'classic',
-  ui_density: user.ui_density || 'classic',
   fiscal_start_month: user.fiscal_start_month || 1,
-  preferences: user.preferences || {},
   onboarding_complete: user.onboarding_complete === true,
   is_admin: user.is_admin === true,
 });

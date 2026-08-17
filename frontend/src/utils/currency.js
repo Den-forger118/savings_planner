@@ -38,8 +38,3 @@ export const formatMoney = (value, currencyCode = 'USD', currencySymbol = null) 
 
   return `${symbol}${safeAmount.toFixed(decimals)}`;
 };
-
-export const defaultAlertPreferences = () => ({
-  budget_runway: [50, 75, 90],
-  feasibility_decay: true,
-});

@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import BudgetSetup from './BudgetSetup';
 import EarnerModeToggle from './EarnerModeToggle';
 import FeatureGuide from './FeatureGuide';
 import ConfirmDialog from './ConfirmDialog';
 import ErrorBanner from './ErrorBanner';
+import GoalSimulatorPage from './GoalSimulatorPage';
 import { getFriendlyError } from '../utils/friendlyError';
 import {
   ONBOARDING_CURRENCIES,
   FISCAL_MONTHS,
-  defaultAlertPreferences,
   formatMoney,
   getCurrencyByCode,
 } from '../utils/currency';
@@ -21,13 +22,12 @@ const Icon = ({ name, className = '' }) => (
 const SETTINGS_TABS = [
   { id: 'profile', label: 'Profile', icon: 'person' },
   { id: 'financial', label: 'Financial', icon: 'account_balance' },
+  { id: 'simulator', label: 'Simulator', icon: 'query_stats' },
   { id: 'security', label: 'Security', icon: 'shield' },
   { id: 'data', label: 'Data', icon: 'database' },
   { id: 'trash', label: 'Trash', icon: 'delete' },
   { id: 'help', label: 'Help', icon: 'help' },
 ];
-
-const RUNWAY_OPTIONS = [50, 75, 90];
 
 const getTokenExpiry = (token) => {
   if (!token) return null;
@@ -39,11 +39,6 @@ const getTokenExpiry = (token) => {
   }
 };
 
-const parsePreferences = (user) => ({
-  ...defaultAlertPreferences(),
-  ...(user?.preferences && typeof user.preferences === 'object' ? user.preferences : {}),
-});
-
 function SettingsPage({
   user,
   isEarnerMode,
@@ -53,20 +48,22 @@ function SettingsPage({
   onBudgetSet,
   onEarnerModeChange,
   onLogout,
-  onDensityChange,
   onNavigate,
   onGoalsChange,
+  onGoalCreated,
 }) {
-  const [activeTab, setActiveTab] = useState('profile');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(
+    SETTINGS_TABS.some((tab) => tab.id === tabFromUrl) ? tabFromUrl : 'profile'
+  );
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
 
   const [currency, setCurrency] = useState(user?.currency || 'USD');
   const [currencySymbol, setCurrencySymbol] = useState(user?.currency_symbol || '$');
-  const [uiDensity, setUiDensity] = useState(user?.ui_density || 'classic');
   const [fiscalStartMonth, setFiscalStartMonth] = useState(user?.fiscal_start_month || 1);
-  const [alertPrefs, setAlertPrefs] = useState(parsePreferences(user));
 
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -90,29 +87,7 @@ function SettingsPage({
   useEffect(() => {
     setCurrency(user?.currency || 'USD');
     setCurrencySymbol(user?.currency_symbol || '$');
-    setUiDensity(user?.ui_density || 'classic');
-  }, [user?.currency, user?.currency_symbol, user?.ui_density]);
-
-  const persistDensity = async (nextDensity) => {
-    try {
-      const response = await api.put(`/users/${user.user_id}/preferences`, {
-        ui_density: nextDensity,
-        fiscal_start_month: fiscalStartMonth,
-        preferences: alertPrefs,
-        currency,
-        currency_symbol: currencySymbol,
-      });
-      onUserUpdate(response.data.user);
-    } catch (err) {
-      flash(err, true);
-    }
-  };
-
-  const selectDensity = (nextDensity) => {
-    setUiDensity(nextDensity);
-    onDensityChange?.(nextDensity);
-    persistDensity(nextDensity);
-  };
+  }, [user?.currency, user?.currency_symbol]);
 
   const tokenExpiry = useMemo(
     () => getTokenExpiry(localStorage.getItem('token')),
@@ -157,6 +132,13 @@ function SettingsPage({
       setCategoriesLoading(false);
     }
   }, [user.user_id, flash]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && SETTINGS_TABS.some((item) => item.id === tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (activeTab === 'financial') {
@@ -253,9 +235,6 @@ function SettingsPage({
     setSaving(true);
     try {
       const response = await api.put(`/users/${user.user_id}/preferences`, {
-        ui_density: uiDensity,
-        fiscal_start_month: fiscalStartMonth,
-        preferences: alertPrefs,
         currency,
         currency_symbol: currencySymbol,
       });
@@ -266,7 +245,6 @@ function SettingsPage({
     } finally {
       setSaving(false);
     }
-    onDensityChange(uiDensity);
   };
 
   const handleCreateCategory = async (event) => {
@@ -357,20 +335,26 @@ function SettingsPage({
     }
   };
 
-  const toggleRunwayThreshold = (value) => {
-    setAlertPrefs((prev) => {
-      const next = prev.budget_runway.includes(value)
-        ? prev.budget_runway.filter((item) => item !== value)
-        : [...prev.budget_runway, value].sort((a, b) => a - b);
-      return { ...prev, budget_runway: next };
-    });
-  };
-
   const panelClass = 'surface overflow-hidden';
+
+  const selectTab = (id) => {
+    setActiveTab(id);
+    if (id === 'simulator') {
+      setSearchParams({ tab: 'simulator' }, { replace: true });
+      return;
+    }
+    if (searchParams.get('tab')) {
+      setSearchParams({}, { replace: true });
+    }
+  };
 
   const handleHelpNavigate = (page) => {
     if (page === 'settings') {
-      setActiveTab('financial');
+      selectTab('financial');
+      return;
+    }
+    if (page === 'simulator') {
+      selectTab('simulator');
       return;
     }
     onNavigate?.(page);
@@ -385,7 +369,9 @@ function SettingsPage({
           <p className="eyebrow">Preferences</p>
           <h2 className="page-title">Account Settings</h2>
           <p className="page-lede">
-            Currency, savings mode, security, and data for your QUANT ledger.
+            {activeTab === 'simulator'
+              ? 'Run a what-if scenario without putting an undated goal on the ledger.'
+              : 'Currency, savings mode, security, and data for your QUANT ledger.'}
           </p>
         </div>
         <button
@@ -407,9 +393,9 @@ function SettingsPage({
         )
       )}
 
-      {/* Summary strip — mirrors dashboard metrics */}
+      {activeTab !== 'simulator' && (
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
-        <div className="surface-navy flex min-h-[120px] flex-col justify-between p-5 text-cream lg:col-span-3">
+        <div className="surface-navy flex min-h-[120px] flex-col justify-between p-5 text-cream lg:col-span-4">
           <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold/80">
             Savings Mode
           </p>
@@ -437,7 +423,7 @@ function SettingsPage({
           </div>
         </div>
 
-        <div className="stat-tile flex min-h-[120px] flex-col justify-between p-5 lg:col-span-3">
+        <div className="stat-tile flex min-h-[120px] flex-col justify-between p-5 lg:col-span-4">
           <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
             Display Currency
           </p>
@@ -450,19 +436,8 @@ function SettingsPage({
             </p>
           </div>
         </div>
-
-        <div className="stat-tile flex min-h-[120px] flex-col justify-between p-5 lg:col-span-2">
-          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-            Density
-          </p>
-          <div className="mt-3">
-            <p className="font-serif text-xl font-light capitalize text-primary-dark">{uiDensity}</p>
-            <p className="mt-1.5 font-sans text-xs text-taupe">
-              {uiDensity === 'compact' ? 'Dense ledger' : 'Spacious cards'}
-            </p>
-          </div>
-        </div>
       </section>
+      )}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <nav className="surface h-fit space-y-1 p-2 xl:sticky xl:top-24 xl:col-span-3 xl:self-start xl:z-10">
@@ -472,7 +447,7 @@ function SettingsPage({
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => selectTab(tab.id)}
                 className={`flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3.5 py-2.5 text-left font-sans text-sm font-normal tracking-[0.02em] transition-all duration-200 ease-out-expo ${
                   active
                     ? 'bg-primary-dark text-cream shadow-soft'
@@ -543,81 +518,6 @@ function SettingsPage({
                       {formatMoney(12450.75, currency, currencySymbol)}
                     </p>
                   </div>
-                </div>
-              </section>
-
-              <section className={panelClass}>
-                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
-                  <h3 className="card-title">Visual Tuning</h3>
-                  <p className="mt-1 font-sans text-sm text-taupe">
-                    Choose how dense your ledger surfaces feel.
-                  </p>
-                </div>
-                <div className="px-5 py-5">
-                  <div className="grid max-w-md grid-cols-2 gap-3">
-                    {[
-                      { id: 'classic', label: 'Classic', desc: 'Spacious cards' },
-                      { id: 'compact', label: 'Compact', desc: 'Dense ledger' },
-                    ].map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => selectDensity(option.id)}
-                        className={`min-h-[72px] rounded-lg border px-3.5 py-3 text-left transition-colors duration-200 ease-out-expo ${
-                          uiDensity === option.id
-                            ? 'border-gold bg-gold/10'
-                            : 'border-primary-dark/12 bg-white hover:border-gold/50'
-                        }`}
-                      >
-                        <p className="font-sans text-sm font-normal text-primary-dark">{option.label}</p>
-                        <p className="mt-1 font-sans text-xs text-taupe">{option.desc}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              <section className={panelClass}>
-                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
-                  <h3 className="card-title">Alert Thresholds</h3>
-                  <p className="mt-1 font-sans text-sm text-taupe">
-                    When runway and feasibility should surface.
-                  </p>
-                </div>
-                <div className="space-y-5 px-5 py-5">
-                  <div>
-                    <p className="field-label">Budget Runway Alerts</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {RUNWAY_OPTIONS.map((pct) => (
-                        <button
-                          key={pct}
-                          type="button"
-                          onClick={() => toggleRunwayThreshold(pct)}
-                          className={`min-h-[40px] rounded-lg border px-3.5 py-2 font-money text-sm font-light transition-colors duration-200 ease-out-expo ${
-                            alertPrefs.budget_runway.includes(pct)
-                              ? 'border-primary-dark bg-primary-dark text-cream'
-                              : 'border-primary-dark/12 text-taupe hover:border-primary-dark/30 hover:text-primary-dark'
-                          }`}
-                        >
-                          {pct}%
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <label className="flex cursor-pointer items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={alertPrefs.feasibility_decay}
-                      onChange={(e) => setAlertPrefs((prev) => ({
-                        ...prev,
-                        feasibility_decay: e.target.checked,
-                      }))}
-                      className="mt-0.5 h-4 w-4 rounded border-primary-dark/20 text-gold focus:ring-gold"
-                    />
-                    <span className="font-sans text-sm font-light leading-relaxed text-primary-dark">
-                      Alert when a goal drops from Achievable to Underfunded
-                    </span>
-                  </label>
                 </div>
               </section>
 
@@ -757,6 +657,18 @@ function SettingsPage({
                 {saving ? 'Saving…' : 'Save Fiscal Settings'}
               </button>
             </>
+          )}
+
+          {activeTab === 'simulator' && (
+            <GoalSimulatorPage
+              embedded
+              user={user}
+              isEarnerMode={isEarnerMode}
+              currencyCode={currency}
+              currencySymbol={currencySymbol}
+              onGoalCreated={onGoalCreated}
+              onOpenLedger={() => onNavigate?.('savings')}
+            />
           )}
 
           {activeTab === 'security' && (

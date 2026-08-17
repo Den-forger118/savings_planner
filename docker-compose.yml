@@ -39,6 +39,8 @@ services:
       JWT_EXPIRES_IN: 24h
       FRONTEND_URL: http://localhost:8080
       ADMIN_PROMOTE_EMAIL: Securetester2@gmail.com
+      GMAIL_USER: ${GMAIL_USER:-}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
     ports:
       - "5001:5001"
     env_file:

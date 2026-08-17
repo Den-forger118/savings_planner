@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { getFriendlyError, getLoginThrottleInfo } from '../utils/friendlyError';
 import { PATHS } from '../utils/paths';
@@ -85,11 +85,22 @@ function LoginNotice({ message, countdown, locked, tone = 'error' }) {
 
 function LoginPage({ onLogin }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState(null);
   const [lockedUntil, setLockedUntil] = useState(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (location.state?.passwordReset) {
+      setNotice({
+        locked: false,
+        tone: 'calm',
+        message: 'Password updated. Sign in with your new password.',
+      });
+    }
+  }, [location.state]);
 
   useEffect(() => {
     const stored = readStoredLock();
@@ -247,6 +258,14 @@ function LoginPage({ onLogin }) {
               disabled={isLocked}
               autoComplete="current-password"
             />
+            <p className="mt-3 text-right">
+              <Link
+                to={PATHS.forgotPassword}
+                className="font-sans text-xs font-normal text-taupe underline decoration-gold/30 underline-offset-4 transition-colors hover:text-primary-dark"
+              >
+                Forgot password?
+              </Link>
+            </p>
           </div>
 
           <LoginNotice
