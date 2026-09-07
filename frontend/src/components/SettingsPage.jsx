@@ -350,8 +350,15 @@ function SettingsPage({
 
   const handleHelpNavigate = (page) => {
     if (page === 'settings') {
-      selectTab('financial');
+      selectTab('profile');
       return;
+    }
+    if (page.startsWith('settings-')) {
+      const tab = page.slice('settings-'.length);
+      if (SETTINGS_TABS.some((item) => item.id === tab)) {
+        selectTab(tab);
+        return;
+      }
     }
     if (page === 'simulator') {
       selectTab('simulator');

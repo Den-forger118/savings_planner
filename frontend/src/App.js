@@ -13,6 +13,7 @@ import HoldGoalDialog from './components/HoldGoalDialog';
 import ExpenseSummary from './components/ExpenseSummary';
 import SettingsPage from './components/SettingsPage';
 import OnboardingPage from './pages/OnboardingPage';
+import LandingPage from './pages/LandingPage';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
@@ -1125,7 +1126,7 @@ function App() {
     setGoals([]);
     setMonthlyBudget(null);
     setIsEarnerMode(false);
-    navigate(PATHS.login, { replace: true });
+    navigate(PATHS.home, { replace: true });
   };
 
   const handleBudgetSet = (budget, updatedUser) => {
@@ -1342,6 +1343,9 @@ function App() {
   if (!user) {
     return (
       <Routes>
+        <Route path={PATHS.home} element={
+          <ScreenTransition screenKey="landing"><LandingPage /></ScreenTransition>
+        } />
         <Route path={PATHS.register} element={
           <ScreenTransition screenKey="register"><RegisterPage onRegister={handleLogin} /></ScreenTransition>
         } />
@@ -1354,7 +1358,7 @@ function App() {
         <Route path={PATHS.resetPassword} element={
           <ScreenTransition screenKey="reset"><ResetPasswordPage /></ScreenTransition>
         } />
-        <Route path="*" element={<Navigate to={PATHS.login} replace />} />
+        <Route path="*" element={<Navigate to={PATHS.home} replace />} />
       </Routes>
     );
   }

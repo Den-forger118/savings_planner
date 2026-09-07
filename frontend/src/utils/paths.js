@@ -1,5 +1,6 @@
 /** App route paths (React Router). */
 export const PATHS = {
+  home: '/',
   login: '/login',
   register: '/register',
   onboarding: '/onboarding',

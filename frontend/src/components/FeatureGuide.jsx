@@ -17,20 +17,20 @@ const GUIDE_SECTIONS = [
     id: 'overview',
     title: 'Overview',
     icon: 'home',
-    intro: 'QUANT helps you plan savings goals, track deposits, and understand spending — whether you have a fixed monthly income or not.',
+    intro: 'QUANT helps you plan savings goals, run what-if scenarios, track deposits, and understand spending — whether you have a fixed monthly income or not.',
     features: [
       {
         id: 'earner-modes',
         title: 'Earner vs Non-Earner Mode',
         icon: 'tune',
         badge: 'Settings',
-        page: 'settings',
+        page: 'settings-financial',
         what: 'Two savings modes that change how the app plans and allocates money across your goals.',
         why: 'Not everyone has a predictable monthly income. Non-Earner mode focuses on what you need to save; Earner mode adds budget splitting and feasibility checks.',
-        where: 'Settings → Savings Mode toggle, plus the monthly budget panel on the same page and Dashboard.',
+        where: 'Settings → Financial → Savings Mode toggle, plus the monthly budget panel on the same tab and Dashboard.',
         who: 'Anyone. Use Non-Earner if you are still figuring out cash flow. Switch to Earner once you can commit a monthly savings amount.',
         how: [
-          'Open Settings and choose Financial Engine or Help.',
+          'Open Settings and choose Financial.',
           'Set a monthly budget if you have not already.',
           'Toggle Savings Mode to Earner or Non-Earner.',
           'Return to Dashboard or Savings Goals — labels and allocation panels update immediately.',
@@ -156,14 +156,65 @@ const GUIDE_SECTIONS = [
         icon: 'credit_card',
         badge: 'Savings Goals',
         page: 'savings',
-        what: 'Each goal is shown as a card with progress, target/saved/remaining stats, schedule status, and action menu.',
+        what: 'Each goal is shown as a card with progress, target/saved/remaining stats, schedule status, cadence controls, and action menu.',
         why: 'Manage every objective from one screen without losing context.',
         where: 'Savings Goals → Objective Ledger grid.',
         who: 'All members.',
         how: [
-          'Open Savings Goals to see all cards. First in the grid is highest intent.',
-          'Drag from the navy heading to set order: left-click and drag, double-click then drag, or press and hold. Move up / Move down also lives in the ⋮ menu.',
-          'Roman numerals on the navy header mark rank within active, on hold, and complete.',
+          'Open Savings Goals to see all cards sorted by status, then priority.',
+          'Roman numerals on the navy header mark rank within active, on hold, and complete groups.',
+          'Use the frequency row to switch daily / weekly / monthly / yearly savings targets.',
+          'Open the ⋮ menu to edit, reorder, or move a goal to trash.',
+        ],
+      },
+      {
+        id: 'goal-priority',
+        title: 'Goal Priority & Order',
+        icon: 'format_list_numbered',
+        badge: 'Savings Goals',
+        page: 'savings',
+        what: 'Set display order for your goals. First in the folio is highest intent. Order is saved per status group — active, on hold, then complete.',
+        why: 'Your most important goals should lead the ledger. Priority is visual order only; earner allocation still balances magnitude and urgency.',
+        where: 'Savings Goals → Objective Ledger. Drag from the navy card heading, or use Move up / Move down in the ⋮ menu.',
+        who: 'Anyone with more than one goal in a status group.',
+        how: [
+          'Open Savings Goals and find the goal you want to move.',
+          'Drag from the navy heading and drop on another card in the same status group, or use Move up / Move down in the ⋮ menu.',
+          'Completed and on-hold goals reorder within their own group.',
+          'New goals are added at the end of the active list.',
+        ],
+      },
+      {
+        id: 'goal-on-hold',
+        title: 'Put a Goal on Hold',
+        icon: 'pause_circle',
+        badge: 'Savings Goals',
+        page: 'savings',
+        what: 'Pause an active goal without deleting it. On-hold goals stay visible but stop accepting transactions and drop out of active allocation.',
+        why: 'Life changes. Hold lets you shelve an objective temporarily while keeping its history intact.',
+        where: 'Goal card navy header → hold switch (next to the ⋮ menu).',
+        who: 'Anyone who needs to pause saving toward a goal for a while.',
+        how: [
+          'Open the goal card on Savings Goals.',
+          'Toggle the hold switch on the navy header to put the goal on hold.',
+          'The card shows an On hold badge and cadence controls are disabled.',
+          'Toggle again to resume when you are ready.',
+        ],
+      },
+      {
+        id: 'edit-goal',
+        title: 'Edit a Goal',
+        icon: 'edit',
+        badge: 'Savings Goals',
+        page: 'savings',
+        what: 'Change a goal’s name, target amount, or deadline after creation.',
+        why: 'Plans evolve. Editing keeps the ledger accurate without starting over.',
+        where: 'Goal card ⋮ menu → Edit.',
+        who: 'Anyone with an active or on-hold goal.',
+        how: [
+          'Open the goal’s ⋮ menu and choose Edit.',
+          'Update the name, target, or deadline in the inline panel.',
+          'Save — cadence, allocation, and charts recalculate automatically.',
         ],
       },
       {
@@ -178,8 +229,8 @@ const GUIDE_SECTIONS = [
         who: 'Everyone — always visible. Monthly allocation panel is Earner-only.',
         how: [
           'Open a goal card on Savings Goals.',
-          'Read the cadence row or open Savings Cadence from the menu.',
-          'Use the daily/weekly/monthly figures as personal targets when you deposit.',
+          'Use the Daily / Weekly / Monthly / Yearly row to pick your cadence view.',
+          'Read the amount shown above the frequency buttons as your personal target when you deposit.',
         ],
       },
       {
@@ -206,10 +257,10 @@ const GUIDE_SECTIONS = [
         page: 'savings',
         what: 'Log a deposit or withdrawal against a specific goal.',
         why: 'Updates saved balance, progress %, charts, and completion status.',
-        where: 'Goal card ⋮ menu → Record Transaction.',
+        where: 'Goal card footer → transaction icon (ledger band at the bottom).',
         who: 'Anyone actively saving toward goals.',
         how: [
-          'Open the goal’s ⋮ menu and choose Record Transaction.',
+          'Open the goal card and click the transaction icon on the bottom band.',
           'Enter amount, pick deposit or withdrawal, add an optional note.',
           'Submit — the card, dashboard charts, and Activity ledger refresh.',
         ],
@@ -231,18 +282,19 @@ const GUIDE_SECTIONS = [
         ],
       },
       {
-        id: 'goal-performance',
-        title: 'Individual Goal Chart',
-        icon: 'monitoring',
-        badge: 'Savings Goals',
-        page: 'savings',
-        what: 'A line chart of cumulative balance over time for one goal, with growth percentage.',
-        why: 'See momentum for a single objective in detail.',
-        where: 'Goal card ⋮ menu → Savings Performance.',
-        who: 'Members who want per-goal history beyond the dashboard multi-goal chart.',
+        id: 'goal-trash',
+        title: 'Trash & Restore',
+        icon: 'delete',
+        badge: 'Settings',
+        page: 'settings-trash',
+        what: 'Move goals to trash instead of deleting them permanently. Restore later or empty trash when you are sure.',
+        why: 'Protects against accidental removal while still letting you clear the ledger.',
+        where: 'Delete from the goal ⋮ menu. Restore from Settings → Trash.',
+        who: 'Anyone managing their objective ledger.',
         how: [
-          'Record at least one transaction on the goal.',
-          'Open ⋮ → Savings Performance to expand the chart inline.',
+          'Open the goal’s ⋮ menu and choose Delete.',
+          'Confirm — the goal moves to trash, not permanent deletion.',
+          'Open Settings → Trash to restore a goal or empty trash permanently.',
         ],
       },
     ],
@@ -251,7 +303,7 @@ const GUIDE_SECTIONS = [
     id: 'simulator',
     title: 'Goal Simulator',
     icon: 'query_stats',
-    intro: 'A what-if planner for targets that do not yet have a ledger date. Scenarios never take a budget share.',
+    intro: 'A what-if planner for targets you have not committed to the ledger yet. Scenarios never take a budget share until you promote them to a real goal.',
     features: [
       {
         id: 'what-if-planner',
@@ -259,16 +311,119 @@ const GUIDE_SECTIONS = [
         icon: 'query_stats',
         badge: 'All modes',
         page: 'simulator',
-        what: 'An explorer that solves cadence or estimated completion from a target, optional saved amount, and one known: a deadline, a contribution, or a horizon. Compare up to three scenarios.',
+        what: 'An explorer with four modes: Deadline (given a date, what cadence?), Contribution (given a savings rate, when done?), Horizon (6 / 12 / 24 months), and Compare (up to three scenarios side by side).',
         why: 'Wanting $X someday is real. Putting undated goals on the live ledger would invent a monthly need and distort earner allocation.',
         where: 'Settings → Simulator. From Savings Goals you can also open What-if planner.',
         who: 'Anyone exploring a target before it is ready to be a goal — earner and non-earner alike.',
         how: [
-          'Open Settings and choose Simulator.',
-          'Enter a target (and optional amount already saved).',
+          'Open Settings and choose Simulator, or click What-if planner on Savings Goals.',
+          'Enter a target and optional amount already saved.',
           'Pick Deadline, Contribution, Horizon, or Compare.',
-          'Read the navy result: remaining to save plus daily / weekly / monthly cadence. Nothing here is allocated.',
-          'Turn this into a goal with a required deadline if you want it on the Objective Ledger.',
+          'Read the navy result: remaining to save plus daily / weekly / monthly / yearly cadence. Nothing here is allocated.',
+        ],
+      },
+      {
+        id: 'promote-to-goal',
+        title: 'Promote to Goal',
+        icon: 'upgrade',
+        badge: 'All modes',
+        page: 'simulator',
+        what: 'Turn a validated simulator scenario into a live ledger goal with a required name and deadline.',
+        why: 'The simulator stays isolated until you are ready to commit. Promotion is the bridge to the Objective Ledger.',
+        where: 'Settings → Simulator → promote form below the result.',
+        who: 'Anyone who has settled on a target and deadline from a what-if run.',
+        how: [
+          'Complete a scenario so the navy result shows valid cadence or finish date.',
+          'Enter a goal name and confirm the deadline (pre-filled from the scenario when available).',
+          'Submit — the goal appears on Savings Goals at the end of your active list.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'settings',
+    title: 'Settings',
+    icon: 'settings',
+    intro: 'Profile, financial engine, security, data export, and trash — everything outside the day-to-day ledger.',
+    features: [
+      {
+        id: 'display-currency',
+        title: 'Display Currency',
+        icon: 'payments',
+        badge: 'Profile',
+        page: 'settings',
+        what: 'Choose the currency and symbol used to format amounts across your ledger.',
+        why: 'QUANT supports many currencies. Set yours once and every surface follows.',
+        where: 'Settings → Profile → Display Currency.',
+        who: 'All members.',
+        how: [
+          'Open Settings and choose Profile.',
+          'Pick your currency from the dropdown and review the preview.',
+          'Click Save Preferences.',
+        ],
+      },
+      {
+        id: 'fiscal-year',
+        title: 'Fiscal Year',
+        icon: 'calendar_month',
+        badge: 'Financial',
+        page: 'settings-financial',
+        what: 'Set the month your reporting cycle begins.',
+        why: 'Aligns fiscal-period views with how you actually plan, not just the calendar year.',
+        where: 'Settings → Financial → Fiscal Year.',
+        who: 'Anyone who reports or plans on a non-January cycle.',
+        how: [
+          'Open Settings and choose Financial.',
+          'Pick your start month under Fiscal Year.',
+          'Click Save Fiscal Settings.',
+        ],
+      },
+      {
+        id: 'category-ledger',
+        title: 'Category Ledger',
+        icon: 'category',
+        badge: 'Financial',
+        page: 'settings-financial',
+        what: 'Create and customize expense categories with names and colours.',
+        why: 'Categories power expense logging and the spending charts on your Dashboard.',
+        where: 'Settings → Financial → Category Ledger.',
+        who: 'Anyone using the Expense Tracker.',
+        how: [
+          'Open Settings → Financial and scroll to Category Ledger.',
+          'Edit an existing category name or colour inline, or add a new category at the bottom.',
+          'Return to Expense Tracker — new categories appear in the log form.',
+        ],
+      },
+      {
+        id: 'export-data',
+        title: 'Export Statement',
+        icon: 'download',
+        badge: 'Data',
+        page: 'settings-data',
+        what: 'Download your full financial statement as JSON or CSV — goals, transactions, expenses, and categories.',
+        why: 'Keep a personal backup or use your data in a spreadsheet.',
+        where: 'Settings → Data → Export Statement.',
+        who: 'Anyone who wants an offline copy of their ledger.',
+        how: [
+          'Open Settings and choose Data.',
+          'Click Export JSON or Export CSV.',
+          'Save the downloaded file to your device.',
+        ],
+      },
+      {
+        id: 'security',
+        title: 'Password & Session',
+        icon: 'shield',
+        badge: 'Security',
+        page: 'settings-security',
+        what: 'View your active session, sign out, or rotate your password.',
+        why: 'Keep your ledger credentials secure on shared or public devices.',
+        where: 'Settings → Security.',
+        who: 'All members.',
+        how: [
+          'Open Settings and choose Security.',
+          'Review session expiry under Active Session.',
+          'Use Log Out of All Devices to sign out, or update your password with the form below.',
         ],
       },
     ],
@@ -466,25 +621,31 @@ function FeatureGuide({ isEarnerMode = false, onNavigate, embedded = false }) {
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-medium text-gold">2</span>
             <span>
-              <strong>Record a deposit</strong> — open the goal menu → Record Transaction when you save money.
+              <strong>Record a deposit</strong> — click the transaction icon on a goal card when you save money.
             </span>
           </li>
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-medium text-gold">3</span>
             <span>
-              <strong>Log expenses</strong> — Expense Tracker → Log Expense to track spending by category.
+              <strong>Explore a what-if</strong> — Settings → Simulator, or What-if planner on Savings Goals, before committing a target to the ledger.
             </span>
           </li>
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-medium text-gold">4</span>
             <span>
-              <strong>Choose your mode</strong> — Settings → toggle Earner if you have a monthly budget to allocate.
+              <strong>Log expenses</strong> — Expense Tracker → Log Expense to track spending by category.
             </span>
           </li>
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-medium text-gold">5</span>
             <span>
-              <strong>Check Dashboard</strong> — review progress charts, spending, and recent activity in one view.
+              <strong>Choose your mode</strong> — Settings → Financial → toggle Earner if you have a monthly budget to allocate.
+            </span>
+          </li>
+          <li className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-medium text-gold">6</span>
+            <span>
+              <strong>Set goal order</strong> — drag from a card’s navy heading to rank what matters most, then check Dashboard for the full picture.
             </span>
           </li>
         </ol>

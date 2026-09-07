@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { getFriendlyError } from '../utils/friendlyError';
+import { hasPendingGoal } from '../utils/pendingGoal';
 import ErrorBanner from './ErrorBanner';
 import AuthStoryPanel from './AuthStoryPanel';
 import { PATHS } from '../utils/paths';
@@ -72,7 +73,9 @@ function RegisterPage({ onRegister }) {
           Get started
         </h2>
         <p className="mt-2 max-w-sm font-sans text-[14px] font-light leading-snug text-taupe">
-          Create your account to manage savings goals and expense analytics.
+          {hasPendingGoal()
+            ? 'Your goal is saved — finish setup and you will review it before it goes on the ledger.'
+            : 'Create your account to manage savings goals and expense analytics.'}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">

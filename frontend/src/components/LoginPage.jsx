@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { getFriendlyError, getLoginThrottleInfo } from '../utils/friendlyError';
+import { clearPendingGoal, hasPendingGoal } from '../utils/pendingGoal';
 import { PATHS } from '../utils/paths';
 import AuthStoryPanel from './AuthStoryPanel';
 
@@ -179,6 +180,9 @@ function LoginPage({ onLogin }) {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       onLogin(response.data.user, response.data.token);
+      if (response.data.user.onboarding_complete !== false) {
+        clearPendingGoal();
+      }
       const next =
         response.data.user.onboarding_complete === false
           ? PATHS.onboarding
@@ -224,7 +228,9 @@ function LoginPage({ onLogin }) {
           Welcome back
         </h2>
         <p className="mt-3 font-sans text-[15px] font-light leading-relaxed text-taupe">
-          Sign in to review your goals, budget, and expense analytics.
+          {hasPendingGoal()
+            ? 'Sign in to finish setup — your goal is saved and waiting at the end.'
+            : 'Sign in to review your goals, budget, and expense analytics.'}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-10 space-y-7">

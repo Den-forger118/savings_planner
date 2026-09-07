@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
 import { ONBOARDING_CURRENCIES, formatMoney, getCurrencyByCode } from '../utils/currency';
 import { getFriendlyError } from '../utils/friendlyError';
+import { clearPendingGoal, getPendingGoal } from '../utils/pendingGoal';
 import ErrorBanner from '../components/ErrorBanner';
 import ProgressBar from '../components/ProgressBar';
 import OnboardingChapterShell from '../components/OnboardingChapterShell';
@@ -117,6 +118,18 @@ function OnboardingPage({ user, onComplete }) {
     deadline: '',
   });
   const [goalSaving, setGoalSaving] = useState(false);
+  const [fromLanding, setFromLanding] = useState(false);
+
+  useEffect(() => {
+    const pending = getPendingGoal();
+    if (!pending) return;
+    setGoalForm({
+      name: pending.name,
+      targetAmount: pending.targetAmount,
+      deadline: pending.deadline,
+    });
+    setFromLanding(true);
+  }, []);
 
   const steps = useMemo(() => buildStepOrder(data.mode), [data.mode]);
   const currentStepId = steps[stepIndex] || STEP_IDS.welcome;
@@ -199,12 +212,20 @@ function OnboardingPage({ user, onComplete }) {
           target_amount: parseFloat(goalForm.targetAmount),
         },
       }));
+      clearPendingGoal();
+      setFromLanding(false);
       goNext();
     } catch (err) {
       setError(getFriendlyError(err, 'We couldn’t create that goal. Please try again.'));
     } finally {
       setGoalSaving(false);
     }
+  };
+
+  const handleSkipGoal = () => {
+    clearPendingGoal();
+    setFromLanding(false);
+    goNext();
   };
 
   const finishOnboarding = async () => {
@@ -429,8 +450,17 @@ function OnboardingPage({ user, onComplete }) {
               What are you saving towards?
             </h2>
             <p className="mt-3 font-sans text-[15px] font-light leading-relaxed text-taupe">
-              Set your first objective now, or skip and add it from the dashboard.
+              {fromLanding
+                ? 'You started this on the way in — review it, change anything, then create when you are ready.'
+                : 'Set your first objective now, or skip and add it from the dashboard.'}
             </p>
+            {fromLanding && (
+              <div className="mt-5 rounded-lg border border-gold/30 bg-cream/50 px-4 py-3">
+                <p className="font-sans text-sm font-light leading-relaxed text-primary-dark">
+                  Your goal from the landing page is ready below.
+                </p>
+              </div>
+            )}
             <div className="mt-8 space-y-4">
               <div>
                 <label className="field-label">Goal Name</label>
@@ -476,7 +506,7 @@ function OnboardingPage({ user, onComplete }) {
               </button>
               <button
                 type="button"
-                onClick={goNext}
+                onClick={handleSkipGoal}
                 className="font-sans text-sm font-normal text-taupe transition-colors hover:text-primary-dark"
               >
                 Skip for now →
