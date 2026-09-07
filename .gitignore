@@ -43,5 +43,9 @@ logs/
 # Planned / local-only specs (not for remote)
 GOAL_SIMULATOR.md
 
+# Local database dumps (never commit)
+quant_backup.sql
+*.sql.dump
+
 backend/package-lock.json
 frontend/package-lock.json

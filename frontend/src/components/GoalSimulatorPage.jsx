@@ -18,10 +18,6 @@ import {
 } from '../utils/goalSimulator';
 import ErrorBanner from './ErrorBanner';
 
-const Icon = ({ name, className = '' }) => (
-  <span className={`material-symbols-outlined ${className}`}>{name}</span>
-);
-
 const emptyCompareRow = (id) => ({
   id,
   mode: id === 3 ? 'horizon' : 'contribution',

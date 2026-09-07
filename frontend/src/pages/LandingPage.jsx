@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import ErrorBanner from '../components/ErrorBanner';
 import { PATHS } from '../utils/paths';
 import { savePendingGoal } from '../utils/pendingGoal';
-import { useNavigate } from 'react-router-dom';
+
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
 );

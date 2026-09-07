@@ -16,6 +16,10 @@
     "recharts": "^3.8.1",
     "web-vitals": "^2.1.4"
   },
+  "allowScripts": {
+    "core-js": true,
+    "core-js-pure": true
+  },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
