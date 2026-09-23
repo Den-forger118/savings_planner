@@ -7,6 +7,7 @@ import FeatureGuide from './FeatureGuide';
 import ConfirmDialog from './ConfirmDialog';
 import ErrorBanner from './ErrorBanner';
 import GoalSimulatorPage from './GoalSimulatorPage';
+import PasswordInput from './PasswordInput';
 import { getFriendlyError } from '../utils/friendlyError';
 import {
   ONBOARDING_CURRENCIES,
@@ -721,12 +722,12 @@ function SettingsPage({
                     <label className="field-label" htmlFor="current-password">
                       Current Password
                     </label>
-                    <input
+                    <PasswordInput
                       id="current-password"
-                      type="password"
+                      variant="field"
                       value={passwordForm.currentPassword}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                      className="field"
+                      autoComplete="current-password"
                       required
                     />
                   </div>
@@ -734,12 +735,12 @@ function SettingsPage({
                     <label className="field-label" htmlFor="new-password">
                       New Password
                     </label>
-                    <input
+                    <PasswordInput
                       id="new-password"
-                      type="password"
+                      variant="field"
                       value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                      className="field"
+                      autoComplete="new-password"
                       required
                       minLength={8}
                     />
@@ -748,12 +749,12 @@ function SettingsPage({
                     <label className="field-label" htmlFor="confirm-password">
                       Confirm New Password
                     </label>
-                    <input
+                    <PasswordInput
                       id="confirm-password"
-                      type="password"
+                      variant="field"
                       value={passwordForm.confirmPassword}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                      className="field"
+                      autoComplete="new-password"
                       required
                       minLength={8}
                     />

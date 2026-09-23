@@ -5,6 +5,7 @@ import { getFriendlyError, getLoginThrottleInfo } from '../utils/friendlyError';
 import { clearPendingGoal, hasPendingGoal } from '../utils/pendingGoal';
 import { PATHS } from '../utils/paths';
 import AuthStoryPanel from './AuthStoryPanel';
+import PasswordInput from './PasswordInput';
 
 const LOCK_STORAGE_KEY = 'quant_login_lock';
 
@@ -254,13 +255,11 @@ function LoginPage({ onLogin }) {
             <label className="mb-2 block font-sans text-xs font-normal uppercase tracking-[0.14em] text-taupe">
               Password
             </label>
-            <input
-              type="password"
+            <PasswordInput
               name="password"
               value={formData.password}
               onChange={handleChange}
               placeholder="Enter your password"
-              className="auth-field-underline"
               disabled={isLocked}
               autoComplete="current-password"
             />

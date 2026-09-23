@@ -5,6 +5,7 @@ import { getFriendlyError } from '../utils/friendlyError';
 import { hasPendingGoal } from '../utils/pendingGoal';
 import ErrorBanner from './ErrorBanner';
 import AuthStoryPanel from './AuthStoryPanel';
+import PasswordInput from './PasswordInput';
 import { PATHS } from '../utils/paths';
 
 function RegisterPage({ onRegister }) {
@@ -129,13 +130,11 @@ function RegisterPage({ onRegister }) {
             <label className="mb-1.5 block font-sans text-[11px] font-normal uppercase tracking-[0.14em] text-taupe">
               Password
             </label>
-            <input
-              type="password"
+            <PasswordInput
               name="password"
               value={formData.password}
               onChange={handleChange}
               placeholder="Minimum 8 characters"
-              className="auth-field-underline"
               autoComplete="new-password"
             />
           </div>
@@ -144,13 +143,11 @@ function RegisterPage({ onRegister }) {
             <label className="mb-1.5 block font-sans text-[11px] font-normal uppercase tracking-[0.14em] text-taupe">
               Confirm Password
             </label>
-            <input
-              type="password"
+            <PasswordInput
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
               placeholder="Repeat your password"
-              className="auth-field-underline"
               autoComplete="new-password"
             />
           </div>

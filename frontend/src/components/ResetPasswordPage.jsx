@@ -4,6 +4,7 @@ import api from '../services/api';
 import { getFriendlyError } from '../utils/friendlyError';
 import { PATHS } from '../utils/paths';
 import AuthStoryPanel from './AuthStoryPanel';
+import PasswordInput from './PasswordInput';
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -75,13 +76,11 @@ function ResetPasswordPage() {
             <label className="mb-2 block font-sans text-xs font-normal uppercase tracking-[0.14em] text-taupe">
               New Password
             </label>
-            <input
-              type="password"
+            <PasswordInput
               name="password"
               value={formData.password}
               onChange={handleChange}
               placeholder="At least 8 characters"
-              className="auth-field-underline"
               autoComplete="new-password"
               required
             />
@@ -91,13 +90,11 @@ function ResetPasswordPage() {
             <label className="mb-2 block font-sans text-xs font-normal uppercase tracking-[0.14em] text-taupe">
               Confirm Password
             </label>
-            <input
-              type="password"
+            <PasswordInput
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
               placeholder="Repeat your password"
-              className="auth-field-underline"
               autoComplete="new-password"
               required
             />

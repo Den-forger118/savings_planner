@@ -151,8 +151,13 @@ function LandingPage() {
   };
 
   return (
-    <div className="page-canvas min-h-screen font-sans">
-      <header className="sticky top-0 z-40 border-b border-primary-dark/[0.06] bg-ivory/90 backdrop-blur-md">
+    <div className="landing-canvas relative min-h-screen overflow-x-clip bg-white font-sans text-primary-dark">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-[32rem] bg-[radial-gradient(ellipse_at_top,_rgba(212,177,109,0.08),_transparent_55%)]"
+        aria-hidden="true"
+      />
+
+      <header className="sticky top-0 z-40 border-b border-primary-dark/[0.08] bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
           <p className="font-engraved text-2xl text-gold sm:text-[1.65rem]">QUANT</p>
           <div className="flex items-center gap-3">
@@ -195,7 +200,7 @@ function LandingPage() {
               </button>
               <Link
                 to={PATHS.login}
-                className="btn-ghost min-h-[44px] px-6"
+                className="btn-ghost min-h-[44px] border border-primary-dark/15 px-6"
               >
                 I already have an account
               </Link>
@@ -236,7 +241,10 @@ function LandingPage() {
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             {FEATURES.map((feature) => (
-              <article key={feature.title} className="surface p-5 sm:p-6">
+              <article
+                key={feature.title}
+                className="rounded-card border border-primary-dark/[0.1] bg-white p-5 shadow-soft sm:p-6"
+              >
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-dark text-gold">
                   <Icon name={feature.icon} className="text-xl" />
                 </span>
@@ -252,8 +260,8 @@ function LandingPage() {
         </section>
 
         <section id="landing-goal" className="mt-16 scroll-mt-24 sm:mt-20">
-          <div className="surface overflow-hidden">
-            <div className="border-b border-primary-dark/[0.06] bg-cream/40 px-5 py-5 sm:px-8 sm:py-6">
+          <div className="overflow-hidden rounded-card border border-primary-dark/[0.1] bg-white shadow-soft">
+            <div className="border-b border-primary-dark/[0.08] bg-white px-5 py-5 sm:px-8 sm:py-6">
               <p className="font-sans text-xs font-normal uppercase tracking-[0.14em] text-gold">
                 First objective
               </p>

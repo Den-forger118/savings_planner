@@ -690,7 +690,7 @@
 }
 
 .auth-onboarding-art-stage {
-  min-height: min(42vh, 360px);
+  min-height: 9.5rem;
 }
 
 .auth-onboarding-art-glow {
@@ -705,29 +705,56 @@
 .auth-story-illustration--onboarding-fit {
   display: block;
   width: 100%;
-  max-width: 118%;
+  max-width: 92%;
   height: auto;
-  max-height: min(54vh, 480px);
-  margin-left: -4%;
+  max-height: 11.5rem;
+  margin-left: 0;
   object-fit: contain;
-  object-position: left center;
+  object-position: center center;
   background: transparent;
   /* Fade handled by chapter motion; keep base visible once mounted */
   opacity: 1;
   animation: none;
   filter:
-    drop-shadow(0 18px 40px rgba(10, 15, 26, 0.35))
-    drop-shadow(0 0 28px rgba(212, 177, 109, 0.12));
+    drop-shadow(0 12px 28px rgba(10, 15, 26, 0.32))
+    drop-shadow(0 0 20px rgba(212, 177, 109, 0.1));
 }
 
 .auth-story-illustration--onboarding-epilogue {
-  max-width: 142%;
-  max-height: min(68vh, 640px);
-  margin-left: -10%;
+  max-width: 100%;
+  max-height: 13rem;
+  margin-left: 0;
   object-position: center center;
   filter:
-    drop-shadow(0 20px 44px rgba(10, 15, 26, 0.4))
-    drop-shadow(0 0 36px rgba(212, 177, 109, 0.18));
+    drop-shadow(0 14px 32px rgba(10, 15, 26, 0.36))
+    drop-shadow(0 0 24px rgba(212, 177, 109, 0.14));
+}
+
+@media (min-width: 640px) {
+  .auth-onboarding-art-stage {
+    min-height: min(42vh, 360px);
+  }
+
+  .auth-story-illustration--onboarding,
+  .auth-story-illustration--onboarding-fit {
+    max-width: 118%;
+    max-height: min(54vh, 480px);
+    margin-left: -4%;
+    object-position: left center;
+    filter:
+      drop-shadow(0 18px 40px rgba(10, 15, 26, 0.35))
+      drop-shadow(0 0 28px rgba(212, 177, 109, 0.12));
+  }
+
+  .auth-story-illustration--onboarding-epilogue {
+    max-width: 142%;
+    max-height: min(68vh, 640px);
+    margin-left: -10%;
+    object-position: center center;
+    filter:
+      drop-shadow(0 20px 44px rgba(10, 15, 26, 0.4))
+      drop-shadow(0 0 36px rgba(212, 177, 109, 0.18));
+  }
 }
 
 @media (min-width: 1280px) {
@@ -742,7 +769,7 @@
   }
 }
 
-@media (max-height: 800px) {
+@media (min-width: 640px) and (max-height: 800px) {
   .auth-story-illustration--onboarding-fit {
     max-height: min(44vh, 380px);
   }
@@ -752,7 +779,7 @@
   }
 }
 
-@media (max-height: 700px) {
+@media (min-width: 640px) and (max-height: 700px) {
   .auth-story-illustration--onboarding-fit {
     max-height: min(38vh, 300px);
   }

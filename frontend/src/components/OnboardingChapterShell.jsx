@@ -119,17 +119,17 @@ function OnboardingChapterShell({
 
   return (
     <div className="relative min-h-screen w-full bg-primary-dark lg:grid lg:grid-cols-2">
-      <aside className="auth-story relative flex flex-col justify-between overflow-hidden px-8 py-10 text-cream sm:px-12 lg:min-h-screen lg:px-14 lg:py-12 xl:px-16">
+      <aside className="auth-story relative flex flex-col justify-between overflow-hidden px-5 py-7 text-cream sm:px-12 sm:py-10 lg:min-h-screen lg:px-14 lg:py-12 xl:px-16">
         <div className="auth-story-glow pointer-events-none absolute inset-0" aria-hidden="true" />
 
         <div className="relative z-10 shrink-0">
-          <p className="font-engraved text-3xl text-gold sm:text-4xl">QUANT</p>
-          <p className="mt-2 font-sans text-xs font-normal uppercase tracking-[0.16em] text-cream/45">
+          <p className="font-engraved text-[1.75rem] text-gold sm:text-4xl">QUANT</p>
+          <p className="mt-1.5 font-sans text-[10px] font-normal uppercase tracking-[0.16em] text-cream/45 sm:mt-2 sm:text-xs">
             Private Savings Intelligence
           </p>
         </div>
 
-        <div className="relative z-10 my-4 flex min-h-0 flex-1 flex-col lg:my-0">
+        <div className="relative z-10 my-3 flex min-h-0 flex-1 flex-col sm:my-4 lg:my-0">
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div
               key={stepId}
@@ -141,17 +141,17 @@ function OnboardingChapterShell({
               transition={transition}
               className="flex min-h-0 flex-1 flex-col"
             >
-              <p className="font-sans text-xs font-normal uppercase tracking-[0.16em] text-gold">
+              <p className="font-sans text-[10px] font-normal uppercase tracking-[0.16em] text-gold sm:text-xs">
                 Chapter {chapter.roman}
               </p>
-              <h1 className="mt-3 max-w-md font-serif text-3xl font-light leading-snug tracking-[-0.02em] text-cream sm:text-[2.35rem]">
+              <h1 className="mt-2 max-w-md font-serif text-[1.65rem] font-light leading-snug tracking-[-0.02em] text-cream sm:mt-3 sm:text-[2.35rem]">
                 {chapter.title}
               </h1>
-              <p className="mt-3 max-w-md font-sans text-[15px] font-light leading-relaxed text-cream/60">
+              <p className="mt-2 max-w-md font-sans text-sm font-light leading-relaxed text-cream/60 sm:mt-3 sm:text-[15px]">
                 {chapter.lede}
               </p>
 
-              <div className="auth-onboarding-art-stage relative mt-4 hidden min-h-0 flex-1 items-center sm:flex lg:mt-6">
+              <div className="auth-onboarding-art-stage relative mt-3 flex min-h-0 flex-1 items-center justify-center sm:mt-4 sm:justify-start lg:mt-6">
                 <div className="auth-onboarding-art-glow pointer-events-none absolute inset-0" aria-hidden="true" />
                 <ChapterArt
                   src={chapter.artSrc}
@@ -162,18 +162,18 @@ function OnboardingChapterShell({
           </AnimatePresence>
         </div>
 
-        <div className="relative z-10 shrink-0 space-y-3">
+        <div className="relative z-10 shrink-0 space-y-2.5 sm:space-y-3">
           <div className="flex items-center justify-between gap-4">
-            <p className="font-sans text-xs uppercase tracking-[0.14em] text-cream/45">
+            <p className="font-sans text-[10px] uppercase tracking-[0.14em] text-cream/45 sm:text-xs">
               Chapter {stepIndex + 1} of {totalSteps || 1}
             </p>
-            <p className="font-money text-xs text-cream/40">{Math.round(progress)}%</p>
+            <p className="font-money text-[10px] text-cream/40 sm:text-xs">{Math.round(progress)}%</p>
           </div>
           {ProgressBarComponent}
         </div>
       </aside>
 
-      <section className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-white px-5 py-10 sm:px-8 lg:min-h-screen lg:px-14 lg:py-14 xl:px-20">
+      <section className="flex min-h-0 flex-1 items-start justify-center overflow-hidden bg-white px-5 py-8 sm:items-center sm:px-8 sm:py-10 lg:min-h-screen lg:px-14 lg:py-14 xl:px-20">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={stepId}
