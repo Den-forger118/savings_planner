@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import ExpenseHistogram from './ExpenseHistogram';
 import GoalsLineGraph from './GoalsLineGraph';
-import RecentActivity from './RecentActivity';
+import CurrencyConverter from './CurrencyConverter';
 import { formatMoney } from '../utils/currency';
 import OdometerNumber from './OdometerNumber';
 import ProgressBar from './ProgressBar';
@@ -243,13 +243,7 @@ function Dashboard({
       {/* Activity + goals overview */}
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="min-w-0 lg:col-span-7">
-          <RecentActivity
-            userId={userId}
-            refreshKey={transactionRefresh}
-            onViewAll={onViewAllActivity}
-            currencyCode={currencyCode}
-            currencySymbol={currencySymbol}
-          />
+          <CurrencyConverter currencyCode={currencyCode} />
         </div>
 
         <div className="surface overflow-hidden lg:col-span-5">
