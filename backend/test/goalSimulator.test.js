@@ -26,6 +26,7 @@ test('deadline mode returns cadence from remaining time', async () => {
   assert.equal(result.ok, true);
   assert.equal(result.days, 30);
   assert.equal(result.cadence.daily, 40);
+  assert.equal(result.cadence.monthly, 0);
   assert.equal(result.cadence.yearly, 0);
 });
 

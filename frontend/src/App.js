@@ -210,6 +210,20 @@ function GoalPortfolioCard({
   const isExactlyOnTrack = surplusDeficit === 0;
   const isAhead = goal.is_surplus && surplusDeficit > 0;
   const isBehindSchedule = !isExactlyOnTrack && !isAhead;
+  const monthlyNeeded = parseAmount(goal.savings_needed?.monthly);
+  const annualNeeded = parseAmount(goal.savings_needed?.annual);
+  const dailyNeeded = parseAmount(goal.savings_needed?.daily);
+
+  // Prefer a cadence that still applies when the deadline is under a month / year
+  useEffect(() => {
+    if (selectedFrequency === 'Monthly' && monthlyNeeded <= 0 && dailyNeeded > 0) {
+      setSelectedFrequency('Weekly');
+      return;
+    }
+    if (selectedFrequency === 'Yearly' && annualNeeded <= 0 && dailyNeeded > 0) {
+      setSelectedFrequency(monthlyNeeded > 0 ? 'Monthly' : 'Weekly');
+    }
+  }, [selectedFrequency, monthlyNeeded, annualNeeded, dailyNeeded]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -423,6 +437,10 @@ function GoalPortfolioCard({
   const selectedFrequencyAmount = frequencyCells.find(
     ([label]) => label === selectedFrequency
   )?.[1];
+  const cadenceNotApplicable =
+    (selectedFrequency === 'Monthly' || selectedFrequency === 'Yearly')
+    && parseAmount(selectedFrequencyAmount) <= 0
+    && dailyNeeded > 0;
   const budgetShare = parseAmount(goal.allocation_percentage);
   const deadlineLabel = goal.deadline
     ? new Date(goal.deadline).toLocaleDateString(undefined, {
@@ -626,10 +644,14 @@ function GoalPortfolioCard({
                 {selectedFrequency} Savings Needed
               </p>
               <p className="font-money text-sm font-light text-primary-dark">
-                <OdometerNumber
-                  value={parseAmount(selectedFrequencyAmount)}
-                  prefix={user.currency_symbol || '$'}
-                />
+                {cadenceNotApplicable ? (
+                  '—'
+                ) : (
+                  <OdometerNumber
+                    value={parseAmount(selectedFrequencyAmount)}
+                    prefix={user.currency_symbol || '$'}
+                  />
+                )}
               </p>
             </div>
 
@@ -638,20 +660,33 @@ function GoalPortfolioCard({
               role="group"
               aria-label="Savings frequency"
             >
-              {frequencyCells.map(([label]) => {
+              {frequencyCells.map(([label, amount]) => {
                 const isSelected = selectedFrequency === label;
+                const unavailable =
+                  (label === 'Monthly' || label === 'Yearly')
+                  && parseAmount(amount) <= 0
+                  && dailyNeeded > 0;
 
                 return (
                   <button
                     key={label}
                     type="button"
                     aria-pressed={isSelected}
-                    disabled={isComplete || isPaused}
+                    disabled={isComplete || isPaused || unavailable}
                     onClick={() => setSelectedFrequency(label)}
+                    title={
+                      unavailable
+                        ? label === 'Monthly'
+                          ? 'Not shown — less than a month until the deadline'
+                          : 'Not shown — less than a year until the deadline'
+                        : undefined
+                    }
                     className={`px-1.5 py-1.5 font-sans text-[9px] font-normal uppercase tracking-[0.08em] transition-colors disabled:cursor-default ${
                       isSelected
                         ? 'bg-primary-dark text-cream'
-                        : 'bg-white text-taupe hover:bg-cream/70 hover:text-primary-dark'
+                        : unavailable
+                          ? 'bg-white text-taupe/40'
+                          : 'bg-white text-taupe hover:bg-cream/70 hover:text-primary-dark'
                     }`}
                   >
                     {label}

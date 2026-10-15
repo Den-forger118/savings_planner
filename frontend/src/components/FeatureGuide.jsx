@@ -257,7 +257,7 @@ const GUIDE_SECTIONS = [
         icon: 'schedule',
         badge: 'All modes',
         page: 'savings',
-        what: 'Daily, weekly, monthly, and yearly amounts needed to hit your deadline based on what is left to save.',
+        what: 'Daily, weekly, monthly, and yearly amounts needed to hit your deadline based on what is left to save. Monthly is omitted under a month left; yearly under a year.',
         why: 'Turns a large target into a saving rhythm you can act on.',
         where: 'On each goal card — the Daily / Weekly / Monthly / Yearly row.',
         who: 'Everyone. The Monthly Allocation panel on the card is Earner-only.',

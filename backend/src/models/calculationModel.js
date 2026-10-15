@@ -46,7 +46,7 @@ const calculateWeeklySavings = (remainingAmount, daysRemaining) => {
   return roundToTwo(toNumber(remainingAmount) / weeks);
 };
 
-// Calculate monthly savings needed
+// Calculate monthly savings needed (raw rate — may exceed remaining for short horizons)
 const calculateMonthlySavings = (remainingAmount, daysRemaining) => {
   const months = Math.max(daysRemaining, 1) / AVERAGE_DAYS_PER_MONTH;
   return roundToTwo(toNumber(remainingAmount) / months);
@@ -58,8 +58,22 @@ const calculateAnnualSavings = (remainingAmount, daysRemaining) => {
   return roundToTwo(toNumber(remainingAmount) / years);
 };
 
+// No monthly cadence when less than a month remains (same idea as yearly under a year).
+const resolveMonthlySavingsNeeded = (remainingAmount, daysRemaining) => {
+  if (daysRemaining < AVERAGE_DAYS_PER_MONTH) {
+    return 0;
+  }
+
+  return calculateMonthlySavings(remainingAmount, daysRemaining);
+};
+
+// No yearly cadence when less than a year remains until the deadline.
 const resolveAnnualSavingsNeeded = (remainingAmount, daysRemaining, daysTotal) => {
-  if (daysTotal < DAYS_IN_YEAR) {
+  const spanDays = Math.min(
+    Math.max(daysRemaining, 1),
+    Math.max(daysTotal != null ? daysTotal : daysRemaining, 1)
+  );
+  if (spanDays < DAYS_IN_YEAR) {
     return 0;
   }
 
@@ -309,9 +323,16 @@ const getNaturalFundNeedScores = (goals, currentDate = new Date()) => {
 // Get full breakdown for a goal
 const getGoalBreakdown = (goal, allocatedMonthlyAmount = 0, currentDate = new Date()) => {
   const timing = buildGoalTiming(goal, currentDate);
-  const monthlySavings = calculateMonthlySavings(timing.remainingAmount, timing.daysRemaining);
+  const monthlySavings = resolveMonthlySavingsNeeded(
+    timing.remainingAmount,
+    timing.daysRemaining
+  );
   const dailySavings = calculateDailySavings(timing.remainingAmount, timing.daysRemaining);
   const allocatedAmount = roundToTwo(allocatedMonthlyAmount);
+  // Under a month: feasibility means covering the full remainder this period.
+  const monthlyFeasibilityNeed = timing.daysRemaining < AVERAGE_DAYS_PER_MONTH
+    ? timing.remainingAmount
+    : monthlySavings;
   const expectedSaved = (timing.daysTotal > 0)
     ? (getDaysBetween(timing.created, timing.today) / timing.daysTotal) * timing.targetAmount
     : timing.targetAmount;
@@ -366,7 +387,7 @@ const getGoalBreakdown = (goal, allocatedMonthlyAmount = 0, currentDate = new Da
       ? parseFloat((Math.abs(surplusOrDeficit) / Math.max(timing.daysRemaining, 1)).toFixed(2))
       : 0,
     allocated_monthly_amount: allocatedAmount,
-    is_feasible: allocatedAmount >= monthlySavings,
+    is_feasible: allocatedAmount >= monthlyFeasibilityNeed,
   };
 };
 
@@ -377,6 +398,7 @@ module.exports = {
   calculateWeeklySavings,
   calculateMonthlySavings,
   calculateAnnualSavings,
+  resolveMonthlySavingsNeeded,
   resolveAnnualSavingsNeeded,
   isOnTrack,
   isActiveForAllocation,

@@ -150,6 +150,29 @@ test('yearly savings is zero for goals shorter than one year', () => {
   assert.ok(breakdown.savings_needed.daily > 0);
 });
 
+test('monthly savings is zero when less than a month remains', () => {
+  const goal = {
+    goal_id: 7,
+    user_id: 7,
+    name: 'Bill',
+    target_amount: 1800,
+    saved_amount: 0,
+    deadline: '2026-10-31',
+    created_at: '2026-10-15T00:00:00.000Z',
+  };
+
+  const breakdown = getGoalBreakdown(goal, 0, new Date('2026-10-15T00:00:00.000Z'));
+
+  assert.ok(breakdown.days_remaining < 30.44);
+  assert.equal(breakdown.savings_needed.monthly, 0);
+  assert.equal(breakdown.savings_needed.annual, 0);
+  assert.ok(breakdown.savings_needed.daily > 0);
+  assert.ok(breakdown.savings_needed.weekly > 0);
+  // Must cover the full remainder before the deadline this period
+  assert.equal(breakdown.is_feasible, false);
+  assert.equal(getGoalBreakdown(goal, 1800, new Date('2026-10-15T00:00:00.000Z')).is_feasible, true);
+});
+
 test('yearly savings is calculated for goals spanning at least one year', () => {
   const goal = {
     goal_id: 5,

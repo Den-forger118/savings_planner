@@ -56,7 +56,10 @@ export const cadenceFromDays = (remaining, days) => {
   return {
     daily: roundToTwo(leftover / safeDays),
     weekly: roundToTwo(leftover / (safeDays / 7)),
-    monthly: roundToTwo(leftover / (safeDays / AVERAGE_DAYS_PER_MONTH)),
+    monthly:
+      safeDays < AVERAGE_DAYS_PER_MONTH
+        ? 0
+        : roundToTwo(leftover / (safeDays / AVERAGE_DAYS_PER_MONTH)),
     yearly: safeDays < DAYS_IN_YEAR ? 0 : roundToTwo(leftover / (safeDays / DAYS_IN_YEAR)),
   };
 };
