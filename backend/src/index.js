@@ -21,9 +21,12 @@ const app = express();
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_WWW,
   'http://localhost:8080',
   'http://localhost:3000',
-].filter(Boolean);
+]
+  .filter(Boolean)
+  .map((origin) => origin.replace(/\/$/, ''));
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 

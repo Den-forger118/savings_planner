@@ -233,24 +233,52 @@ QUANT sends mail through Gmail SMTP with an **App Password** — the same free G
 
 Do **not** use your normal Gmail password. Railway / Vercel will reject or Google will block it.
 
-### 3. Add variables on Railway (backend)
+### 3. Railway backend + Postgres (restore checklist)
 
-In the **backend** service → **Variables**:
+Keep **frontend on Vercel** and **API + Postgres on Railway**.
+
+**A. Postgres service (Railway)**  
+- Add a PostgreSQL plugin/service in the same Railway project.  
+- Link it to the backend service so Railway injects `DATABASE_URL` (preferred).  
+- The API also still accepts manual `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` if you set those instead.
+
+**B. Backend service → Variables** (set these on the API service):
 
 ```env
+NODE_ENV=production
+PORT=5001
+JWT_SECRET=replace_with_a_long_random_secret
+JWT_EXPIRES_IN=24h
+FRONTEND_URL=https://your-app.vercel.app
+DATABASE_URL=${{Postgres.DATABASE_URL}}
 GMAIL_USER=you@gmail.com
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 MAIL_FROM=QUANT <you@gmail.com>
-FRONTEND_URL=https://your-app.vercel.app
+ADMIN_PROMOTE_EMAIL=you@example.com
 ```
 
-`FRONTEND_URL` must be your live Vercel URL (no trailing slash). Reset emails link to:
+Notes:
+- `FRONTEND_URL` = live Vercel URL, **no trailing slash** (CORS + reset-email links).
+- If you use a `www` Vercel domain too, also set `FRONTEND_URL_WWW=https://www.your-app.vercel.app`.
+- `DATABASE_URL` is normally auto-filled when Postgres is linked; do not invent host pieces if the URL is already there.
+- Start command / root: service root directory = `backend`, start = `npm start` (or Docker `backend/Dockerfile`).
+
+**C. Vercel frontend → Environment Variables**
+
+```env
+REACT_APP_API_URL=https://your-railway-api.up.railway.app/api
+```
+
+Redeploy **both** after saving. Reset emails link to:
 
 ```text
 https://your-app.vercel.app/reset-password?token=...
 ```
 
-Redeploy the backend after saving.
+**D. Smoke test**
+1. Open `https://your-railway-api.up.railway.app/` → should return `{ "message": "Savings Planner API is running!" }`
+2. Open the Vercel site → Register / Login
+3. If login fails in the browser console with CORS, `FRONTEND_URL` does not match the exact Vercel origin
 
 ### 4. Local Docker (optional)
 
