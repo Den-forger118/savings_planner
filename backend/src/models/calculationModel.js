@@ -1,7 +1,16 @@
 const AVERAGE_DAYS_PER_MONTH = 30.44;
 const DAYS_IN_YEAR = 365.25;
-const MAGNITUDE_WEIGHT = 0.5;
-const URGENCY_WEIGHT = 0.5;
+/** Target size share of the allocation score */
+const MAGNITUDE_WEIGHT = 0.4;
+/** Deadline urgency share of the allocation score */
+const URGENCY_WEIGHT = 0.4;
+/** Manual ledger priority share (lower priority number = higher intent) */
+const PRIORITY_WEIGHT = 0.2;
+
+const numericPriority = (goal) => {
+  const value = Number.parseInt(goal?.priority, 10);
+  return Number.isFinite(value) && value > 0 ? value : 1;
+};
 
 const toNumber = (value) => {
   const parsed = Number.parseFloat(value);
@@ -164,6 +173,7 @@ const calculateAutoAllocations = (goals, userMonthlyBudget, currentDate = new Da
       score: 0,
       weight_magnitude: 0,
       weight_urgency: 0,
+      weight_priority: 0,
       days_remaining: buildGoalTiming(goal, currentDate).daysRemaining,
     }));
   }
@@ -176,12 +186,14 @@ const calculateAutoAllocations = (goals, userMonthlyBudget, currentDate = new Da
       score: 0,
       weight_magnitude: 0,
       weight_urgency: 0,
+      weight_priority: 0,
       days_remaining: buildGoalTiming(goal, currentDate).daysRemaining,
     }));
   }
 
   const goalMetrics = activeGoals.map((goal) => {
     const timing = buildGoalTiming(goal, currentDate);
+    const priority = numericPriority(goal);
 
     return {
       ...goal,
@@ -190,26 +202,36 @@ const calculateAutoAllocations = (goals, userMonthlyBudget, currentDate = new Da
       saved_amount: timing.savedAmount,
       remaining_amount: timing.remainingAmount,
       urgencyReciprocal: 1 / Math.max(timing.daysRemaining, 1),
+      // Lower priority number (1st in folio) → higher reciprocal → larger share
+      priorityReciprocal: 1 / priority,
+      priority,
     };
   });
 
   const totalTargetAmount = goalMetrics.reduce((sum, goal) => sum + goal.target_amount, 0);
   const totalUrgencyReciprocal = goalMetrics.reduce((sum, goal) => sum + goal.urgencyReciprocal, 0);
+  const totalPriorityReciprocal = goalMetrics.reduce((sum, goal) => sum + goal.priorityReciprocal, 0);
 
   const goalsWithScores = goalMetrics.map((goal) => {
-    const equalMagnitudeWeight = 1 / goalMetrics.length;
+    const equalWeight = 1 / goalMetrics.length;
     const weightMagnitude = totalTargetAmount > 0
       ? goal.target_amount / totalTargetAmount
-      : equalMagnitudeWeight;
+      : equalWeight;
     const weightUrgency = totalUrgencyReciprocal > 0
       ? goal.urgencyReciprocal / totalUrgencyReciprocal
-      : equalMagnitudeWeight;
-    const score = (weightMagnitude * MAGNITUDE_WEIGHT) + (weightUrgency * URGENCY_WEIGHT);
+      : equalWeight;
+    const weightPriority = totalPriorityReciprocal > 0
+      ? goal.priorityReciprocal / totalPriorityReciprocal
+      : equalWeight;
+    const score = (weightMagnitude * MAGNITUDE_WEIGHT)
+      + (weightUrgency * URGENCY_WEIGHT)
+      + (weightPriority * PRIORITY_WEIGHT);
 
     return {
       ...goal,
       weight_magnitude: roundToTwo(weightMagnitude),
       weight_urgency: roundToTwo(weightUrgency),
+      weight_priority: roundToTwo(weightPriority),
       score: roundToTwo(score),
       rawScore: score,
     };
@@ -239,10 +261,49 @@ const calculateAutoAllocations = (goals, userMonthlyBudget, currentDate = new Da
     score: 0,
     weight_magnitude: 0,
     weight_urgency: 0,
+    weight_priority: 0,
     days_remaining: buildGoalTiming(goal, currentDate).daysRemaining,
   }));
 
   return [...activeAllocations, ...inactiveAllocations];
+};
+
+/**
+ * Fund-need score from target size + deadline only (no manual priority).
+ * Used to warn when a reorder fights what urgency/magnitude recommend.
+ */
+const getNaturalFundNeedScores = (goals, currentDate = new Date()) => {
+  const activeGoals = (Array.isArray(goals) ? goals : []).filter(isActiveForAllocation);
+  if (activeGoals.length === 0) {
+    return new Map();
+  }
+
+  const metrics = activeGoals.map((goal) => {
+    const timing = buildGoalTiming(goal, currentDate);
+    return {
+      goal_id: goal.goal_id,
+      target_amount: timing.targetAmount,
+      urgencyReciprocal: 1 / Math.max(timing.daysRemaining, 1),
+    };
+  });
+
+  const totalTargetAmount = metrics.reduce((sum, goal) => sum + goal.target_amount, 0);
+  const totalUrgencyReciprocal = metrics.reduce((sum, goal) => sum + goal.urgencyReciprocal, 0);
+  const equalWeight = 1 / metrics.length;
+  const scores = new Map();
+
+  metrics.forEach((goal) => {
+    const weightMagnitude = totalTargetAmount > 0
+      ? goal.target_amount / totalTargetAmount
+      : equalWeight;
+    const weightUrgency = totalUrgencyReciprocal > 0
+      ? goal.urgencyReciprocal / totalUrgencyReciprocal
+      : equalWeight;
+    // Equal blend of the two “math” factors only
+    scores.set(Number(goal.goal_id), (weightMagnitude * 0.5) + (weightUrgency * 0.5));
+  });
+
+  return scores;
 };
 
 // Get full breakdown for a goal
@@ -319,8 +380,13 @@ module.exports = {
   resolveAnnualSavingsNeeded,
   isOnTrack,
   isActiveForAllocation,
+  getNaturalFundNeedScores,
   calculateAutoAllocations,
   getGoalBreakdown,
   roundToTwo,
   DAYS_IN_YEAR,
+  AVERAGE_DAYS_PER_MONTH,
+  MAGNITUDE_WEIGHT,
+  URGENCY_WEIGHT,
+  PRIORITY_WEIGHT,
 };

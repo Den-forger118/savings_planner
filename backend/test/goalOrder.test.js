@@ -33,7 +33,7 @@ test('goalStatusRank treats complete above paused even if both flags were set', 
   assert.equal(goalStatusRank({ is_complete: false, is_paused: false }), 0);
 });
 
-test('manual priority does not change earner allocation shares', () => {
+test('manual priority gently shifts earner allocation shares', () => {
   const referenceDate = new Date('2025-04-30T00:00:00.000Z');
   const base = [
     {
@@ -58,18 +58,28 @@ test('manual priority does not change earner allocation shares', () => {
     },
   ];
 
+  // Promote the smaller/less-urgent goal to #1 — share should rise, but B still leads on need
   const flipped = [
-    { ...base[0], priority: 99 },
+    { ...base[0], priority: 1 },
+    { ...base[1], priority: 2 },
+  ];
+  const aFirst = [
+    { ...base[0], priority: 2 },
     { ...base[1], priority: 1 },
   ];
 
-  const original = calculateAutoAllocations(base, 500, referenceDate)
+  const withAFirst = calculateAutoAllocations(flipped, 500, referenceDate)
     .sort((a, b) => a.goal_id - b.goal_id);
-  const afterIntent = calculateAutoAllocations(flipped, 500, referenceDate)
+  const withBFirst = calculateAutoAllocations(aFirst, 500, referenceDate)
     .sort((a, b) => a.goal_id - b.goal_id);
 
-  assert.equal(original[0].allocated_monthly_amount, 133.17);
-  assert.equal(original[1].allocated_monthly_amount, 366.83);
-  assert.equal(afterIntent[0].allocated_monthly_amount, original[0].allocated_monthly_amount);
-  assert.equal(afterIntent[1].allocated_monthly_amount, original[1].allocated_monthly_amount);
+  assert.ok(withAFirst[0].allocated_monthly_amount > withBFirst[0].allocated_monthly_amount);
+  assert.ok(withAFirst[1].allocated_monthly_amount < withBFirst[1].allocated_monthly_amount);
+  // Deadline/target still dominate: urgent larger Goal B keeps the bigger share either way
+  assert.ok(withAFirst[1].allocated_monthly_amount > withAFirst[0].allocated_monthly_amount);
+  assert.ok(withBFirst[1].allocated_monthly_amount > withBFirst[0].allocated_monthly_amount);
+  assert.equal(
+    Number((withAFirst[0].allocated_monthly_amount + withAFirst[1].allocated_monthly_amount).toFixed(2)),
+    500
+  );
 });

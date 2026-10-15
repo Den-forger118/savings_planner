@@ -19,24 +19,43 @@ const { runMigrations } = require('./migrate');
 // app setup
 const app = express();
 
+const normalizeOrigin = (value) => String(value || '').trim().replace(/\/$/, '');
+
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_WWW,
+  ...(process.env.FRONTEND_URLS || '').split(','),
   'http://localhost:8080',
   'http://localhost:3000',
 ]
-  .filter(Boolean)
-  .map((origin) => origin.replace(/\/$/, ''));
+  .map(normalizeOrigin)
+  .filter(Boolean);
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
+const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || '').toLowerCase() === 'true';
+
+const isAllowedOrigin = (origin) => {
+  const normalized = normalizeOrigin(origin);
+  if (!normalized) return true;
+  if (allowedOrigins.includes(normalized)) return true;
+
+  // Vercel preview URLs change every deploy; optional allowlist for *.vercel.app
+  if (allowVercelPreviews && /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(normalized)) {
+    return true;
+  }
+
+  return false;
+};
 
 const corsOptions = {
   origin(origin, callback) {
-    if (isDevelopment || !origin || allowedOrigins.includes(origin)) {
+    if (isDevelopment || isAllowedOrigin(origin)) {
       return callback(null, true);
     }
 
-    return callback(new Error(`CORS origin not allowed: ${origin}`));
+    // Do not throw — a thrown error becomes HTTP 500 on preflight
+    console.warn(`[cors] Blocked origin: ${origin}`);
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

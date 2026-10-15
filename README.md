@@ -211,29 +211,49 @@ docker exec -it savings_planner_db psql -U postgres -d quant -c "UPDATE users SE
 
 Log out and log back in so your session picks up `is_admin: true`.
 
-## Email (Gmail App Password)
+## Email (Resend — recommended)
 
-QUANT sends mail through Gmail SMTP with an **App Password** — the same free Google approach used on FoodFusion. You need this for:
+QUANT sends mail with **[Resend](https://resend.com)** for:
 
 - A sign-in notice after a successful login
 - Password reset links from **Forgot password?**
 
-### 1. Turn on 2-Step Verification
+### 1. Create an API key in Resend
 
-1. Open [Google Account → Security](https://myaccount.google.com/security)
-2. Sign in with the Gmail you want QUANT to send from
-3. Enable **2-Step Verification** (required before App Passwords appear)
+1. Sign in at [resend.com](https://resend.com)
+2. Go to **API Keys** → **Create API Key**
+3. Name it e.g. `QUANT Railway` → copy the key (`re_...`)
 
-### 2. Create an App Password
+### 2. Choose a From address
 
-1. Open [App Passwords](https://myaccount.google.com/apppasswords)
-2. Choose **Mail** and a device name such as `QUANT`
-3. Google shows a **16-character password** (spaces are fine; they are ignored)
-4. Copy it. You will not see it again.
+**Quick test (no domain):** use Resend’s onboarding sender:
 
-Do **not** use your normal Gmail password. Railway / Vercel will reject or Google will block it.
+```env
+MAIL_FROM=QUANT <onboarding@resend.dev>
+```
 
-### 3. Railway backend + Postgres (restore checklist)
+On the free test sender, Resend usually only delivers to **the email you signed up with**.  
+**Production:** add and verify your domain in Resend → Domains, then use e.g. `QUANT <noreply@yourdomain.com>`.
+
+### 3. Railway backend variables (email)
+
+On the **Express** service → **Variables**:
+
+```env
+RESEND_API_KEY=re_xxxxxxxx
+MAIL_FROM=QUANT <onboarding@resend.dev>
+FRONTEND_URL=https://your-app.vercel.app
+```
+
+`FRONTEND_URL` must be your live Vercel URL (**no trailing slash**) so reset links work:
+
+```text
+https://your-app.vercel.app/reset-password?token=...
+```
+
+Redeploy the backend after saving. You can remove old `GMAIL_*` vars; Gmail remains an optional fallback only if Resend is unset.
+
+### 4. Railway backend + Postgres (restore checklist)
 
 Keep **frontend on Vercel** and **API + Postgres on Railway**.
 
@@ -251,15 +271,16 @@ JWT_SECRET=replace_with_a_long_random_secret
 JWT_EXPIRES_IN=24h
 FRONTEND_URL=https://your-app.vercel.app
 DATABASE_URL=${{Postgres.DATABASE_URL}}
-GMAIL_USER=you@gmail.com
-GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
-MAIL_FROM=QUANT <you@gmail.com>
+RESEND_API_KEY=re_xxxxxxxx
+MAIL_FROM=QUANT <onboarding@resend.dev>
 ADMIN_PROMOTE_EMAIL=you@example.com
 ```
 
 Notes:
 - `FRONTEND_URL` = live Vercel URL, **no trailing slash** (CORS + reset-email links).
 - If you use a `www` Vercel domain too, also set `FRONTEND_URL_WWW=https://www.your-app.vercel.app`.
+- Vercel preview URLs change every deploy. Either set `FRONTEND_URL` to the exact URL in the browser address bar, or add `ALLOW_VERCEL_PREVIEWS=true` so any `https://*.vercel.app` origin is allowed for CORS.
+- Optional: `FRONTEND_URLS=https://url1.vercel.app,https://url2.vercel.app` for extra exact origins.
 - `DATABASE_URL` is normally auto-filled when Postgres is linked; do not invent host pieces if the URL is already there.
 - Start command / root: service root directory = `backend`, start = `npm start` (or Docker `backend/Dockerfile`).
 
@@ -280,30 +301,44 @@ https://your-app.vercel.app/reset-password?token=...
 2. Open the Vercel site → Register / Login
 3. If login fails in the browser console with CORS, `FRONTEND_URL` does not match the exact Vercel origin
 
-### 4. Local Docker (optional)
+### 5. Local (Docker or `npm run dev`)
 
-Put the same values in `backend/.env` (already loaded by Compose):
+1. Copy the example env file and paste your Resend key:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Edit `backend/.env`:
 
 ```env
-GMAIL_USER=you@gmail.com
-GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+RESEND_API_KEY=re_your_real_key
+MAIL_FROM=QUANT <onboarding@resend.dev>
 FRONTEND_URL=http://localhost:8080
 ```
 
-Then restart:
+Use `FRONTEND_URL=http://localhost:3000` if you run the frontend with `npm start` instead of Docker on 8080.
+
+2. Restart the API:
 
 ```bash
+# Docker
 docker compose up -d --build backend
+
+# Or bare Node from /backend
+npm run dev
 ```
+
+3. Request a reset from the local login page. With `onboarding@resend.dev`, the inbox must be the **email on your Resend account**.
 
 ### How to test
 
-1. Sign in — you should get a **New QUANT sign-in** email
+1. Sign in — you should get a **New QUANT sign-in** email (to an allowed recipient)
 2. On the login page, click **Forgot password?** and submit your email
 3. Open the link (expires in 1 hour) and set a new password
 4. Sign in with the new password
 
-If mail is not configured, login still works; the server logs `Gmail is not configured` and skips the email. Reset requests still succeed on the UI (same generic message) so accounts cannot be enumerated.
+If mail is not configured, login still works; the server logs that no provider is set and skips the email. Reset requests still succeed on the UI (same generic message) so accounts cannot be enumerated.
 
 ### Admin API
 

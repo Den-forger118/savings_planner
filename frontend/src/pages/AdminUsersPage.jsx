@@ -1,10 +1,32 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../services/api';
 import { formatMoney } from '../utils/currency';
 import { getFriendlyError } from '../utils/friendlyError';
 import AdminUserDetail from './AdminUserDetail';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ErrorBanner from '../components/ErrorBanner';
+
+const MENU_WIDTH = 208; // w-52
+
+const getAnchoredMenuStyle = (anchorRect, menuHeight = 120) => {
+  if (!anchorRect) return null;
+
+  const gap = 6;
+  const viewportPadding = 8;
+  const openUpward = anchorRect.bottom + gap + menuHeight > window.innerHeight
+    && anchorRect.top > menuHeight + gap;
+
+  let left = anchorRect.right - MENU_WIDTH;
+  left = Math.min(left, window.innerWidth - MENU_WIDTH - viewportPadding);
+  left = Math.max(viewportPadding, left);
+
+  const top = openUpward
+    ? Math.max(viewportPadding, anchorRect.top - gap - menuHeight)
+    : Math.min(window.innerHeight - menuHeight - viewportPadding, anchorRect.bottom + gap);
+
+  return { position: 'fixed', top, left, width: MENU_WIDTH, zIndex: 80 };
+};
 
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
@@ -31,26 +53,52 @@ const ROLE_FILTERS = [
 
 function MemberActionsMenu({
   member,
+  open,
+  onOpenChange,
   statusUpdatingId,
   onView,
   onStatusChange,
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
   const isUpdating = statusUpdatingId === member.user_id;
   const isDeactivated = member.is_active === false;
+
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) {
+      setMenuStyle(null);
+      return undefined;
+    }
+
+    const updatePosition = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      const menuHeight = menuRef.current?.offsetHeight || 120;
+      setMenuStyle(getAnchoredMenuStyle(rect, menuHeight));
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
 
     const handlePointerDown = (event) => {
-      if (rootRef.current && !rootRef.current.contains(event.target)) {
-        setOpen(false);
+      const target = event.target;
+      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
       }
+      onOpenChange(false);
     };
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') onOpenChange(false);
     };
 
     document.addEventListener('mousedown', handlePointerDown);
@@ -59,11 +107,12 @@ function MemberActionsMenu({
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open]);
+  }, [open, onOpenChange]);
 
   return (
-    <div ref={rootRef} className="relative inline-flex justify-end">
+    <div className="inline-flex justify-end">
       <button
+        ref={buttonRef}
         type="button"
         aria-label={`Actions for ${member.full_name}`}
         aria-haspopup="menu"
@@ -71,58 +120,63 @@ function MemberActionsMenu({
         disabled={isUpdating}
         onClick={(event) => {
           event.stopPropagation();
-          setOpen((current) => !current);
+          onOpenChange(!open);
         }}
         className="inline-flex h-9 w-9 items-center justify-center border border-primary-dark/12 text-taupe transition-colors hover:border-gold/50 hover:bg-cream/60 hover:text-primary-dark disabled:opacity-50"
       >
         <Icon name="more_horiz" className="text-xl" />
       </button>
 
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-20 mt-1.5 flex min-w-max items-center gap-1 border border-primary-dark/10 bg-white p-1.5 shadow-lift"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={(event) => {
-              event.stopPropagation();
-              setOpen(false);
-              onView(member.user_id);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-primary-dark transition-colors hover:bg-cream"
-          >
-            <Icon name="visibility" className="text-base text-gold" />
-            View
-          </button>
-
-          {!member.is_admin && (
-            <button
-              type="button"
-              role="menuitem"
-              disabled={isUpdating}
-              onClick={(event) => {
-                event.stopPropagation();
-                setOpen(false);
-                onStatusChange(member, isDeactivated, event);
-              }}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-colors disabled:opacity-50 ${
-                isDeactivated
-                  ? 'text-primary-dark hover:bg-cream'
-                  : 'text-red-800 hover:bg-red-50'
-              }`}
+      {open
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              style={menuStyle || { position: 'fixed', top: -9999, left: -9999, width: MENU_WIDTH, zIndex: 80 }}
+              className="overflow-hidden rounded-md border border-primary-dark/10 bg-white py-1 shadow-lift"
+              onClick={(event) => event.stopPropagation()}
             >
-              <Icon
-                name={isDeactivated ? 'person_add' : 'person_off'}
-                className="text-base"
-              />
-              {isUpdating ? 'Saving…' : isDeactivated ? 'Reactivate' : 'Deactivate'}
-            </button>
-          )}
-        </div>
-      )}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenChange(false);
+                  onView(member.user_id);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left font-sans text-sm text-primary-dark transition-colors hover:bg-cream"
+              >
+                <Icon name="visibility" className="text-base text-gold" />
+                View profile
+              </button>
+
+              {!member.is_admin && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={isUpdating}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpenChange(false);
+                    onStatusChange(member, isDeactivated, event);
+                  }}
+                  className={`flex w-full items-center gap-2 px-3 py-2.5 text-left font-sans text-sm transition-colors disabled:opacity-50 ${
+                    isDeactivated
+                      ? 'text-primary-dark hover:bg-cream'
+                      : 'text-red-800 hover:bg-red-50'
+                  }`}
+                >
+                  <Icon
+                    name={isDeactivated ? 'person_add' : 'person_off'}
+                    className="text-base"
+                  />
+                  {isUpdating ? 'Saving…' : isDeactivated ? 'Reactivate' : 'Deactivate'}
+                </button>
+              )}
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
@@ -262,6 +316,7 @@ function AdminUsersPage() {
   const [statusUpdatingId, setStatusUpdatingId] = useState(null);
   const [statusError, setStatusError] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const [openActionsUserId, setOpenActionsUserId] = useState(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -451,7 +506,10 @@ function AdminUsersPage() {
                 <tr
                   key={member.user_id}
                   className={`cursor-pointer border-b border-cream/70 transition-colors hover:bg-cream/30 ${member.is_active === false ? 'opacity-70' : ''}`}
-                  onClick={() => setSelectedUserId(member.user_id)}
+                  onClick={() => {
+                    setOpenActionsUserId(null);
+                    setSelectedUserId(member.user_id);
+                  }}
                 >
                   <td className="px-4 py-3 font-sans text-sm text-primary-dark">
                     <div className="flex items-center gap-2">
@@ -496,6 +554,10 @@ function AdminUsersPage() {
                   <td className="px-4 py-3 text-right">
                     <MemberActionsMenu
                       member={member}
+                      open={openActionsUserId === member.user_id}
+                      onOpenChange={(nextOpen) => {
+                        setOpenActionsUserId(nextOpen ? member.user_id : null);
+                      }}
                       statusUpdatingId={statusUpdatingId}
                       onView={setSelectedUserId}
                       onStatusChange={handleStatusChange}

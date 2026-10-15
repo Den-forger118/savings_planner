@@ -1,5 +1,7 @@
 const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
+const RESEND_API_KEY = (process.env.RESEND_API_KEY || '').trim();
 const GMAIL_USER = (process.env.GMAIL_USER || process.env.EMAIL_USER || '').trim();
 const GMAIL_PASS = (
   process.env.GMAIL_APP_PASSWORD ||
@@ -7,19 +9,38 @@ const GMAIL_PASS = (
   process.env.EMAIL_PASS ||
   ''
 ).trim();
-const MAIL_FROM = (process.env.MAIL_FROM || GMAIL_USER || 'QUANT <noreply@quant>').trim();
+const MAIL_FROM = (
+  process.env.MAIL_FROM ||
+  (RESEND_API_KEY ? 'QUANT <onboarding@resend.dev>' : GMAIL_USER) ||
+  'QUANT <noreply@quant.app>'
+).trim();
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:8080').replace(/\/$/, '');
 
 let transporter = null;
+let resendClient = null;
 
-function isMailConfigured() {
+function isResendConfigured() {
+  return Boolean(RESEND_API_KEY);
+}
+
+function isGmailConfigured() {
   return Boolean(GMAIL_USER && GMAIL_PASS);
 }
 
-function getTransporter() {
-  if (!isMailConfigured()) {
-    return null;
+function isMailConfigured() {
+  return isResendConfigured() || isGmailConfigured();
+}
+
+function getResend() {
+  if (!isResendConfigured()) return null;
+  if (!resendClient) {
+    resendClient = new Resend(RESEND_API_KEY);
   }
+  return resendClient;
+}
+
+function getTransporter() {
+  if (!isGmailConfigured()) return null;
   if (!transporter) {
     transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -30,6 +51,10 @@ function getTransporter() {
     });
   }
   return transporter;
+}
+
+function formatFrom() {
+  return MAIL_FROM.includes('<') ? MAIL_FROM : `QUANT <${MAIL_FROM}>`;
 }
 
 function wrapHtml({ heading, body, buttonLabel, buttonHref }) {
@@ -73,22 +98,46 @@ function wrapHtml({ heading, body, buttonLabel, buttonHref }) {
 </html>`;
 }
 
-async function sendMail({ to, subject, heading, body, buttonLabel, buttonHref, text }) {
+async function sendViaResend({ to, subject, heading, body, buttonLabel, buttonHref, text }) {
+  const resend = getResend();
+  const { data, error } = await resend.emails.send({
+    from: formatFrom(),
+    to: [to],
+    subject,
+    text,
+    html: wrapHtml({ heading, body, buttonLabel, buttonHref }),
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Resend send failed');
+  }
+  return { sent: true, id: data?.id, provider: 'resend' };
+}
+
+async function sendViaGmail({ to, subject, heading, body, buttonLabel, buttonHref, text }) {
   const transport = getTransporter();
-  if (!transport) {
-    console.warn('[mailer] Gmail is not configured. Skipping email:', subject);
+  await transport.sendMail({
+    from: formatFrom(),
+    to,
+    subject,
+    text,
+    html: wrapHtml({ heading, body, buttonLabel, buttonHref }),
+  });
+  return { sent: true, provider: 'gmail' };
+}
+
+async function sendMail({ to, subject, heading, body, buttonLabel, buttonHref, text }) {
+  if (!isMailConfigured()) {
+    console.warn('[mailer] No email provider configured (set RESEND_API_KEY). Skipping:', subject);
     return { skipped: true };
   }
 
   try {
-    await transport.sendMail({
-      from: MAIL_FROM.includes('<') ? MAIL_FROM : `QUANT <${MAIL_FROM}>`,
-      to,
-      subject,
-      text,
-      html: wrapHtml({ heading, body, buttonLabel, buttonHref }),
-    });
-    return { sent: true };
+    // Prefer Resend when configured
+    if (isResendConfigured()) {
+      return await sendViaResend({ to, subject, heading, body, buttonLabel, buttonHref, text });
+    }
+    return await sendViaGmail({ to, subject, heading, body, buttonLabel, buttonHref, text });
   } catch (err) {
     console.error('[mailer] Failed to send email:', err.message);
     return { skipped: false, error: err.message };

@@ -128,13 +128,8 @@ const runMigrations = async () => {
       )
   `);
 
-  const promoteEmail = process.env.ADMIN_PROMOTE_EMAIL?.trim();
-  if (promoteEmail) {
-    await pool.query(
-      `UPDATE users SET is_admin = true WHERE LOWER(email) = LOWER($1)`,
-      [promoteEmail]
-    );
-  }
+  const { syncAdminPromoteOnStartup } = require('./utils/adminPromote');
+  await syncAdminPromoteOnStartup();
 };
 
 /**

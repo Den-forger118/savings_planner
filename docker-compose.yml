@@ -38,13 +38,13 @@ services:
       JWT_SECRET: your_super_secret_jwt_key_change_in_production
       JWT_EXPIRES_IN: 24h
       FRONTEND_URL: http://localhost:8080
-      ADMIN_PROMOTE_EMAIL: Securetester2@gmail.com
-      GMAIL_USER: ${GMAIL_USER:-}
-      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
+      # Set in backend/.env (env_file). Avoid empty ${VAR:-} overrides that wipe secrets.
+      ADMIN_PROMOTE_EMAIL: ${ADMIN_PROMOTE_EMAIL:-denzelamoako19@gmail.com}
     ports:
       - "5001:5001"
     env_file:
-      - ./backend/.env
+      - path: ./backend/.env
+        required: false
     depends_on:
       db:
         condition: service_healthy

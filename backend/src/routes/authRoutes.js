@@ -11,6 +11,7 @@ const {
   sendLoginNotice,
   sendPasswordResetEmail,
 } = require('../utils/mailer');
+const { syncAdminPromoteEmail } = require('../utils/adminPromote');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
@@ -85,7 +86,7 @@ router.post('/register', async (req, res) => {
       [first_name, last_name, email, password_hash]
     );
 
-    const user = result.rows[0];
+    let user = result.rows[0];
 
     // Create default categories for new user
     await pool.query(
@@ -99,6 +100,9 @@ router.post('/register', async (req, res) => {
        ($1, 'Other', '#4E4B46')`,
       [user.user_id]
     );
+
+    const promoted = await syncAdminPromoteEmail(user.email);
+    if (promoted) user = promoted;
 
     // Generate JWT token
     const token = jwt.sign(
@@ -198,6 +202,11 @@ router.post('/login', async (req, res) => {
     }
 
     await clearLoginLock(user.user_id);
+
+    const promoted = await syncAdminPromoteEmail(user.email);
+    if (promoted) {
+      user = promoted;
+    }
 
     const token = jwt.sign(
       { userId: user.user_id, email: user.email },

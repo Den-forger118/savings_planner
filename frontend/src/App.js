@@ -27,6 +27,7 @@ import ErrorBanner from './components/ErrorBanner';
 import OdometerNumber from './components/OdometerNumber';
 import { PATHS, pathForPageId } from './utils/paths';
 import { canMoveGoal, folioIndexInGroup, goalStatusRank, insertGoalAt, moveGoalInGroup, toRoman } from './utils/goalPriority';
+import { buildPriorityReorderWarning } from './utils/allocationAdvice';
 
 const GOALS_PER_PAGE = 12;
 const REORDER_HOLD_MS = 300;
@@ -995,6 +996,7 @@ function App() {
   const [transactionRefresh, setTransactionRefresh] = useState(0);
   const [goalsPage, setGoalsPage] = useState(1);
   const [reorderError, setReorderError] = useState(null);
+  const [priorityWarning, setPriorityWarning] = useState(null);
   const [draggingGoalId, setDraggingGoalId] = useState(null);
   const [dropTargetId, setDropTargetId] = useState(null);
   const pendingReorderRef = useRef(null);
@@ -1182,12 +1184,34 @@ function App() {
     }
   };
 
+  const requestGoalGroupOrder = (nextGoals, movedGoalId, rank) => {
+    if (nextGoals === goals) return;
+
+    const shouldAdvise = isEarnerMode && hasBudget && goalStatusRank(
+      goals.find((goal) => Number(goal.goal_id) === Number(movedGoalId)) || {}
+    ) === 0;
+
+    if (shouldAdvise) {
+      const warning = buildPriorityReorderWarning(goals, nextGoals, movedGoalId);
+      if (warning) {
+        setPriorityWarning({
+          ...warning,
+          nextGoals,
+          rank,
+        });
+        return;
+      }
+    }
+
+    persistGoalGroupOrder(nextGoals, rank);
+  };
+
   const handleMoveGoal = (goalId, direction) => {
     const nextGoals = moveGoalInGroup(goals, goalId, direction);
     if (nextGoals === goals) return;
     const current = goals.find((goal) => Number(goal.goal_id) === Number(goalId));
     if (!current) return;
-    persistGoalGroupOrder(nextGoals, goalStatusRank(current));
+    requestGoalGroupOrder(nextGoals, goalId, goalStatusRank(current));
   };
 
   const handleReorderDrop = (draggedId, targetId) => {
@@ -1196,7 +1220,7 @@ function App() {
     if (nextGoals === goals) return;
     const dragged = goals.find((goal) => Number(goal.goal_id) === Number(draggedId));
     if (!dragged) return;
-    persistGoalGroupOrder(nextGoals, goalStatusRank(dragged));
+    requestGoalGroupOrder(nextGoals, draggedId, goalStatusRank(dragged));
   };
 
   const clearPendingReorder = () => {
@@ -1749,6 +1773,23 @@ function App() {
           </p>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(priorityWarning)}
+        title={priorityWarning?.title || 'Priority may not match funding need'}
+        message={priorityWarning?.message || ''}
+        confirmLabel={priorityWarning?.confirmLabel || 'Change priority anyway'}
+        cancelLabel={priorityWarning?.cancelLabel || 'Keep current order'}
+        tone="warning"
+        onConfirm={() => {
+          const pending = priorityWarning;
+          setPriorityWarning(null);
+          if (pending?.nextGoals != null && pending?.rank != null) {
+            persistGoalGroupOrder(pending.nextGoals, pending.rank);
+          }
+        }}
+        onCancel={() => setPriorityWarning(null)}
+      />
 
       <main
         className={`relative z-10 min-w-0 px-4 pb-32 pt-20 transition-[margin] duration-300 ease-out-expo sm:px-5 lg:px-10 lg:pb-14 lg:pt-10 ${

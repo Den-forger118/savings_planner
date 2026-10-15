@@ -34,8 +34,9 @@ test('automatic allocation follows the weighted budget distribution example', ()
 
   assert.equal(allocations[0].days_remaining, 245);
   assert.equal(allocations[1].days_remaining, 61);
-  assert.equal(allocations[0].allocated_monthly_amount, 133.17);
-  assert.equal(allocations[1].allocated_monthly_amount, 366.83);
+  // 40% target + 40% urgency + 20% priority (equal default priorities)
+  assert.equal(allocations[0].allocated_monthly_amount, 156.54);
+  assert.equal(allocations[1].allocated_monthly_amount, 343.46);
   assert.equal(
     Number((allocations[0].allocated_monthly_amount + allocations[1].allocated_monthly_amount).toFixed(2)),
     500

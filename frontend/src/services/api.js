@@ -1,7 +1,16 @@
 import axios from 'axios';
 
+/** Ensure production API URLs are absolute (missing https:// makes the browser call Vercel + path). */
+const resolveApiBaseUrl = () => {
+  const raw = (process.env.REACT_APP_API_URL || 'http://localhost:5001/api').trim();
+  if (!raw) return 'http://localhost:5001/api';
+  if (/^https?:\/\//i.test(raw)) return raw.replace(/\/$/, '');
+  // Host-only values from bad Vercel env entries, e.g. myapi.up.railway.app/api
+  return `https://${raw.replace(/^\/+/, '').replace(/\/$/, '')}`;
+};
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001/api'
+  baseURL: resolveApiBaseUrl(),
 });
 
 api.interceptors.request.use(

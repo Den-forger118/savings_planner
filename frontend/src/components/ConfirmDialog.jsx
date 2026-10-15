@@ -19,8 +19,8 @@ const TONE_STYLES = {
  * @param {string} title
  * @param {string|React.ReactNode} message
  * @param {string} [confirmLabel='Confirm']
- * @param {string} [cancelLabel='Cancel'] — unused visually; cancel via close / backdrop
- * @param {boolean} [hideCancel=false] — single-button alert mode (same chrome either way)
+ * @param {string} [cancelLabel='Cancel']
+ * @param {boolean} [hideCancel=false] — single-button alert mode
  * @param {'default'|'warning'|'danger'} [tone='default']
  * @param {boolean} [loading=false]
  * @param {() => void} onConfirm
@@ -31,8 +31,8 @@ function ConfirmDialog({
   title,
   message,
   confirmLabel = 'Confirm',
-  cancelLabel: _cancelLabel = 'Cancel',
-  hideCancel: _hideCancel = false,
+  cancelLabel = 'Cancel',
+  hideCancel = false,
   tone = 'default',
   loading = false,
   onConfirm,
@@ -101,14 +101,26 @@ function ConfirmDialog({
             {typeof message === 'string' ? <p>{message}</p> : message}
           </div>
 
-          <button
-            type="button"
-            disabled={loading}
-            onClick={onConfirm}
-            className={confirmClass}
-          >
-            {loading ? 'Please wait…' : confirmLabel}
-          </button>
+          <div className="mt-5 flex flex-col gap-2">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={onConfirm}
+              className={confirmClass}
+            >
+              {loading ? 'Please wait…' : confirmLabel}
+            </button>
+            {!hideCancel ? (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={onCancel}
+                className="btn-ghost min-h-[44px] w-full"
+              >
+                {cancelLabel}
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>,

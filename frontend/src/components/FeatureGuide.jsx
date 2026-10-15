@@ -208,7 +208,7 @@ const GUIDE_SECTIONS = [
         badge: 'Savings Goals',
         page: 'savings',
         what: 'Set display order. First in the folio is highest intent. Order is saved per status group — active, on hold, then complete.',
-        why: 'Your most important goals should lead the ledger. Priority is visual order; earner allocation still balances magnitude and urgency.',
+        why: 'Your most important goals should lead the ledger. In Earner mode, priority also gently boosts that goal’s budget share, while deadline and target size still matter most. QUANT warns you if a move fights funding need — you can proceed anyway.',
         where: 'Savings Goals → Objective Ledger. Drag from the navy card heading, or use Move up / Move down in the ⋮ menu.',
         who: 'Anyone with more than one goal in a status group.',
         how: [
@@ -273,8 +273,8 @@ const GUIDE_SECTIONS = [
         icon: 'pie_chart',
         badge: 'Earner only',
         page: 'savings',
-        what: 'How much of your monthly budget is assigned to this goal and whether the plan is achievable or underfunded.',
-        why: 'Prevents over-committing and flags goals that need more time or money.',
+        what: 'How much of your monthly budget is assigned to this goal and whether the plan is achievable or underfunded. Shares blend target size, deadline urgency, and ledger priority.',
+        why: 'Prevents over-committing and shows how reordering priority nudges the split without ignoring deadlines.',
         where: 'Goal card → Monthly Allocation panel (Earner mode). Also on Dashboard under Monthly Allocation / Allocation Details.',
         who: 'Members in Earner mode with a monthly budget.',
         how: [
