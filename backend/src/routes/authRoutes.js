@@ -139,7 +139,7 @@ router.post('/login', async (req, res) => {
       [normalizedEmail]
     );
 
-    const user = result.rows[0];
+    let user = result.rows[0];
 
     // Same generic message whether or not the account exists
     if (!user) {
