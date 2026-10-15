@@ -32,14 +32,16 @@ const allowedOrigins = [
   .filter(Boolean);
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
-const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || '').toLowerCase() === 'true';
+// Preview URLs change every deploy. Default on; set ALLOW_VERCEL_PREVIEWS=false to disable.
+const allowVercelPreviews =
+  String(process.env.ALLOW_VERCEL_PREVIEWS || 'true').toLowerCase() !== 'false';
 
 const isAllowedOrigin = (origin) => {
   const normalized = normalizeOrigin(origin);
   if (!normalized) return true;
   if (allowedOrigins.includes(normalized)) return true;
 
-  // Vercel preview URLs change every deploy; optional allowlist for *.vercel.app
+  // Any https://*.vercel.app origin (production + preview deployments)
   if (allowVercelPreviews && /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(normalized)) {
     return true;
   }

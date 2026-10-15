@@ -141,6 +141,11 @@ export function getFriendlyError(error, fallback = 'Something didn’t go throug
     return 'We couldn’t find what you were looking for.';
   }
 
+  // Classic symptom of API calls hitting the Vercel frontend instead of Railway
+  if (status === 405) {
+    return 'We couldn’t reach the server correctly. Please refresh and try again.';
+  }
+
   if (raw && !isTechnical(raw)) {
     return raw;
   }

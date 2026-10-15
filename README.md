@@ -279,7 +279,8 @@ ADMIN_PROMOTE_EMAIL=you@example.com
 Notes:
 - `FRONTEND_URL` = live Vercel URL, **no trailing slash** (CORS + reset-email links).
 - If you use a `www` Vercel domain too, also set `FRONTEND_URL_WWW=https://www.your-app.vercel.app`.
-- Vercel preview URLs change every deploy. Either set `FRONTEND_URL` to the exact URL in the browser address bar, or add `ALLOW_VERCEL_PREVIEWS=true` so any `https://*.vercel.app` origin is allowed for CORS.
+- Vercel preview URLs change every deploy. The API allows `https://*.vercel.app` by default (`ALLOW_VERCEL_PREVIEWS=false` to turn that off).
+- Still set `FRONTEND_URL` to your main Vercel URL (no trailing slash) so password-reset emails link to the right place.
 - Optional: `FRONTEND_URLS=https://url1.vercel.app,https://url2.vercel.app` for extra exact origins.
 - `DATABASE_URL` is normally auto-filled when Postgres is linked; do not invent host pieces if the URL is already there.
 - Start command / root: service root directory = `backend`, start = `npm start` (or Docker `backend/Dockerfile`).
