@@ -107,6 +107,70 @@ const migrations = [
          WHERE t.goal_id = g.goal_id
        ), 0)
      )`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS email_notifications BOOLEAN DEFAULT true`,
+  `UPDATE users
+     SET email_notifications = true
+     WHERE email_notifications IS NULL`,
+  `ALTER TABLE users
+     ALTER COLUMN email_notifications SET DEFAULT true`,
+  `ALTER TABLE users
+     ALTER COLUMN email_notifications SET NOT NULL`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS reminder_frequency VARCHAR(20) DEFAULT 'daily'`,
+  `UPDATE users
+     SET reminder_frequency = 'daily'
+     WHERE reminder_frequency IS NULL`,
+  `ALTER TABLE users
+     ALTER COLUMN reminder_frequency SET DEFAULT 'daily'`,
+  `ALTER TABLE users
+     ALTER COLUMN reminder_frequency SET NOT NULL`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS reminder_time TIME DEFAULT '09:00'`,
+  `UPDATE users
+     SET reminder_time = '09:00'
+     WHERE reminder_time IS NULL`,
+  `ALTER TABLE users
+     ALTER COLUMN reminder_time SET DEFAULT '09:00'`,
+  `ALTER TABLE users
+     ALTER COLUMN reminder_time SET NOT NULL`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS timezone VARCHAR(64) DEFAULT 'UTC'`,
+  `UPDATE users
+     SET timezone = 'UTC'
+     WHERE timezone IS NULL OR timezone = ''`,
+  `ALTER TABLE users
+     ALTER COLUMN timezone SET DEFAULT 'UTC'`,
+  `ALTER TABLE users
+     ALTER COLUMN timezone SET NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS reminder_email_sends (
+     send_id SERIAL PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+     goal_id INTEGER REFERENCES saving_goals(goal_id) ON DELETE SET NULL,
+     kind VARCHAR(40) NOT NULL,
+     send_date DATE NOT NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_reminder_email_sends_unique
+     ON reminder_email_sends (user_id, kind, send_date, (COALESCE(goal_id, 0)))`,
+  `CREATE INDEX IF NOT EXISTS idx_reminder_email_sends_user
+     ON reminder_email_sends (user_id, send_date)`,
+  `CREATE TABLE IF NOT EXISTS payment_references (
+     reference_id SERIAL PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+     goal_id INTEGER NOT NULL REFERENCES saving_goals(goal_id) ON DELETE CASCADE,
+     paystack_ref VARCHAR(100) NOT NULL UNIQUE,
+     amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
+     currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+     status VARCHAR(20) NOT NULL DEFAULT 'pending',
+     transaction_id INTEGER REFERENCES transactions(transaction_id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+     completed_at TIMESTAMPTZ
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_payment_references_user
+     ON payment_references (user_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_payment_references_goal
+     ON payment_references (goal_id)`,
 ];
 
 const runMigrations = async () => {

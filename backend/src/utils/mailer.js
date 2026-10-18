@@ -144,6 +144,21 @@ async function sendMail({ to, subject, heading, body, buttonLabel, buttonHref, t
   }
 }
 
+function sendWelcomeEmail(user) {
+  const name = user.first_name || 'there';
+  return sendMail({
+    to: user.email,
+    subject: 'Welcome to QUANT',
+    heading: 'Welcome to QUANT',
+    text: `Hello ${name},\n\nYour QUANT ledger is ready. Set a goal, track deposits, and keep your plan on pace.\n\nOpen QUANT: ${FRONTEND_URL}\n\nIf you did not create this account, you can ignore this email.`,
+    body: `<p>Hello ${escapeHtml(name)},</p>
+      <p>Your QUANT ledger is ready. Create a goal, log what you save, and use reminders to stay accountable.</p>
+      <p>When you are ready, open the app and start with one clear objective.</p>`,
+    buttonLabel: 'Open QUANT',
+    buttonHref: FRONTEND_URL,
+  });
+}
+
 function sendLoginNotice(user) {
   const when = new Date().toLocaleString('en-GB', {
     day: 'numeric',
@@ -182,9 +197,59 @@ function sendPasswordResetEmail(user, resetUrl) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function sendReminderDigest(user, lines) {
+  const settingsUrl = `${FRONTEND_URL}/settings?tab=reminders`;
+  const safeLines = (Array.isArray(lines) ? lines : []).filter(Boolean);
+  if (safeLines.length === 0) {
+    return Promise.resolve({ skipped: true });
+  }
+
+  const textList = safeLines.map((line) => `• ${line}`).join('\n');
+  const htmlList = safeLines
+    .map((line) => `<li style="margin:0 0 10px;">${escapeHtml(line)}</li>`)
+    .join('');
+
+  return sendMail({
+    to: user.email,
+    subject: 'Your QUANT reminders',
+    heading: 'Ledger reminders',
+    text: `Hello ${user.first_name},\n\n${textList}\n\nOpen QUANT: ${FRONTEND_URL}\nManage reminders: ${settingsUrl}`,
+    body: `<p>Hello ${escapeHtml(user.first_name)},</p>
+      <ul style="padding-left:18px;margin:12px 0;color:#C9C2B5;">${htmlList}</ul>
+      <p style="font-size:12px;color:#8B8378;">You can change or turn off reminders in Settings.</p>`,
+    buttonLabel: 'Open QUANT',
+    buttonHref: FRONTEND_URL,
+  });
+}
+
+function sendGoalCompleteCelebration(user, goalName) {
+  const name = String(goalName || 'Your goal').trim() || 'Your goal';
+  return sendMail({
+    to: user.email,
+    subject: `${name} is fully funded!`,
+    heading: 'Goal complete',
+    text: `Hello ${user.first_name},\n\n${name} is fully funded. Well done.\n\nOpen QUANT: ${FRONTEND_URL}`,
+    body: `<p>Hello ${escapeHtml(user.first_name)},</p>
+      <p><strong style="color:#FDFBF7;">${escapeHtml(name)}</strong> is fully funded. Your remaining goals can recalibrate around what is left.</p>`,
+    buttonLabel: 'Open QUANT',
+    buttonHref: FRONTEND_URL,
+  });
+}
+
 module.exports = {
   FRONTEND_URL,
   isMailConfigured,
+  sendWelcomeEmail,
   sendLoginNotice,
   sendPasswordResetEmail,
+  sendReminderDigest,
+  sendGoalCompleteCelebration,
 };

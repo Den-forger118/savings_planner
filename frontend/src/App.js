@@ -12,6 +12,8 @@ import ConfirmDialog from './components/ConfirmDialog';
 import HoldGoalDialog from './components/HoldGoalDialog';
 import ExpenseSummary from './components/ExpenseSummary';
 import SettingsPage from './components/SettingsPage';
+import PaymentCallbackPage from './components/PaymentCallbackPage';
+import { openPaystackPopup } from './utils/paystackPopup';
 import OnboardingPage from './pages/OnboardingPage';
 import LandingPage from './pages/LandingPage';
 import AdminPage from './pages/AdminPage';
@@ -194,6 +196,8 @@ function GoalPortfolioCard({
   const [txNote, setTxNote] = useState('');
   const [txLoading, setTxLoading] = useState(false);
   const [txError, setTxError] = useState(null);
+  const [paystackConfig, setPaystackConfig] = useState(null);
+  const [paystackLoading, setPaystackLoading] = useState(false);
   const [pauseConfirmOpen, setPauseConfirmOpen] = useState(false);
   const [pauseLoading, setPauseLoading] = useState(false);
   const [statusAlert, setStatusAlert] = useState(null);
@@ -366,6 +370,86 @@ function GoalPortfolioCard({
   const openTransactionModal = () => {
     resetTransactionForm();
     setShowTransactionModal(true);
+    if (!paystackConfig) {
+      api.get('/payments/config')
+        .then((response) => setPaystackConfig(response.data))
+        .catch(() => setPaystackConfig({ enabled: false }));
+    }
+  };
+
+  const handlePaystackDeposit = async () => {
+    setTxError(null);
+
+    if (txType !== 'deposit') {
+      setTxError('Paystack is only available for deposits.');
+      return;
+    }
+
+    if (!txAmount || parseFloat(txAmount) < 1) {
+      setTxError('Enter at least 1.00 to pay with Paystack.');
+      return;
+    }
+
+    setPaystackLoading(true);
+    try {
+      const response = await api.post('/payments/initialize', {
+        goalId: goal.goal_id,
+        amount: parseFloat(txAmount),
+      });
+      const accessCode = response.data.access_code;
+      const reference = response.data.reference;
+      if (!accessCode) {
+        setTxError('Paystack did not return an access code for checkout.');
+        return;
+      }
+
+      // Popup stays on QUANT. Credit happens via /payments/verify (webhooks cannot reach localhost).
+      await openPaystackPopup({
+        accessCode,
+        onSuccess: async (transaction) => {
+          const ref = transaction?.reference || reference;
+          try {
+            const verified = await api.get(`/payments/verify/${encodeURIComponent(ref)}`);
+            if (verified.data?.status !== 'success') {
+              setPaystackLoading(false);
+              setTxError(
+                'Paystack took the payment, but QUANT is still confirming it. Open Activity in a minute or use the callback page.'
+              );
+              window.location.assign(
+                `${PATHS.paymentsCallback}?reference=${encodeURIComponent(ref)}`
+              );
+              return;
+            }
+
+            const goalsResponse = await api.get(`/goals?userId=${user.user_id}`);
+            closeTransactionModal();
+            window.requestAnimationFrame(() => {
+              setGoals(goalsResponse.data.goals || []);
+              onTransactionRecorded?.(verified.data);
+            });
+          } catch (err) {
+            setPaystackLoading(false);
+            setTxError(
+              getFriendlyError(
+                err,
+                'Payment may have succeeded on Paystack, but QUANT could not record it yet. Try the activity page shortly.'
+              )
+            );
+          }
+        },
+        onCancel: () => {
+          setPaystackLoading(false);
+          setTxError('Payment cancelled. No deposit was recorded.');
+        },
+        onError: (error) => {
+          setPaystackLoading(false);
+          setTxError(error?.message || 'Paystack checkout failed. Please try again.');
+        },
+      });
+    } catch (err) {
+      setTxError(getFriendlyError(err, 'We couldn’t start Paystack checkout. Please try again.'));
+      setPaystackLoading(false);
+    }
   };
 
   const requestPauseToggle = () => {
@@ -979,11 +1063,41 @@ function GoalPortfolioCard({
 
               <button
                 type="submit"
-                disabled={txLoading}
+                disabled={txLoading || paystackLoading}
                 className="modal-submit"
               >
-                {txLoading ? 'Recording…' : 'Confirm'}
+                {txLoading ? 'Recording…' : 'Confirm manual entry'}
               </button>
+
+              {txType === 'deposit'
+                && paystackConfig?.enabled
+                && String(user.currency || '').toUpperCase() === String(paystackConfig.currency || 'GHS').toUpperCase()
+                && !isComplete
+                && !isPaused && (
+                <button
+                  type="button"
+                  disabled={txLoading || paystackLoading}
+                  onClick={handlePaystackDeposit}
+                  className="mt-2 w-full rounded-lg border border-primary-dark/15 bg-cream/70 px-4 py-3 font-sans text-sm font-normal text-primary-dark transition-colors hover:bg-cream disabled:opacity-60"
+                >
+                  {paystackLoading
+                    ? 'Opening Paystack…'
+                    : `Pay with Paystack (${paystackConfig.currency || 'GHS'})`}
+                </button>
+              )}
+
+              {txType === 'deposit' && paystackConfig?.enabled
+                && String(user.currency || '').toUpperCase() !== String(paystackConfig.currency || 'GHS').toUpperCase() && (
+                <p className="mt-2 text-center font-sans text-xs text-taupe">
+                  Set display currency to {paystackConfig.currency || 'GHS'} in Settings to deposit via Paystack.
+                </p>
+              )}
+
+              {txType === 'deposit' && paystackConfig && !paystackConfig.enabled && (
+                <p className="mt-2 text-center font-sans text-xs text-taupe">
+                  Paystack checkout will appear here once API keys are configured on the server.
+                </p>
+              )}
             </form>
           </div>
         </div>,
@@ -1848,6 +1962,7 @@ function App() {
             <Route path={PATHS.activity} element={renderActivity()} />
             <Route path={PATHS.expenses} element={renderExpenses()} />
             <Route path={PATHS.settings} element={renderSettings()} />
+            <Route path={PATHS.paymentsCallback} element={<PaymentCallbackPage />} />
             {user.is_admin ? <Route path={PATHS.admin} element={<AdminPage />} /> : null}
             <Route path="/" element={<Navigate to={PATHS.dashboard} replace />} />
             <Route path="*" element={<Navigate to={PATHS.dashboard} replace />} />

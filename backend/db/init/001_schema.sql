@@ -18,6 +18,10 @@ CREATE TABLE IF NOT EXISTS users (
   ui_density VARCHAR(20) NOT NULL DEFAULT 'classic',
   fiscal_start_month INTEGER NOT NULL DEFAULT 1 CHECK (fiscal_start_month BETWEEN 1 AND 12),
   preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
+  email_notifications BOOLEAN NOT NULL DEFAULT true,
+  reminder_frequency VARCHAR(20) NOT NULL DEFAULT 'daily',
+  reminder_time TIME NOT NULL DEFAULT '09:00',
+  timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -98,3 +102,37 @@ ALTER TABLE saving_goals
 CREATE INDEX IF NOT EXISTS idx_saving_goals_deleted_at ON saving_goals(user_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
+
+CREATE TABLE IF NOT EXISTS reminder_email_sends (
+  send_id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  goal_id INTEGER REFERENCES saving_goals(goal_id) ON DELETE SET NULL,
+  kind VARCHAR(40) NOT NULL,
+  send_date DATE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reminder_email_sends_unique
+  ON reminder_email_sends (user_id, kind, send_date, (COALESCE(goal_id, 0)));
+
+CREATE INDEX IF NOT EXISTS idx_reminder_email_sends_user
+  ON reminder_email_sends (user_id, send_date);
+
+CREATE TABLE IF NOT EXISTS payment_references (
+  reference_id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  goal_id INTEGER NOT NULL REFERENCES saving_goals(goal_id) ON DELETE CASCADE,
+  paystack_ref VARCHAR(100) NOT NULL UNIQUE,
+  amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
+  currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  transaction_id INTEGER REFERENCES transactions(transaction_id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_references_user
+  ON payment_references (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_payment_references_goal
+  ON payment_references (goal_id);

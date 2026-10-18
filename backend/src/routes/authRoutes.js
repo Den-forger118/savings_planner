@@ -8,6 +8,7 @@ const { formatAuthUser } = require('../utils/authUser');
 const userModel = require('../models/userModel');
 const {
   FRONTEND_URL,
+  sendWelcomeEmail,
   sendLoginNotice,
   sendPasswordResetEmail,
 } = require('../utils/mailer');
@@ -110,6 +111,8 @@ router.post('/register', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
+
+    void sendWelcomeEmail(user);
 
     res.status(201).json({
       message: 'Account created successfully',

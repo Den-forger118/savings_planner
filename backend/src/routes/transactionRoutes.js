@@ -3,8 +3,12 @@ const router = express.Router();
 const transactionModel = require('../models/transactionModel');
 const goalModel = require('../models/goalModel');
 const calculationModel = require('../models/calculationModel');
+const userModel = require('../models/userModel');
+const reminderModel = require('../models/reminderModel');
 const { getUserBudgetContext, buildGoalResponse } = require('../utils/budgetContext');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
+const { sendGoalCompleteCelebration } = require('../utils/mailer');
+const { getLocalParts } = require('../utils/localTime');
 
 const buildUpdatedGoalResponse = async (goal) => {
   const budgetContext = await getUserBudgetContext(goal.user_id);
@@ -47,6 +51,28 @@ router.post('/', async (req, res) => {
     );
 
     const completedGoal = await transactionModel.checkAndMarkComplete(goalId);
+
+    if (completedGoal) {
+      void (async () => {
+        try {
+          const user = await userModel.getUserById(userId);
+          if (!user || user.email_notifications === false || user.is_active === false) {
+            return;
+          }
+          const local = getLocalParts(new Date(), user.timezone || 'UTC');
+          const claimed = await reminderModel.recordSend({
+            userId: user.user_id,
+            kind: 'celebration',
+            sendDate: local.dateStr,
+            goalId: completedGoal.goal_id,
+          });
+          if (!claimed) return;
+          await sendGoalCompleteCelebration(user, completedGoal.name);
+        } catch (err) {
+          console.error('[reminders] Celebration email failed:', err.message);
+        }
+      })();
+    }
 
     const updatedGoal = await goalModel.getGoalById(goalId);
     const goalWithCalculations = await buildUpdatedGoalResponse(updatedGoal);

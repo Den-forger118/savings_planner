@@ -19,7 +19,8 @@ const createUser = async (firstname, lastname, email, passwordHash) => {
 const USER_PUBLIC_FIELDS = `
   user_id, first_name, last_name, email, monthly_budget, monthly_income, is_earner,
   is_admin, is_active, currency, currency_symbol, theme, fiscal_start_month,
-  onboarding_complete, created_at
+  onboarding_complete, email_notifications, reminder_frequency, reminder_time,
+  timezone, created_at
 `;
 
 const getUserById = async (userId) => {
@@ -76,13 +77,64 @@ const updateEarnerMode = async (userId, isEarner) => {
   }
 };
 
+const ALLOWED_REMINDER_FREQUENCIES = new Set(['daily', 'weekly', 'off']);
+
+const normalizeReminderTime = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const match = String(value).trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) {
+    const error = new Error('reminder_time must be HH:MM');
+    error.statusCode = 400;
+    throw error;
+  }
+  const hour = Number.parseInt(match[1], 10);
+  const minute = Number.parseInt(match[2], 10);
+  if (hour > 23 || minute > 59) {
+    const error = new Error('reminder_time must be a valid time');
+    error.statusCode = 400;
+    throw error;
+  }
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+};
+
 const updatePreferences = async (userId, prefs) => {
   const {
     currency,
     currency_symbol: currencySymbol,
     theme,
     fiscal_start_month: fiscalStartMonth,
+    email_notifications: emailNotifications,
+    reminder_frequency: reminderFrequency,
+    reminder_time: reminderTime,
+    timezone,
   } = prefs;
+
+  let nextFrequency = null;
+  if (reminderFrequency !== undefined && reminderFrequency !== null && reminderFrequency !== '') {
+    const normalized = String(reminderFrequency).toLowerCase();
+    if (!ALLOWED_REMINDER_FREQUENCIES.has(normalized)) {
+      const error = new Error('reminder_frequency must be daily, weekly, or off');
+      error.statusCode = 400;
+      throw error;
+    }
+    nextFrequency = normalized;
+  }
+
+  const nextReminderTime = normalizeReminderTime(reminderTime);
+  const nextTimezone =
+    timezone !== undefined && timezone !== null && String(timezone).trim()
+      ? String(timezone).trim()
+      : null;
+
+  let nextEmailNotifications = null;
+  if (emailNotifications !== undefined && emailNotifications !== null && emailNotifications !== '') {
+    if (typeof emailNotifications !== 'boolean') {
+      const error = new Error('email_notifications must be a boolean');
+      error.statusCode = 400;
+      throw error;
+    }
+    nextEmailNotifications = emailNotifications;
+  }
 
   const query = `
     UPDATE users
@@ -90,7 +142,11 @@ const updatePreferences = async (userId, prefs) => {
       currency = COALESCE($2, currency),
       currency_symbol = COALESCE($3, currency_symbol),
       theme = COALESCE($4, theme),
-      fiscal_start_month = COALESCE($5, fiscal_start_month)
+      fiscal_start_month = COALESCE($5, fiscal_start_month),
+      email_notifications = COALESCE($6, email_notifications),
+      reminder_frequency = COALESCE($7, reminder_frequency),
+      reminder_time = COALESCE($8::time, reminder_time),
+      timezone = COALESCE($9, timezone)
     WHERE user_id = $1
     RETURNING ${USER_PUBLIC_FIELDS}
   `;
@@ -102,9 +158,14 @@ const updatePreferences = async (userId, prefs) => {
       currencySymbol || null,
       theme || null,
       fiscalStartMonth || null,
+      nextEmailNotifications,
+      nextFrequency,
+      nextReminderTime,
+      nextTimezone,
     ]);
     return result.rows[0];
   } catch (err) {
+    if (err.statusCode) throw err;
     throw new Error(`Error updating preferences: ${err.message}`);
   }
 };

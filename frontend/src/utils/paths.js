@@ -12,6 +12,7 @@ export const PATHS = {
   admin: '/admin',
   forgotPassword: '/forgot-password',
   resetPassword: '/reset-password',
+  paymentsCallback: '/payments/callback',
 };
 
 /** Map legacy page ids (nav / FeatureGuide) → paths */

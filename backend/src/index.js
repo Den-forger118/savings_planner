@@ -14,6 +14,9 @@ const adminRoutes = require('./routes/adminRoutes');
 const authMiddleware = require('./middleware/authMiddleware');
 const adminMiddleware = require('./middleware/adminMiddleware');
 const { runMigrations } = require('./migrate');
+const { startReminderCron, runReminderJob } = require('./jobs/reminderJob');
+const paymentRoutes = require('./routes/paymentRoutes');
+const { handlePaystackWebhook } = require('./routes/paymentRoutes');
 
 
 // app setup
@@ -68,6 +71,14 @@ const corsOptions = {
 // middleware
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
+
+// Paystack webhook needs the raw body for HMAC verification — mount before JSON parser
+app.post(
+  '/api/payments/webhook',
+  express.raw({ type: 'application/json' }),
+  handlePaystackWebhook
+);
+
 app.use(express.json());
 
 
@@ -100,9 +111,27 @@ app.use('/api/transactions', authMiddleware, transactionRoute);
 app.use('/api/expenses', authMiddleware, expenseRoutes);
 app.use('/api/reports', authMiddleware, reportRoutes);
 app.use('/api/admin', authMiddleware, adminMiddleware, adminRoutes);
+app.use('/api/payments', authMiddleware, paymentRoutes);
 
 //Public routes for authentication (no auth middleware)
 app.use('/api/auth', authRoutes);
+
+// Optional external cron trigger (Railway cron / cron-job.org)
+app.post('/api/internal/reminders/run', async (req, res) => {
+  const secret = (process.env.REMINDER_CRON_SECRET || '').trim();
+  if (!secret || req.get('x-reminder-secret') !== secret) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const result = await runReminderJob();
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('[reminders] Manual run failed:', err.message);
+    return res.status(500).json({ error: 'Reminder job failed' });
+  }
+});
+
 // health check route
 app.get('/', (request, response) => {
   response.json({'message': 'Savings Planner API is running!'});
@@ -113,5 +142,6 @@ app.get('/', (request, response) => {
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  startReminderCron();
 });
 

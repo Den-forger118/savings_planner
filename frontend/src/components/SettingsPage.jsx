@@ -23,12 +23,35 @@ const Icon = ({ name, className = '' }) => (
 const SETTINGS_TABS = [
   { id: 'profile', label: 'Profile', icon: 'person' },
   { id: 'financial', label: 'Financial', icon: 'account_balance' },
+  { id: 'reminders', label: 'Reminders', icon: 'notifications' },
   { id: 'simulator', label: 'Simulator', icon: 'query_stats' },
   { id: 'security', label: 'Security', icon: 'shield' },
   { id: 'data', label: 'Data', icon: 'database' },
   { id: 'trash', label: 'Trash', icon: 'delete' },
   { id: 'help', label: 'Help', icon: 'help' },
 ];
+
+const REMINDER_TIMEZONES = [
+  { value: 'Africa/Accra', label: 'Accra (GMT)' },
+  { value: 'Africa/Lagos', label: 'Lagos (WAT)' },
+  { value: 'Africa/Nairobi', label: 'Nairobi (EAT)' },
+  { value: 'Africa/Johannesburg', label: 'Johannesburg (SAST)' },
+  { value: 'Europe/London', label: 'London' },
+  { value: 'Europe/Paris', label: 'Paris' },
+  { value: 'America/New_York', label: 'New York' },
+  { value: 'America/Chicago', label: 'Chicago' },
+  { value: 'America/Los_Angeles', label: 'Los Angeles' },
+  { value: 'Asia/Dubai', label: 'Dubai' },
+  { value: 'Asia/Kolkata', label: 'India' },
+  { value: 'UTC', label: 'UTC' },
+];
+
+const REMINDER_HOURS = Array.from({ length: 24 }, (_, hour) => {
+  const value = `${String(hour).padStart(2, '0')}:00`;
+  const suffix = hour < 12 ? 'AM' : 'PM';
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return { value, label: `${displayHour}:00 ${suffix}` };
+});
 
 const getTokenExpiry = (token) => {
   if (!token) return null;
@@ -65,6 +88,14 @@ function SettingsPage({
   const [currency, setCurrency] = useState(user?.currency || 'USD');
   const [currencySymbol, setCurrencySymbol] = useState(user?.currency_symbol || '$');
   const [fiscalStartMonth, setFiscalStartMonth] = useState(user?.fiscal_start_month || 1);
+  const [emailNotifications, setEmailNotifications] = useState(
+    user?.email_notifications !== false
+  );
+  const [reminderFrequency, setReminderFrequency] = useState(
+    user?.reminder_frequency || 'daily'
+  );
+  const [reminderTime, setReminderTime] = useState(user?.reminder_time || '09:00');
+  const [timezone, setTimezone] = useState(user?.timezone || 'UTC');
 
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -88,7 +119,18 @@ function SettingsPage({
   useEffect(() => {
     setCurrency(user?.currency || 'USD');
     setCurrencySymbol(user?.currency_symbol || '$');
-  }, [user?.currency, user?.currency_symbol]);
+    setEmailNotifications(user?.email_notifications !== false);
+    setReminderFrequency(user?.reminder_frequency || 'daily');
+    setReminderTime(user?.reminder_time || '09:00');
+    setTimezone(user?.timezone || 'UTC');
+  }, [
+    user?.currency,
+    user?.currency_symbol,
+    user?.email_notifications,
+    user?.reminder_frequency,
+    user?.reminder_time,
+    user?.timezone,
+  ]);
 
   const tokenExpiry = useMemo(
     () => getTokenExpiry(localStorage.getItem('token')),
@@ -241,6 +283,24 @@ function SettingsPage({
       });
       onUserUpdate(response.data.user);
       flash('Preferences saved');
+    } catch (err) {
+      flash(err, true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveReminders = async () => {
+    setSaving(true);
+    try {
+      const response = await api.put(`/users/${user.user_id}/preferences`, {
+        email_notifications: emailNotifications,
+        reminder_frequency: reminderFrequency,
+        reminder_time: reminderTime,
+        timezone,
+      });
+      onUserUpdate(response.data.user);
+      flash('Reminder preferences saved');
     } catch (err) {
       flash(err, true);
     } finally {
@@ -536,6 +596,114 @@ function SettingsPage({
                 className="btn-navy min-h-[44px] disabled:opacity-60"
               >
                 {saving ? 'Saving…' : 'Save Preferences'}
+              </button>
+            </>
+          )}
+
+          {activeTab === 'reminders' && (
+            <>
+              <section className={panelClass}>
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Email reminders</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Nudges for daily targets, inactivity, deadlines, and goal completions.
+                  </p>
+                </div>
+                <div className="space-y-5 px-5 py-5">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 accent-primary-dark"
+                      checked={emailNotifications}
+                      onChange={(e) => setEmailNotifications(e.target.checked)}
+                    />
+                    <span>
+                      <span className="block font-sans text-[15px] font-light text-primary-dark">
+                        Send email notifications
+                      </span>
+                      <span className="mt-0.5 block font-sans text-xs text-taupe">
+                        Master switch for scheduled reminders and goal-complete emails.
+                      </span>
+                    </span>
+                  </label>
+
+                  <div className={`grid gap-4 sm:grid-cols-2 ${emailNotifications ? '' : 'opacity-50'}`}>
+                    <div>
+                      <label className="field-label" htmlFor="reminder-frequency">
+                        Cadence
+                      </label>
+                      <select
+                        id="reminder-frequency"
+                        className="field"
+                        disabled={!emailNotifications}
+                        value={reminderFrequency}
+                        onChange={(e) => setReminderFrequency(e.target.value)}
+                      >
+                        <option value="daily">Daily nudge</option>
+                        <option value="weekly">Weekly summary</option>
+                        <option value="off">Scheduled off (completions only)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="field-label" htmlFor="reminder-time">
+                        Preferred hour
+                      </label>
+                      <select
+                        id="reminder-time"
+                        className="field"
+                        disabled={!emailNotifications}
+                        value={reminderTime?.slice(0, 5) || '09:00'}
+                        onChange={(e) => setReminderTime(e.target.value)}
+                      >
+                        {REMINDER_HOURS.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="field-label" htmlFor="reminder-timezone">
+                        Timezone
+                      </label>
+                      <select
+                        id="reminder-timezone"
+                        className="field"
+                        disabled={!emailNotifications}
+                        value={
+                          REMINDER_TIMEZONES.some((item) => item.value === timezone)
+                            ? timezone
+                            : 'UTC'
+                        }
+                        onChange={(e) => setTimezone(e.target.value)}
+                      >
+                        {!REMINDER_TIMEZONES.some((item) => item.value === timezone) && (
+                          <option value={timezone}>{timezone}</option>
+                        )}
+                        {REMINDER_TIMEZONES.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-2 border-t border-primary-dark/[0.06] pt-4 font-sans text-sm text-taupe">
+                    <li>After 7 days with no deposit on a goal, you get an inactivity nudge.</li>
+                    <li>If you still have not deposited, reminders continue every 2 days, then weekly.</li>
+                    <li>Deadline and at-risk alerts still apply when a goal is close and behind.</li>
+                  </ul>
+                </div>
+              </section>
+
+              <button
+                type="button"
+                onClick={handleSaveReminders}
+                disabled={saving}
+                className="btn-navy min-h-[44px] disabled:opacity-60"
+              >
+                {saving ? 'Saving…' : 'Save Reminders'}
               </button>
             </>
           )}

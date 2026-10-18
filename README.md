@@ -347,6 +347,13 @@ If mail is not configured, login still works; the server logs that no provider i
 - `GET /api/admin/users/:userId` — read-only profile with goals, transactions, and expenses
 - Requires a valid JWT for an admin user
 
+## Paystack (goal deposits)
+
+**Option 1** (MoMo/card → specific goal via metadata + popup) is implemented.  
+**Option 2** (dedicated virtual account → wallet → allocate later) is deferred.
+
+Full architecture, env vars, webhook notes, and the Option 2 build checklist: **[docs/PAYSTACK.md](docs/PAYSTACK.md)**.
+
 ## Status
 
 In development.

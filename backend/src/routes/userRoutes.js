@@ -7,6 +7,7 @@ const calculationModel = require('../models/calculationModel');
 const transactionModel = require('../models/transactionModel');
 const expenseModel = require('../models/expenseModel');
 const { getUserBudgetContext } = require('../utils/budgetContext');
+const { formatAuthUser } = require('../utils/authUser');
 const pool = require('../dbcon');
 // Get user details by ID
 router.get('/:userId', async (req, res) => {
@@ -18,7 +19,7 @@ router.get('/:userId', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ user });
+    res.json({ user: formatAuthUser(user) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -178,9 +179,9 @@ router.put('/:userId/preferences', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ message: 'Preferences updated', user });
+    res.json({ message: 'Preferences updated', user: formatAuthUser(user) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
 
