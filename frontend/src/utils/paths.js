@@ -9,6 +9,7 @@ export const PATHS = {
   expenses: '/expenses',
   activity: '/activity',
   settings: '/settings',
+  coach: '/coach',
   admin: '/admin',
   forgotPassword: '/forgot-password',
   resetPassword: '/reset-password',
@@ -22,6 +23,7 @@ export const PAGE_ID_TO_PATH = {
   simulator: `${PATHS.settings}?tab=simulator`,
   expenses: PATHS.expenses,
   activity: PATHS.activity,
+  coach: PATHS.coach,
   settings: PATHS.settings,
   admin: PATHS.admin,
 };
@@ -36,6 +38,7 @@ export const NAV_ORDER = [
   PATHS.savings,
   PATHS.expenses,
   PATHS.activity,
+  PATHS.coach,
   PATHS.settings,
   PATHS.admin,
 ];

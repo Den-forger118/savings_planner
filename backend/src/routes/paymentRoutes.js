@@ -8,10 +8,13 @@ const {
   isPaystackConfigured,
   getPaystackPublicKey,
   getPaystackCurrency,
+  getPaystackLedgerCurrencies,
+  isPaystackLedgerCurrency,
   initializeTransaction,
   verifyTransaction,
   verifyWebhookSignature,
 } = require('../utils/paystack');
+const { convertAmount } = require('../utils/fxConvert');
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:8080').replace(/\/$/, '');
 
@@ -22,12 +25,55 @@ function buildReference(userId, goalId) {
   return `quant_${userId}_${goalId}_${Date.now()}_${suffix}`;
 }
 
+/**
+ * Resolve what Paystack should charge vs what QUANT credits on the goal.
+ * GH businesses settle in GHS: USD/EUR/GBP amounts are converted for the charge only.
+ */
+async function resolvePaystackCharge(ledgerAmount, ledgerCurrency) {
+  const settlement = getPaystackCurrency();
+  const from = String(ledgerCurrency || settlement).toUpperCase();
+  const amount = Number(Number.parseFloat(ledgerAmount).toFixed(2));
+
+  if (from === settlement) {
+    return {
+      ledgerAmount: amount,
+      ledgerCurrency: from,
+      chargeAmount: amount,
+      chargeCurrency: settlement,
+      fxRate: 1,
+      fxSource: 'identity',
+    };
+  }
+
+  const converted = await convertAmount(amount, from, settlement);
+  const chargeAmount = converted.result;
+  if (!Number.isFinite(chargeAmount) || chargeAmount < 1) {
+    const error = new Error(
+      `Converted charge is too small (${settlement} ${chargeAmount}). Try a larger amount.`
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    ledgerAmount: amount,
+    ledgerCurrency: from,
+    chargeAmount,
+    chargeCurrency: settlement,
+    fxRate: converted.rate,
+    fxSource: converted.source,
+  };
+}
+
 /** Public config for the frontend (no secret). */
 router.get('/config', (req, res) => {
+  const supportedCurrencies = getPaystackLedgerCurrencies();
   res.json({
     enabled: isPaystackConfigured(),
     publicKey: isPaystackConfigured() ? getPaystackPublicKey() : null,
     currency: getPaystackCurrency(),
+    settlementCurrency: getPaystackCurrency(),
+    supportedCurrencies,
   });
 });
 
@@ -47,7 +93,6 @@ router.post('/initialize', async (req, res) => {
     const userId = req.user.userId;
     const goalId = Number.parseInt(req.body?.goalId, 10);
     const amount = Number.parseFloat(req.body?.amount);
-    const currency = getPaystackCurrency();
 
     if (!Number.isFinite(goalId) || goalId < 1) {
       return res.status(400).json({ error: 'A valid goalId is required' });
@@ -63,12 +108,23 @@ router.post('/initialize', async (req, res) => {
     }
 
     const userCurrency = String(user.currency || 'USD').toUpperCase();
-    if (userCurrency !== currency) {
+    if (!isPaystackLedgerCurrency(userCurrency)) {
       return res.status(400).json({
-        error: `Paystack deposits use ${currency}. Set your display currency to ${currency} in Settings first.`,
-        code: 'CURRENCY_MISMATCH',
-        paystack_currency: currency,
+        error: `Paystack deposits support ${getPaystackLedgerCurrencies().join(', ')}. Switch display currency in Settings.`,
+        code: 'CURRENCY_UNSUPPORTED',
+        supported_currencies: getPaystackLedgerCurrencies(),
         user_currency: userCurrency,
+      });
+    }
+
+    let chargePlan;
+    try {
+      chargePlan = await resolvePaystackCharge(amount, userCurrency);
+    } catch (fxErr) {
+      console.error('[payments] FX convert failed:', fxErr.message);
+      return res.status(502).json({
+        error: `Could not convert ${userCurrency} to ${getPaystackCurrency()} for checkout. Try again shortly.`,
+        code: 'FX_FAILED',
       });
     }
 
@@ -88,18 +144,19 @@ router.post('/initialize', async (req, res) => {
     const reference = buildReference(userId, goalId);
     const callbackUrl = `${FRONTEND_URL}/payments/callback`;
 
+    // Ledger credits display-currency amount; Paystack charges settlement currency.
     await paymentModel.createPendingPayment({
       userId,
       goalId,
       paystackRef: reference,
-      amount: Number(amount.toFixed(2)),
-      currency,
+      amount: chargePlan.ledgerAmount,
+      currency: chargePlan.ledgerCurrency,
     });
 
     const data = await initializeTransaction({
       email: user.email,
-      amount: Number(amount.toFixed(2)),
-      currency,
+      amount: chargePlan.chargeAmount,
+      currency: chargePlan.chargeCurrency,
       reference,
       callbackUrl,
       metadata: {
@@ -107,6 +164,11 @@ router.post('/initialize', async (req, res) => {
         goal_id: String(goalId),
         goal_name: goal.name,
         transaction_type: 'goal_deposit',
+        ledger_amount: String(chargePlan.ledgerAmount),
+        ledger_currency: chargePlan.ledgerCurrency,
+        charge_amount: String(chargePlan.chargeAmount),
+        charge_currency: chargePlan.chargeCurrency,
+        fx_rate: String(chargePlan.fxRate),
         custom_fields: [
           {
             display_name: 'Goal',
@@ -123,8 +185,11 @@ router.post('/initialize', async (req, res) => {
       authorization_url: data.authorization_url,
       access_code: data.access_code,
       publicKey: getPaystackPublicKey(),
-      amount: Number(amount.toFixed(2)),
-      currency,
+      amount: chargePlan.ledgerAmount,
+      currency: chargePlan.ledgerCurrency,
+      charge_amount: chargePlan.chargeAmount,
+      charge_currency: chargePlan.chargeCurrency,
+      fx_rate: chargePlan.fxRate,
     });
   } catch (err) {
     console.error('[payments] Initialize failed:', err.message);

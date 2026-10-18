@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import { getFriendlyError } from '../utils/friendlyError';
 import ErrorBanner from './ErrorBanner';
+import { clearPendingGoal, getPendingGoal } from '../utils/pendingGoal';
 
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
@@ -25,6 +26,18 @@ function CreateGoalForm({
   const [formData, setFormData] = useState(initialFormState);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const pending = getPendingGoal();
+    if (!pending) return;
+    setFormData({
+      name: pending.name || '',
+      targetAmount: pending.targetAmount || '',
+      deadline: pending.deadline || '',
+    });
+    setIsOpen(true);
+    clearPendingGoal();
+  }, []);
 
   const closeModal = useCallback(() => {
     setIsOpen(false);

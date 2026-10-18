@@ -100,7 +100,16 @@ async function applySuccessfulPayment({
 
   payment = claimed;
 
-  if (Number(payment.amount) !== amount) {
+  // Pending amount is ledger (display) currency; webhook amount is settlement (e.g. GHS).
+  // Only warn when currencies match and values diverge.
+  const pendingCurrency = String(payment.currency || '').toUpperCase();
+  const webhookCurrency = String(currency || '').toUpperCase();
+  if (
+    pendingCurrency
+    && webhookCurrency
+    && pendingCurrency === webhookCurrency
+    && Number(payment.amount) !== amount
+  ) {
     console.warn(
       `[payments] Amount mismatch for ${reference}: pending=${payment.amount} webhook=${amount}`
     );

@@ -13,6 +13,7 @@ import HoldGoalDialog from './components/HoldGoalDialog';
 import ExpenseSummary from './components/ExpenseSummary';
 import SettingsPage from './components/SettingsPage';
 import PaymentCallbackPage from './components/PaymentCallbackPage';
+import CoachPage from './components/CoachPage';
 import { openPaystackPopup } from './utils/paystackPopup';
 import OnboardingPage from './pages/OnboardingPage';
 import LandingPage from './pages/LandingPage';
@@ -1071,7 +1072,9 @@ function GoalPortfolioCard({
 
               {txType === 'deposit'
                 && paystackConfig?.enabled
-                && String(user.currency || '').toUpperCase() === String(paystackConfig.currency || 'GHS').toUpperCase()
+                && (paystackConfig.supportedCurrencies || [paystackConfig.currency || 'GHS'])
+                  .map((code) => String(code).toUpperCase())
+                  .includes(String(user.currency || '').toUpperCase())
                 && !isComplete
                 && !isPaused && (
                 <button
@@ -1082,14 +1085,20 @@ function GoalPortfolioCard({
                 >
                   {paystackLoading
                     ? 'Opening Paystack…'
-                    : `Pay with Paystack (${paystackConfig.currency || 'GHS'})`}
+                    : String(user.currency || '').toUpperCase()
+                        === String(paystackConfig.settlementCurrency || paystackConfig.currency || 'GHS').toUpperCase()
+                      ? `Pay with Paystack (${user.currency})`
+                      : `Pay with Paystack (${user.currency} → ${paystackConfig.settlementCurrency || paystackConfig.currency || 'GHS'})`}
                 </button>
               )}
 
               {txType === 'deposit' && paystackConfig?.enabled
-                && String(user.currency || '').toUpperCase() !== String(paystackConfig.currency || 'GHS').toUpperCase() && (
+                && !(paystackConfig.supportedCurrencies || [paystackConfig.currency || 'GHS'])
+                  .map((code) => String(code).toUpperCase())
+                  .includes(String(user.currency || '').toUpperCase()) && (
                 <p className="mt-2 text-center font-sans text-xs text-taupe">
-                  Set display currency to {paystackConfig.currency || 'GHS'} in Settings to deposit via Paystack.
+                  Paystack supports {(paystackConfig.supportedCurrencies || ['GHS']).join(', ')}.
+                  Switch display currency in Settings to use checkout.
                 </p>
               )}
 
@@ -1593,6 +1602,7 @@ function App() {
     { id: 'savings', label: 'Savings Goals', icon: 'payments' },
     { id: 'expenses', label: 'Expense Tracker', icon: 'receipt_long' },
     { id: 'activity', label: 'Activity', icon: 'history' },
+    { id: 'coach', label: 'Coach', icon: 'psychology' },
     { id: 'settings', label: 'Settings', icon: 'settings' },
     ...(user.is_admin ? [{ id: 'admin', label: 'Admin', icon: 'admin_panel_settings' }] : []),
   ];
@@ -1602,6 +1612,7 @@ function App() {
     { id: 'savings', label: 'Goals', icon: 'payments' },
     { id: 'expenses', label: 'Spend', icon: 'receipt_long' },
     { id: 'activity', label: 'Activity', icon: 'history' },
+    { id: 'coach', label: 'Coach', icon: 'psychology' },
     { id: 'settings', label: 'Settings', icon: 'settings' },
     ...(user.is_admin ? [{ id: 'admin', label: 'Admin', icon: 'admin_panel_settings' }] : []),
   ];
@@ -1961,6 +1972,7 @@ function App() {
             />
             <Route path={PATHS.activity} element={renderActivity()} />
             <Route path={PATHS.expenses} element={renderExpenses()} />
+            <Route path={PATHS.coach} element={<CoachPage user={user} />} />
             <Route path={PATHS.settings} element={renderSettings()} />
             <Route path={PATHS.paymentsCallback} element={<PaymentCallbackPage />} />
             {user.is_admin ? <Route path={PATHS.admin} element={<AdminPage />} /> : null}
@@ -1970,7 +1982,7 @@ function App() {
         </Routes>
       </main>
 
-      <nav className={`fixed inset-x-0 bottom-0 z-50 grid ${user.is_admin ? 'grid-cols-6' : 'grid-cols-5'} border-t border-primary-dark/10 bg-ivory/90 px-1 py-2 shadow-lift backdrop-blur-md lg:hidden`}>
+      <nav className={`fixed inset-x-0 bottom-0 z-50 grid ${user.is_admin ? 'grid-cols-7' : 'grid-cols-6'} border-t border-primary-dark/10 bg-ivory/90 px-1 py-2 shadow-lift backdrop-blur-md lg:hidden`}>
         {mobileNavItems.map(item => (
           <NavLink
             key={`bottom-${item.label}`}

@@ -1,6 +1,12 @@
 const PAYSTACK_SECRET_KEY = (process.env.PAYSTACK_SECRET_KEY || '').trim();
 const PAYSTACK_PUBLIC_KEY = (process.env.PAYSTACK_PUBLIC_KEY || '').trim();
+/** Settlement / charge currency for this Paystack business (usually GHS or NGN). */
 const PAYSTACK_CURRENCY = (process.env.PAYSTACK_CURRENCY || 'GHS').trim().toUpperCase();
+/**
+ * Ledger currencies allowed to pay via Paystack.
+ * Non-settlement currencies are FX-converted for the charge; the goal is credited in display currency.
+ */
+const DEFAULT_LEDGER_CURRENCIES = 'GHS,USD,EUR,GBP,NGN';
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 
 function isPaystackConfigured() {
@@ -13,6 +19,21 @@ function getPaystackPublicKey() {
 
 function getPaystackCurrency() {
   return PAYSTACK_CURRENCY || 'GHS';
+}
+
+function getPaystackLedgerCurrencies() {
+  const raw = (process.env.PAYSTACK_LEDGER_CURRENCIES || DEFAULT_LEDGER_CURRENCIES).trim();
+  const list = raw
+    .split(',')
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
+  const settlement = getPaystackCurrency();
+  if (!list.includes(settlement)) list.unshift(settlement);
+  return [...new Set(list)];
+}
+
+function isPaystackLedgerCurrency(code) {
+  return getPaystackLedgerCurrencies().includes(String(code || '').toUpperCase());
 }
 
 async function paystackRequest(path, { method = 'GET', body } = {}) {
@@ -92,6 +113,8 @@ module.exports = {
   isPaystackConfigured,
   getPaystackPublicKey,
   getPaystackCurrency,
+  getPaystackLedgerCurrencies,
+  isPaystackLedgerCurrency,
   initializeTransaction,
   verifyTransaction,
   verifyWebhookSignature,

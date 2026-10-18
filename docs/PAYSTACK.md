@@ -81,7 +81,8 @@ Paystack dashboard:
 
 - **Local:** Paystack webhooks cannot reach `localhost`. Credit relies on **verify after popup**. That is enough for Option 1 testing.
 - **Production:** Set the same keys on Railway; webhook URL must include `/api/payments/webhook`. Verify + webhook both OK; `payment_references.paystack_ref` UNIQUE prevents double credit.
-- Display currency must match `PAYSTACK_CURRENCY` (default GHS) or initialize is rejected.
+- Display currencies **GHS, USD, EUR, GBP, NGN** can use Paystack (configurable via `PAYSTACK_LEDGER_CURRENCIES`).
+- Paystack still charges in `PAYSTACK_CURRENCY` (default **GHS** for Ghana). USD/EUR/GBP amounts are FX-converted for checkout; the goal is credited in the user’s display currency.
 
 ### Important rules (keep when extending)
 

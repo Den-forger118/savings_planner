@@ -360,6 +360,10 @@ QUANT is not a full installable PWA yet (stub manifest only). Web push rides on 
 
 Plan, VAPID keys, iOS notes, and remaining PWA polish: **[docs/PWA_PUSH.md](docs/PWA_PUSH.md)**.
 
+## AI (Coach)
+
+Skip list, what to build first, and Hugging Face free-model choice: **[docs/AI.md](docs/AI.md)**.
+
 ## Status
 
 In development.
