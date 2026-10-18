@@ -2,7 +2,8 @@ const pool = require('../dbcon');
 
 const REMINDER_USER_FIELDS = `
   user_id, first_name, last_name, email, currency, currency_symbol,
-  email_notifications, reminder_frequency, reminder_time, timezone, is_active
+  email_notifications, push_notifications, reminder_frequency, reminder_time,
+  timezone, is_active
 `;
 
 async function getReminderEligibleUsers() {
@@ -10,8 +11,11 @@ async function getReminderEligibleUsers() {
     SELECT ${REMINDER_USER_FIELDS}
     FROM users
     WHERE is_active = true
-      AND email_notifications = true
       AND reminder_frequency <> 'off'
+      AND (
+        email_notifications = true
+        OR push_notifications = true
+      )
   `);
   return result.rows;
 }

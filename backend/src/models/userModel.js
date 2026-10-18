@@ -19,8 +19,8 @@ const createUser = async (firstname, lastname, email, passwordHash) => {
 const USER_PUBLIC_FIELDS = `
   user_id, first_name, last_name, email, monthly_budget, monthly_income, is_earner,
   is_admin, is_active, currency, currency_symbol, theme, fiscal_start_month,
-  onboarding_complete, email_notifications, reminder_frequency, reminder_time,
-  timezone, created_at
+  onboarding_complete, email_notifications, push_notifications, reminder_frequency,
+  reminder_time, timezone, created_at
 `;
 
 const getUserById = async (userId) => {

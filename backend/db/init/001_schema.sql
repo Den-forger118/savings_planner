@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
   fiscal_start_month INTEGER NOT NULL DEFAULT 1 CHECK (fiscal_start_month BETWEEN 1 AND 12),
   preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
   email_notifications BOOLEAN NOT NULL DEFAULT true,
+  push_notifications BOOLEAN NOT NULL DEFAULT false,
   reminder_frequency VARCHAR(20) NOT NULL DEFAULT 'daily',
   reminder_time TIME NOT NULL DEFAULT '09:00',
   timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
@@ -136,3 +137,14 @@ CREATE INDEX IF NOT EXISTS idx_payment_references_user
 
 CREATE INDEX IF NOT EXISTS idx_payment_references_goal
   ON payment_references (goal_id);
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  subscription_id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  subscription JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
+  ON push_subscriptions (user_id);

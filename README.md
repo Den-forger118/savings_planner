@@ -354,6 +354,12 @@ If mail is not configured, login still works; the server logs that no provider i
 
 Full architecture, env vars, webhook notes, and the Option 2 build checklist: **[docs/PAYSTACK.md](docs/PAYSTACK.md)**.
 
+## PWA + Web Push
+
+QUANT is not a full installable PWA yet (stub manifest only). Web push rides on a service worker and the reminder cron.
+
+Plan, VAPID keys, iOS notes, and remaining PWA polish: **[docs/PWA_PUSH.md](docs/PWA_PUSH.md)**.
+
 ## Status
 
 In development.

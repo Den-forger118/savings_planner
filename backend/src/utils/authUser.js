@@ -30,6 +30,7 @@ const formatAuthUser = (user) => ({
   onboarding_complete: user.onboarding_complete === true,
   is_admin: user.is_admin === true,
   email_notifications: user.email_notifications !== false,
+  push_notifications: user.push_notifications === true,
   reminder_frequency: user.reminder_frequency || 'daily',
   reminder_time: formatReminderTime(user.reminder_time),
   timezone: user.timezone || 'UTC',

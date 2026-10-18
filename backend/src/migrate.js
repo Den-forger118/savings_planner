@@ -171,6 +171,25 @@ const migrations = [
      ON payment_references (user_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_payment_references_goal
      ON payment_references (goal_id)`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS push_notifications BOOLEAN DEFAULT false`,
+  `UPDATE users
+     SET push_notifications = false
+     WHERE push_notifications IS NULL`,
+  `ALTER TABLE users
+     ALTER COLUMN push_notifications SET DEFAULT false`,
+  `ALTER TABLE users
+     ALTER COLUMN push_notifications SET NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS push_subscriptions (
+     subscription_id SERIAL PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+     endpoint TEXT NOT NULL,
+     subscription JSONB NOT NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+     UNIQUE (endpoint)
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
+     ON push_subscriptions (user_id)`,
 ];
 
 const runMigrations = async () => {

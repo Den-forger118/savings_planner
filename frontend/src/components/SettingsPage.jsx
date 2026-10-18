@@ -15,6 +15,11 @@ import {
   formatMoney,
   getCurrencyByCode,
 } from '../utils/currency';
+import {
+  isPushSupported,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from '../utils/webPushClient';
 
 const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
@@ -96,6 +101,9 @@ function SettingsPage({
   );
   const [reminderTime, setReminderTime] = useState(user?.reminder_time || '09:00');
   const [timezone, setTimezone] = useState(user?.timezone || 'UTC');
+  const [pushEnabled, setPushEnabled] = useState(user?.push_notifications === true);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushSupported] = useState(() => isPushSupported());
 
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -123,14 +131,56 @@ function SettingsPage({
     setReminderFrequency(user?.reminder_frequency || 'daily');
     setReminderTime(user?.reminder_time || '09:00');
     setTimezone(user?.timezone || 'UTC');
+    setPushEnabled(user?.push_notifications === true);
   }, [
     user?.currency,
     user?.currency_symbol,
     user?.email_notifications,
+    user?.push_notifications,
     user?.reminder_frequency,
     user?.reminder_time,
     user?.timezone,
   ]);
+
+  const handleEnablePush = async () => {
+    setPushBusy(true);
+    try {
+      const keyResponse = await api.get('/push/vapid-public-key');
+      if (!keyResponse.data?.enabled || !keyResponse.data.publicKey) {
+        flash('Push is not configured on the server yet (VAPID keys).', true);
+        return;
+      }
+      const subscription = await subscribeToPush(keyResponse.data.publicKey);
+      const response = await api.post('/push/subscribe', {
+        subscription: subscription.toJSON(),
+      });
+      onUserUpdate(response.data.user);
+      setPushEnabled(true);
+      flash('Browser notifications enabled for this device');
+    } catch (err) {
+      flash(err, true);
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const handleDisablePush = async () => {
+    setPushBusy(true);
+    try {
+      const endpoint = await unsubscribeFromPush();
+      if (endpoint) {
+        await api.delete('/push/subscribe', { data: { endpoint } });
+      }
+      const response = await api.post('/push/disable');
+      onUserUpdate(response.data.user);
+      setPushEnabled(false);
+      flash('Browser notifications disabled');
+    } catch (err) {
+      flash(err, true);
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   const tokenExpiry = useMemo(
     () => getTokenExpiry(localStorage.getItem('token')),
@@ -694,6 +744,53 @@ function SettingsPage({
                     <li>If you still have not deposited, reminders continue every 2 days, then weekly.</li>
                     <li>Deadline and at-risk alerts still apply when a goal is close and behind.</li>
                   </ul>
+                </div>
+              </section>
+
+              <section className={panelClass}>
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Browser push</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Same reminder content as email, delivered as a device notification when the cron runs.
+                  </p>
+                </div>
+                <div className="space-y-4 px-5 py-5">
+                  {!pushSupported ? (
+                    <p className="font-sans text-sm text-taupe">
+                      This browser does not support web push. Try Chrome or Edge on desktop/Android.
+                      On iPhone, install QUANT to the Home Screen first (PWA).
+                    </p>
+                  ) : (
+                    <>
+                      <p className="font-sans text-sm text-taupe">
+                        Status:{' '}
+                        <span className="text-primary-dark">
+                          {pushEnabled ? 'Enabled on this account' : 'Off'}
+                        </span>
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          disabled={pushBusy}
+                          onClick={handleEnablePush}
+                          className="btn-navy min-h-[44px] disabled:opacity-60"
+                        >
+                          {pushBusy ? 'Working…' : pushEnabled ? 'Refresh this device' : 'Enable on this device'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pushBusy || !pushEnabled}
+                          onClick={handleDisablePush}
+                          className="btn-ghost min-h-[44px] px-4 disabled:opacity-60"
+                        >
+                          {pushBusy && pushEnabled ? 'Disabling…' : 'Disable push'}
+                        </button>
+                      </div>
+                      <p className="font-sans text-xs text-taupe">
+                        Uses your reminder hour and timezone above. iOS only works after Add to Home Screen.
+                      </p>
+                    </>
+                  )}
                 </div>
               </section>
 

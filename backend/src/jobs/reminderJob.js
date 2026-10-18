@@ -4,6 +4,8 @@ const reminderModel = require('../models/reminderModel');
 const { getLocalParts, isReminderHour } = require('../utils/localTime');
 const { formatMoney } = require('../utils/moneyFormat');
 const { sendReminderDigest, isMailConfigured } = require('../utils/mailer');
+const { sendReminderPush } = require('../services/pushService');
+const { isWebPushConfigured } = require('../utils/webPush');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -197,7 +199,10 @@ async function collectDigestLines(user, goals, local, frequency) {
 
 async function processUser(user, now = new Date()) {
   const frequency = String(user.reminder_frequency || 'daily').toLowerCase();
-  if (frequency === 'off' || user.email_notifications === false) {
+  const emailOn = user.email_notifications !== false;
+  const pushOn = user.push_notifications === true;
+
+  if (frequency === 'off' || (!emailOn && !pushOn)) {
     return { skipped: true, reason: 'disabled' };
   }
 
@@ -240,12 +245,23 @@ async function processUser(user, now = new Date()) {
     return { skipped: true, reason: 'race_lost' };
   }
 
-  const result = await sendReminderDigest(user, lines);
-  if (result?.error || result?.skipped) {
-    console.warn(
-      `[reminders] Digest not delivered for user ${user.user_id}:`,
-      result?.error || 'mail not configured'
-    );
+  if (emailOn && isMailConfigured()) {
+    const result = await sendReminderDigest(user, lines);
+    if (result?.error || result?.skipped) {
+      console.warn(
+        `[reminders] Email digest not delivered for user ${user.user_id}:`,
+        result?.error || 'mail not configured'
+      );
+    }
+  }
+
+  if (pushOn) {
+    const pushResult = await sendReminderPush(user, lines);
+    if (pushResult?.sent > 0) {
+      console.log(`[reminders] Push sent to user ${user.user_id} (${pushResult.sent} device(s))`);
+    } else if (pushResult?.skipped) {
+      console.warn(`[reminders] Push skipped for user ${user.user_id}:`, pushResult.reason);
+    }
   }
 
   for (const claim of claimKinds) {
@@ -261,8 +277,8 @@ async function processUser(user, now = new Date()) {
 }
 
 async function runReminderJob(now = new Date()) {
-  if (!isMailConfigured()) {
-    console.warn('[reminders] Mail not configured — skipping scheduled run');
+  if (!isMailConfigured() && !isWebPushConfigured()) {
+    console.warn('[reminders] Neither mail nor web push configured — skipping scheduled run');
     return { processed: 0, sent: 0, skipped: 0 };
   }
 
