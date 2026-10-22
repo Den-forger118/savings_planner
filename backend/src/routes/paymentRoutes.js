@@ -5,6 +5,12 @@ const userModel = require('../models/userModel');
 const goalModel = require('../models/goalModel');
 const { applySuccessfulPayment } = require('../services/paymentService');
 const {
+  applyWalletCredit,
+  isGoalDepositCharge,
+  extractDvaIdentifiers,
+} = require('../services/walletService');
+const { handleTransferWebhookEvent } = require('../services/payoutService');
+const {
   isPaystackConfigured,
   getPaystackPublicKey,
   getPaystackCurrency,
@@ -243,6 +249,7 @@ router.get('/verify/:reference', async (req, res) => {
       amountMinor: verified.amount,
       currency: verified.currency,
       metadata: verified.metadata || {},
+      feesMinor: verified.fees ?? verified.fee ?? null,
     });
 
     const goal = await goalModel.getGoalById(result.payment.goal_id);
@@ -285,14 +292,68 @@ async function handlePaystackWebhook(req, res) {
     if (event.event === 'charge.success') {
       const data = event.data || {};
       try {
-        await applySuccessfulPayment({
-          reference: data.reference,
-          amountMinor: data.amount,
-          currency: data.currency,
-          metadata: data.metadata || {},
-        });
+        const local = data.reference
+          ? await paymentModel.getByReference(data.reference)
+          : null;
+
+        if (isGoalDepositCharge(data, local)) {
+          await applySuccessfulPayment({
+            reference: data.reference,
+            amountMinor: data.amount,
+            currency: data.currency,
+            metadata: data.metadata || {},
+            feesMinor: data.fees ?? data.fee ?? null,
+          });
+        } else {
+          const { customerCode, accountNumber } = extractDvaIdentifiers(data);
+          await applyWalletCredit({
+            reference: data.reference,
+            amountMinor: data.amount,
+            currency: data.currency,
+            feesMinor: data.fees ?? data.fee ?? null,
+            customerCode,
+            accountNumber,
+            userId: data.metadata?.user_id
+              ? Number.parseInt(data.metadata.user_id, 10)
+              : null,
+          });
+        }
       } catch (err) {
         console.error('[payments] Webhook apply failed:', err.message);
+      }
+    }
+
+    if (event.event === 'dedicatedaccount.assign') {
+      const data = event.data || {};
+      try {
+        const customerCode = data.customer?.customer_code
+          || data.customer_code
+          || null;
+        const user = customerCode
+          ? await userModel.getUserByPaystackCustomerCode(customerCode)
+          : null;
+        if (user) {
+          await userModel.updateDvaFields(user.user_id, {
+            virtualAccountNumber: data.account_number || undefined,
+            virtualAccountBank: data.bank?.name || data.bank_name || undefined,
+            virtualAccountName: data.account_name || undefined,
+            paystackCustomerCode: customerCode,
+          });
+        }
+      } catch (err) {
+        console.error('[payments] dedicatedaccount.assign failed:', err.message);
+      }
+    }
+
+    if (
+      event.event === 'transfer.success'
+      || event.event === 'transfer.failed'
+      || event.event === 'transfer.reversed'
+    ) {
+      try {
+        await handleTransferWebhookEvent(event.event, event.data || {});
+      } catch (err) {
+        console.error('[payments] Transfer webhook failed:', err.message);
       }
     }
 
@@ -305,3 +366,4 @@ async function handlePaystackWebhook(req, res) {
 
 module.exports = router;
 module.exports.handlePaystackWebhook = handlePaystackWebhook;
+module.exports.isGoalDepositCharge = isGoalDepositCharge;

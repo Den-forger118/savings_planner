@@ -8,6 +8,7 @@ import ConfirmDialog from './ConfirmDialog';
 import ErrorBanner from './ErrorBanner';
 import GoalSimulatorPage from './GoalSimulatorPage';
 import PasswordInput from './PasswordInput';
+import BudgetFundingMeter from './BudgetFundingMeter';
 import { getFriendlyError } from '../utils/friendlyError';
 import {
   ONBOARDING_CURRENCIES,
@@ -25,16 +26,73 @@ const Icon = ({ name, className = '' }) => (
   <span className={`material-symbols-outlined ${className}`}>{name}</span>
 );
 
+/** Top-level sidebar only — nested pages open from in-page links (progressive disclosure). */
 const SETTINGS_TABS = [
   { id: 'profile', label: 'Profile', icon: 'person' },
   { id: 'financial', label: 'Financial', icon: 'account_balance' },
   { id: 'reminders', label: 'Reminders', icon: 'notifications' },
-  { id: 'simulator', label: 'Simulator', icon: 'query_stats' },
   { id: 'security', label: 'Security', icon: 'shield' },
-  { id: 'data', label: 'Data', icon: 'database' },
-  { id: 'trash', label: 'Trash', icon: 'delete' },
   { id: 'help', label: 'Help', icon: 'help' },
 ];
+
+const NESTED_SETTINGS_TABS = ['wallet', 'simulator', 'data', 'trash'];
+
+const ALL_SETTINGS_TAB_IDS = [...SETTINGS_TABS.map((tab) => tab.id), ...NESTED_SETTINGS_TABS];
+
+const isSettingsTabId = (id) => ALL_SETTINGS_TAB_IDS.includes(id);
+
+/** Which sidebar item stays highlighted when a nested page is open. */
+const NAV_HIGHLIGHT_FOR = {
+  profile: 'profile',
+  data: 'profile',
+  trash: 'profile',
+  financial: 'financial',
+  wallet: 'financial',
+  simulator: 'financial',
+  reminders: 'reminders',
+  security: 'security',
+  help: 'help',
+};
+
+const SettingsBackLink = ({ label, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="inline-flex items-center gap-1 font-sans text-xs font-normal text-taupe transition-colors hover:text-primary-dark"
+  >
+    <Icon name="arrow_back" className="text-sm" />
+    {label}
+  </button>
+);
+
+const SettingsSectionLink = ({ icon, label, hint, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="flex w-full items-center gap-3 rounded-lg border border-primary-dark/10 bg-cream/40 px-4 py-3 text-left transition-colors hover:border-primary-dark/20 hover:bg-cream"
+  >
+    <Icon name={icon} className="text-xl text-gold" />
+    <span className="min-w-0 flex-1">
+      <span className="block font-sans text-sm font-normal text-primary-dark">{label}</span>
+      {hint ? <span className="mt-0.5 block font-sans text-xs text-taupe">{hint}</span> : null}
+    </span>
+    <Icon name="chevron_right" className="text-lg text-taupe" />
+  </button>
+);
+
+const SettingsDisclosure = ({ label, open, onToggle, children }) => (
+  <div className="rounded-lg border border-primary-dark/10">
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-3 text-left"
+    >
+      <span className="font-sans text-sm font-normal text-primary-dark">{label}</span>
+      <Icon name={open ? 'expand_less' : 'expand_more'} className="text-xl text-taupe" />
+    </button>
+    {open ? <div className="border-t border-primary-dark/10 px-4 py-4">{children}</div> : null}
+  </div>
+);
 
 const REMINDER_TIMEZONES = [
   { value: 'Africa/Accra', label: 'Accra (GMT)' },
@@ -84,7 +142,7 @@ function SettingsPage({
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(
-    SETTINGS_TABS.some((tab) => tab.id === tabFromUrl) ? tabFromUrl : 'profile'
+    isSettingsTabId(tabFromUrl) ? tabFromUrl : 'profile'
   );
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -105,10 +163,32 @@ function SettingsPage({
   const [pushBusy, setPushBusy] = useState(false);
   const [pushSupported] = useState(() => isPushSupported());
 
-  const [categories, setCategories] = useState([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [newCategoryColor, setNewCategoryColor] = useState('#D4B16D');
+  const [walletPhone, setWalletPhone] = useState(user?.phone || '');
+  const [walletConsent, setWalletConsent] = useState(false);
+  const [walletBusy, setWalletBusy] = useState(false);
+  const [walletInfo, setWalletInfo] = useState(null);
+  const [payoutDestinations, setPayoutDestinations] = useState(null);
+  const [payouts, setPayouts] = useState([]);
+  const [withdrawForm, setWithdrawForm] = useState({
+    amount: '',
+    type: 'mobile_money',
+    bankCode: 'MTN',
+    accountNumber: '',
+    name: '',
+  });
+  const [withdrawBusy, setWithdrawBusy] = useState(false);
+  const [autoAllocateWallet, setAutoAllocateWallet] = useState(
+    user?.auto_allocate_wallet !== false
+  );
+  const [budgetFunding, setBudgetFunding] = useState(null);
+  const [showFundingGuide, setShowFundingGuide] = useState(false);
+  const [showTransferSetup, setShowTransferSetup] = useState(false);
+  const [showTransferDetails, setShowTransferDetails] = useState(false);
+  const [showWithdrawForm, setShowWithdrawForm] = useState(false);
+  const [showReminderGuide, setShowReminderGuide] = useState(false);
+  const [showPushSettings, setShowPushSettings] = useState(false);
+  const [showFiscalAdvanced, setShowFiscalAdvanced] = useState(false);
+  const [showSoftReset, setShowSoftReset] = useState(false);
 
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -132,15 +212,104 @@ function SettingsPage({
     setReminderTime(user?.reminder_time || '09:00');
     setTimezone(user?.timezone || 'UTC');
     setPushEnabled(user?.push_notifications === true);
+    setWalletPhone(user?.phone || '');
+    setAutoAllocateWallet(user?.auto_allocate_wallet !== false);
   }, [
     user?.currency,
     user?.currency_symbol,
     user?.email_notifications,
     user?.push_notifications,
+    user?.phone,
+    user?.auto_allocate_wallet,
     user?.reminder_frequency,
     user?.reminder_time,
     user?.timezone,
   ]);
+
+  const loadWallet = useCallback(async () => {
+    try {
+      const [walletRes, destRes, payoutRes] = await Promise.all([
+        api.get('/wallet'),
+        api.get('/wallet/payout-destinations').catch(() => ({ data: null })),
+        api.get('/wallet/payouts').catch(() => ({ data: { payouts: [] } })),
+      ]);
+      setWalletInfo(walletRes.data);
+      setBudgetFunding(walletRes.data?.budget_funding || null);
+      if (typeof walletRes.data?.auto_allocate_wallet === 'boolean') {
+        setAutoAllocateWallet(walletRes.data.auto_allocate_wallet);
+      }
+      setPayoutDestinations(destRes.data);
+      setPayouts(payoutRes.data?.payouts || []);
+      const momo = destRes.data?.mobile_money || [];
+      if (momo.length > 0) {
+        setWithdrawForm((prev) => ({
+          ...prev,
+          bankCode: prev.bankCode || momo[0].code,
+        }));
+      }
+    } catch {
+      setWalletInfo(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'wallet') {
+      void loadWallet();
+    }
+  }, [activeTab, loadWallet]);
+
+  const handleWithdraw = async (event) => {
+    event.preventDefault();
+    setWithdrawBusy(true);
+    try {
+      const response = await api.post('/wallet/withdraw', {
+        amount: Number.parseFloat(withdrawForm.amount),
+        type: withdrawForm.type,
+        bankCode: withdrawForm.bankCode,
+        accountNumber: withdrawForm.accountNumber,
+        name: withdrawForm.name || undefined,
+      });
+      if (response.data.user) {
+        onUserUpdate(response.data.user);
+      } else if (Number.isFinite(Number.parseFloat(response.data.wallet_balance))) {
+        onUserUpdate({
+          ...user,
+          wallet_balance: Number.parseFloat(response.data.wallet_balance),
+        });
+      }
+      setWithdrawForm((prev) => ({ ...prev, amount: '', accountNumber: '' }));
+      flash(response.data.message || 'Withdrawal submitted');
+      setShowWithdrawForm(false);
+      await loadWallet();
+    } catch (err) {
+      flash(err, true);
+    } finally {
+      setWithdrawBusy(false);
+    }
+  };
+
+  const handleEnableDva = async () => {
+    if (!walletConsent) {
+      flash('Confirm consent to create your QUANT transfer account.', true);
+      return;
+    }
+    setWalletBusy(true);
+    try {
+      const response = await api.post('/wallet/dva', {
+        phone: walletPhone,
+        consent: true,
+      });
+      if (response.data.user) {
+        onUserUpdate(response.data.user);
+      }
+      setWalletInfo(response.data.wallet || null);
+      flash(response.data.message || 'Bank transfer account ready');
+    } catch (err) {
+      flash(err, true);
+    } finally {
+      setWalletBusy(false);
+    }
+  };
 
   const handleEnablePush = async () => {
     setPushBusy(true);
@@ -214,33 +383,18 @@ function SettingsPage({
     }
   }, [user.user_id, flash]);
 
-  const loadCategories = useCallback(async () => {
-    setCategoriesLoading(true);
-    try {
-      const response = await api.get(`/expenses/categories?userId=${user.user_id}`);
-      setCategories(response.data.categories || []);
-    } catch {
-      flash('We couldn’t load your categories right now.', true);
-    } finally {
-      setCategoriesLoading(false);
-    }
-  }, [user.user_id, flash]);
-
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && SETTINGS_TABS.some((item) => item.id === tab)) {
+    if (tab && isSettingsTabId(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
 
   useEffect(() => {
-    if (activeTab === 'financial') {
-      loadCategories();
-    }
     if (activeTab === 'trash') {
       loadTrash();
     }
-  }, [activeTab, loadCategories, loadTrash]);
+  }, [activeTab, loadTrash]);
 
   const handleRestoreGoal = async (goalId) => {
     setTrashActionId(goalId);
@@ -324,12 +478,13 @@ function SettingsPage({
     }
   };
 
-  const handleSaveProfile = async () => {
+  const handleSaveFinancialPreferences = async () => {
     setSaving(true);
     try {
       const response = await api.put(`/users/${user.user_id}/preferences`, {
         currency,
         currency_symbol: currencySymbol,
+        fiscal_start_month: fiscalStartMonth,
       });
       onUserUpdate(response.data.user);
       flash('Preferences saved');
@@ -355,37 +510,6 @@ function SettingsPage({
       flash(err, true);
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleCreateCategory = async (event) => {
-    event.preventDefault();
-    if (!newCategoryName.trim()) return;
-
-    try {
-      await api.post('/expenses/categories', {
-        userId: user.user_id,
-        name: newCategoryName.trim(),
-        color: newCategoryColor,
-      });
-      setNewCategoryName('');
-      setNewCategoryColor('#D4B16D');
-      loadCategories();
-      flash('Category added');
-    } catch (err) {
-      flash(err, true);
-    }
-  };
-
-  const handleUpdateCategory = async (categoryId, patch) => {
-    try {
-      await api.put(`/expenses/categories/${categoryId}`, {
-        userId: user.user_id,
-        ...patch,
-      });
-      loadCategories();
-    } catch (err) {
-      flash(err, true);
     }
   };
 
@@ -447,11 +571,19 @@ function SettingsPage({
   };
 
   const panelClass = 'surface overflow-hidden';
+  const fundingHasDva = Boolean(
+    walletInfo?.virtual_account_number || user?.virtual_account_number
+  );
+  const fundingWalletBal =
+    Number.parseFloat(walletInfo?.wallet_balance ?? user?.wallet_balance) || 0;
+  const fundingSettleCur = walletInfo?.currency || 'GHS';
+  const fundingSettleSymbol = getCurrencyByCode(fundingSettleCur).symbol;
 
   const selectTab = (id) => {
+    if (!isSettingsTabId(id)) return;
     setActiveTab(id);
-    if (id === 'simulator') {
-      setSearchParams({ tab: 'simulator' }, { replace: true });
+    if (id === 'simulator' || id === 'wallet' || id === 'data' || id === 'trash') {
+      setSearchParams({ tab: id }, { replace: true });
       return;
     }
     if (searchParams.get('tab')) {
@@ -466,7 +598,7 @@ function SettingsPage({
     }
     if (page.startsWith('settings-')) {
       const tab = page.slice('settings-'.length);
-      if (SETTINGS_TABS.some((item) => item.id === tab)) {
+      if (isSettingsTabId(tab)) {
         selectTab(tab);
         return;
       }
@@ -511,56 +643,10 @@ function SettingsPage({
         )
       )}
 
-      {activeTab !== 'simulator' && (
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
-        <div className="surface-navy flex min-h-[120px] flex-col justify-between p-5 text-cream lg:col-span-4">
-          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-gold/80">
-            Savings Mode
-          </p>
-          <div className="mt-3">
-            <p className="font-serif text-xl font-light tracking-[-0.015em]">
-              {isEarnerMode ? 'Earner' : 'Non-Earner'}
-            </p>
-            <p className="mt-1.5 font-sans text-xs text-cream/55">
-              {isEarnerMode && hasBudget
-                ? `Budget ${formatMoney(monthlyBudget, currency, currencySymbol)}`
-                : isEarnerMode
-                  ? 'Set a budget to allocate'
-                  : 'Track goals without fixed income'}
-            </p>
-          </div>
-        </div>
-
-        <div className="stat-tile flex min-h-[120px] flex-col justify-between p-5 lg:col-span-4">
-          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-            Member
-          </p>
-          <div className="mt-3 min-w-0">
-            <p className="truncate font-serif text-xl font-light text-primary-dark">{memberName}</p>
-            <p className="mt-1 truncate font-sans text-xs text-taupe">{user.email}</p>
-          </div>
-        </div>
-
-        <div className="stat-tile flex min-h-[120px] flex-col justify-between p-5 lg:col-span-4">
-          <p className="font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-            Display Currency
-          </p>
-          <div className="mt-3">
-            <p className="font-money text-2xl font-light tracking-[0.02em] text-primary-dark">
-              {formatMoney(12450.75, currency, currencySymbol)}
-            </p>
-            <p className="mt-1.5 font-sans text-xs text-taupe">
-              {currency} · {currencySymbol}
-            </p>
-          </div>
-        </div>
-      </section>
-      )}
-
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <nav className="surface h-fit space-y-1 p-2 xl:sticky xl:top-24 xl:col-span-3 xl:self-start xl:z-10">
           {SETTINGS_TABS.map((tab) => {
-            const active = activeTab === tab.id;
+            const active = (NAV_HIGHLIGHT_FOR[activeTab] || activeTab) === tab.id;
             return (
               <button
                 key={tab.id}
@@ -601,6 +687,609 @@ function SettingsPage({
                 </div>
               </section>
 
+              <EarnerModeToggle
+                userId={user.user_id}
+                isEarner={isEarnerMode}
+                hasBudget={hasBudget}
+                onModeChange={onEarnerModeChange}
+              />
+
+              <section className={panelClass}>
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">More</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Open only when you need export or deleted goals.
+                  </p>
+                </div>
+                <div className="space-y-2 px-5 py-5">
+                  <SettingsSectionLink
+                    icon="database"
+                    label="Data & export"
+                    hint="Download your statement"
+                    onClick={() => selectTab('data')}
+                  />
+                  <SettingsSectionLink
+                    icon="delete"
+                    label="Trash"
+                    hint="Restore or permanently remove goals"
+                    onClick={() => selectTab('trash')}
+                  />
+                </div>
+              </section>
+            </>
+          )}
+
+          {activeTab === 'wallet' && (
+            <>
+              <SettingsBackLink label="Financial" onClick={() => selectTab('financial')} />
+
+              {budgetFunding && (
+                <section className={panelClass}>
+                  <div className="px-5 py-4">
+                    <BudgetFundingMeter
+                      progress={budgetFunding}
+                      currencyCode={fundingSettleCur}
+                      currencySymbol={fundingSettleSymbol}
+                      compact
+                      onEditBudget={
+                        budgetFunding.status === 'no_budget'
+                          ? () => selectTab('financial')
+                          : undefined
+                      }
+                    />
+                  </div>
+                </section>
+              )}
+
+              <section className={panelClass}>
+                <div className="space-y-3 px-5 py-5">
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-lg border border-primary-dark/10 bg-cream/40 px-3 py-2.5">
+                      <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-taupe">Account</p>
+                      <p className="mt-1 font-sans text-sm text-primary-dark">
+                        {fundingHasDva ? 'Ready' : 'Not set up'}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-primary-dark/10 bg-cream/40 px-3 py-2.5">
+                      <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-taupe">Wallet</p>
+                      <p className="mt-1 font-money text-sm text-primary-dark">
+                        {formatMoney(fundingWalletBal, fundingSettleCur, fundingSettleSymbol)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-primary-dark/10 bg-cream/40 px-3 py-2.5">
+                      <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-taupe">On arrival</p>
+                      <p className="mt-1 font-sans text-sm text-primary-dark">
+                        {autoAllocateWallet ? 'Auto-apply on' : 'Park in wallet'}
+                      </p>
+                    </div>
+                  </div>
+                  <SettingsDisclosure
+                    label="How money moves in QUANT"
+                    open={showFundingGuide}
+                    onToggle={() => setShowFundingGuide((prev) => !prev)}
+                  >
+                    <ol className="space-y-3 font-sans text-sm text-primary-dark">
+                      <li>
+                        <span className="font-normal">Transfer account</span>
+                        <span className="mt-0.5 block text-taupe">
+                          Send money from MoMo or bank to your Paystack virtual account.
+                        </span>
+                      </li>
+                      <li>
+                        <span className="font-normal">Wallet (unallocated)</span>
+                        <span className="mt-0.5 block text-taupe">
+                          Credits land here first — not on goal progress bars.
+                        </span>
+                      </li>
+                      <li>
+                        <span className="font-normal">Allocate to goals</span>
+                        <span className="mt-0.5 block text-taupe">
+                          Auto-apply by priority, or Allocate from wallet on a goal.
+                        </span>
+                      </li>
+                    </ol>
+                  </SettingsDisclosure>
+                </div>
+              </section>
+
+              <section className={panelClass}>
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Transfer account</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Inbound Paystack virtual account — not a link to your personal MoMo login.
+                  </p>
+                </div>
+                <div className="space-y-4 px-5 py-5">
+                  {fundingHasDva ? (
+                    <>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="field-label">Account</p>
+                          <p className="font-money text-[15px] text-primary-dark">
+                            ••••{' '}
+                            {String(
+                              walletInfo?.virtual_account_number || user.virtual_account_number || ''
+                            ).slice(-4)}
+                          </p>
+                          <p className="mt-0.5 font-sans text-xs text-taupe">
+                            {walletInfo?.virtual_account_bank || user.virtual_account_bank || '—'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-ghost min-h-[40px] text-xs"
+                          onClick={() => setShowTransferDetails((prev) => !prev)}
+                        >
+                          {showTransferDetails ? 'Hide details' : 'Show details'}
+                        </button>
+                      </div>
+                      {showTransferDetails && (
+                        <div className="space-y-3 rounded-lg border border-primary-dark/10 bg-cream/40 px-4 py-3">
+                          <div>
+                            <p className="field-label">Account number</p>
+                            <p className="font-money text-[15px] text-primary-dark">
+                              {walletInfo?.virtual_account_number || user.virtual_account_number}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="field-label">Account name</p>
+                            <p className="font-sans text-[15px] text-primary-dark">
+                              {walletInfo?.virtual_account_name || user.virtual_account_name || '—'}
+                            </p>
+                          </div>
+                          <p className="font-sans text-xs text-taupe">
+                            In MoMo or bank, choose send / transfer and paste this number.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  ) : showTransferSetup ? (
+                    <>
+                      <div>
+                        <label className="field-label" htmlFor="wallet-phone">
+                          Mobile number
+                        </label>
+                        <input
+                          id="wallet-phone"
+                          type="tel"
+                          value={walletPhone}
+                          onChange={(e) => setWalletPhone(e.target.value)}
+                          placeholder="e.g. 024XXXXXXX"
+                          className="field"
+                        />
+                      </div>
+                      <label className="flex items-start gap-3 font-sans text-sm text-taupe">
+                        <input
+                          type="checkbox"
+                          checked={walletConsent}
+                          onChange={(e) => setWalletConsent(e.target.checked)}
+                          className="mt-1"
+                        />
+                        <span>
+                          I consent to QUANT creating a Paystack virtual account with my name, email,
+                          and phone so I can transfer money into my QUANT wallet. This does not give
+                          QUANT access to my personal MoMo or bank login.
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={handleEnableDva}
+                          disabled={walletBusy || !walletConsent}
+                          className="btn-navy min-h-[44px] disabled:opacity-60"
+                        >
+                          {walletBusy ? 'Creating account…' : 'Get my QUANT transfer account'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost min-h-[44px]"
+                          onClick={() => setShowTransferSetup(false)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {walletInfo && walletInfo.paystack_configured === false && (
+                        <p className="font-sans text-xs text-taupe">
+                          Transfers are not available yet — ask your admin to finish Paystack setup.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-navy min-h-[44px]"
+                      onClick={() => setShowTransferSetup(true)}
+                    >
+                      Set up transfer account
+                    </button>
+                  )}
+                </div>
+              </section>
+
+              <section className={panelClass}>
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Wallet — unallocated</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Holding balance after a transfer lands. Goal cards use a separate saved amount;
+                    allocate to move money from here onto a goal.
+                  </p>
+                </div>
+                <div className="space-y-4 px-5 py-5">
+                  <div>
+                    <p className="field-label">Available to allocate or cash out</p>
+                    <p className="mt-1 font-money text-2xl font-light text-primary-dark">
+                      {formatMoney(fundingWalletBal, fundingSettleCur, fundingSettleSymbol)}
+                    </p>
+                    <p className="mt-2 font-sans text-xs text-taupe">
+                      Settled in {fundingSettleCur}. Not included in goal “Saved” totals until you allocate
+                      (or auto-apply runs).
+                    </p>
+                  </div>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-primary-dark/10 bg-cream/40 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 accent-primary-dark"
+                      checked={autoAllocateWallet}
+                      onChange={async (e) => {
+                        const next = e.target.checked;
+                        setAutoAllocateWallet(next);
+                        try {
+                          await persistPreferences({ auto_allocate_wallet: next });
+                          setWalletInfo((prev) => (prev ? { ...prev, auto_allocate_wallet: next } : prev));
+                        } catch (err) {
+                          setAutoAllocateWallet(!next);
+                          flash(err, true);
+                        }
+                      }}
+                    />
+                    <span>
+                      <span className="font-sans text-sm font-normal text-primary-dark">
+                        Auto-apply when a transfer arrives
+                      </span>
+                      <span className="mt-1 block font-sans text-xs text-taupe">
+                        Fills active goals in folio order (highest priority first), same as Allocate
+                        from wallet. Off = leave funds here until you allocate manually on a goal.
+                      </span>
+                    </span>
+                  </label>
+                  {fundingWalletBal > 0 && (
+                    <button
+                      type="button"
+                      className="btn-ghost min-h-[44px]"
+                      onClick={() => onNavigate?.('savings')}
+                    >
+                      Go to goals to allocate
+                    </button>
+                  )}
+                </div>
+              </section>
+
+              {(fundingWalletBal >= 1 || payouts.length > 0) && (
+                <section className={panelClass}>
+                  <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                    <h3 className="card-title">Cash out</h3>
+                    <p className="mt-1 font-sans text-sm text-taupe">
+                      Send unallocated wallet funds to MoMo or bank. Goal “Reduce” only changes the ledger.
+                    </p>
+                  </div>
+                  <div className="space-y-4 px-5 py-5">
+                    {fundingWalletBal >= 1 && !showWithdrawForm && (
+                      <button
+                        type="button"
+                        className="btn-navy min-h-[44px]"
+                        onClick={() => setShowWithdrawForm(true)}
+                      >
+                        Withdraw to MoMo / bank
+                      </button>
+                    )}
+                    {fundingWalletBal >= 1 && showWithdrawForm && (
+                      <form className="space-y-4" onSubmit={handleWithdraw}>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <label className="field-label" htmlFor="withdraw-amount">
+                              Amount ({fundingSettleCur})
+                            </label>
+                            <input
+                              id="withdraw-amount"
+                              type="number"
+                              min="1"
+                              step="0.01"
+                              required
+                              value={withdrawForm.amount}
+                              onChange={(e) =>
+                                setWithdrawForm((prev) => ({ ...prev, amount: e.target.value }))
+                              }
+                              className="field font-money"
+                            />
+                          </div>
+                          <div>
+                            <label className="field-label" htmlFor="withdraw-type">
+                              Destination type
+                            </label>
+                            <select
+                              id="withdraw-type"
+                              value={withdrawForm.type}
+                              onChange={(e) => {
+                                const nextType = e.target.value;
+                                const list = nextType === 'mobile_money'
+                                  ? (payoutDestinations?.mobile_money || [])
+                                  : (payoutDestinations?.banks || []);
+                                setWithdrawForm((prev) => ({
+                                  ...prev,
+                                  type: nextType,
+                                  bankCode: list[0]?.code || '',
+                                }));
+                              }}
+                              className="field"
+                            >
+                              <option value="mobile_money">Mobile Money</option>
+                              <option value="ghipss">Ghana bank (GHIPSS)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="field-label" htmlFor="withdraw-provider">
+                              {withdrawForm.type === 'mobile_money' ? 'Network' : 'Bank'}
+                            </label>
+                            <select
+                              id="withdraw-provider"
+                              value={withdrawForm.bankCode}
+                              onChange={(e) =>
+                                setWithdrawForm((prev) => ({ ...prev, bankCode: e.target.value }))
+                              }
+                              className="field"
+                              required
+                            >
+                              {(withdrawForm.type === 'mobile_money'
+                                ? (payoutDestinations?.mobile_money || [
+                                    { code: 'MTN', name: 'MTN' },
+                                    { code: 'ATL', name: 'AirtelTigo' },
+                                    { code: 'VOD', name: 'Telecel / Vodafone' },
+                                  ])
+                                : (payoutDestinations?.banks || [])
+                              ).map((item) => (
+                                <option key={item.code || item.id} value={item.code}>
+                                  {item.name} ({item.code})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="field-label" htmlFor="withdraw-account">
+                              {withdrawForm.type === 'mobile_money' ? 'MoMo number' : 'Account number'}
+                            </label>
+                            <input
+                              id="withdraw-account"
+                              type="text"
+                              required
+                              value={withdrawForm.accountNumber}
+                              onChange={(e) =>
+                                setWithdrawForm((prev) => ({ ...prev, accountNumber: e.target.value }))
+                              }
+                              placeholder={withdrawForm.type === 'mobile_money' ? '0551234567' : '0123456789'}
+                              className="field"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="field-label" htmlFor="withdraw-name">
+                              Account name <span className="font-light text-taupe">(optional)</span>
+                            </label>
+                            <input
+                              id="withdraw-name"
+                              type="text"
+                              value={withdrawForm.name}
+                              onChange={(e) =>
+                                setWithdrawForm((prev) => ({ ...prev, name: e.target.value }))
+                              }
+                              className="field"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="submit"
+                            disabled={withdrawBusy}
+                            className="btn-navy min-h-[44px] disabled:opacity-60"
+                          >
+                            {withdrawBusy ? 'Submitting…' : 'Confirm withdrawal'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-ghost min-h-[44px]"
+                            onClick={() => setShowWithdrawForm(false)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                    {payouts.length > 0 && (
+                      <div className={fundingWalletBal >= 1 ? 'border-t border-primary-dark/[0.06] pt-4' : ''}>
+                        <p className="field-label mb-3">Recent withdrawals</p>
+                        <ul className="space-y-2">
+                          {payouts.slice(0, 5).map((item) => (
+                            <li
+                              key={item.payout_id}
+                              className="flex flex-wrap items-center justify-between gap-2 font-sans text-sm text-primary-dark"
+                            >
+                              <span className="font-money">
+                                {formatMoney(
+                                  item.amount,
+                                  item.currency || 'GHS',
+                                  getCurrencyByCode(item.currency || 'GHS').symbol
+                                )}
+                              </span>
+                              <span className="text-taupe">
+                                {item.recipient_type} · {item.bank_code} · {item.status}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+
+          {activeTab === 'reminders' && (
+            <>
+              <section className={panelClass}>
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">Email reminders</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Nudges for daily targets, inactivity, deadlines, and goal completions.
+                  </p>
+                </div>
+                <div className="space-y-5 px-5 py-5">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 accent-primary-dark"
+                      checked={emailNotifications}
+                      onChange={(e) => setEmailNotifications(e.target.checked)}
+                    />
+                    <span>
+                      <span className="block font-sans text-[15px] font-light text-primary-dark">
+                        Send email notifications
+                      </span>
+                      <span className="mt-0.5 block font-sans text-xs text-taupe">
+                        Master switch for scheduled reminders and goal-complete emails.
+                      </span>
+                    </span>
+                  </label>
+
+                  {emailNotifications && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="field-label" htmlFor="reminder-frequency">
+                          Cadence
+                        </label>
+                        <select
+                          id="reminder-frequency"
+                          className="field"
+                          value={reminderFrequency}
+                          onChange={(e) => setReminderFrequency(e.target.value)}
+                        >
+                          <option value="daily">Daily nudge</option>
+                          <option value="weekly">Weekly summary</option>
+                          <option value="off">Scheduled off (completions only)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="field-label" htmlFor="reminder-time">
+                          Preferred hour
+                        </label>
+                        <select
+                          id="reminder-time"
+                          className="field"
+                          value={reminderTime?.slice(0, 5) || '09:00'}
+                          onChange={(e) => setReminderTime(e.target.value)}
+                        >
+                          {REMINDER_HOURS.map((item) => (
+                            <option key={item.value} value={item.value}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="field-label" htmlFor="reminder-timezone">
+                          Timezone
+                        </label>
+                        <select
+                          id="reminder-timezone"
+                          className="field"
+                          value={
+                            REMINDER_TIMEZONES.some((item) => item.value === timezone)
+                              ? timezone
+                              : 'UTC'
+                          }
+                          onChange={(e) => setTimezone(e.target.value)}
+                        >
+                          {!REMINDER_TIMEZONES.some((item) => item.value === timezone) && (
+                            <option value={timezone}>{timezone}</option>
+                          )}
+                          {REMINDER_TIMEZONES.map((item) => (
+                            <option key={item.value} value={item.value}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  <SettingsDisclosure
+                    label="How email reminders work"
+                    open={showReminderGuide}
+                    onToggle={() => setShowReminderGuide((prev) => !prev)}
+                  >
+                    <ul className="space-y-2 font-sans text-sm text-taupe">
+                      <li>After 7 days with no deposit on a goal, you get an inactivity nudge.</li>
+                      <li>If you still have not deposited, reminders continue every 2 days, then weekly.</li>
+                      <li>Deadline and at-risk alerts still apply when a goal is close and behind.</li>
+                    </ul>
+                  </SettingsDisclosure>
+                </div>
+              </section>
+
+              <SettingsDisclosure
+                label="Also notify this device (browser push)"
+                open={showPushSettings}
+                onToggle={() => setShowPushSettings((prev) => !prev)}
+              >
+                {!pushSupported ? (
+                  <p className="font-sans text-sm text-taupe">
+                    This browser does not support web push. Try Chrome or Edge on desktop/Android.
+                    On iPhone, install QUANT to the Home Screen first (PWA).
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="font-sans text-sm text-taupe">
+                      Status:{' '}
+                      <span className="text-primary-dark">
+                        {pushEnabled ? 'Enabled on this account' : 'Off'}
+                      </span>
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        disabled={pushBusy}
+                        onClick={handleEnablePush}
+                        className="btn-navy min-h-[44px] disabled:opacity-60"
+                      >
+                        {pushBusy ? 'Working…' : pushEnabled ? 'Refresh this device' : 'Enable on this device'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pushBusy || !pushEnabled}
+                        onClick={handleDisablePush}
+                        className="btn-ghost min-h-[44px] px-4 disabled:opacity-60"
+                      >
+                        {pushBusy && pushEnabled ? 'Disabling…' : 'Disable push'}
+                      </button>
+                    </div>
+                    <p className="font-sans text-xs text-taupe">
+                      Uses your reminder hour and timezone. iOS only works after Add to Home Screen.
+                    </p>
+                  </div>
+                )}
+              </SettingsDisclosure>
+
+              <button
+                type="button"
+                onClick={handleSaveReminders}
+                disabled={saving}
+                className="btn-navy min-h-[44px] disabled:opacity-60"
+              >
+                {saving ? 'Saving…' : 'Save Reminders'}
+              </button>
+            </>
+          )}
+
+          {activeTab === 'financial' && (
+            <>
               <section className={panelClass}>
                 <div className="border-b border-primary-dark/[0.06] px-5 py-4">
                   <h3 className="card-title">Display Currency</h3>
@@ -639,181 +1328,6 @@ function SettingsPage({
                 </div>
               </section>
 
-              <button
-                type="button"
-                onClick={handleSaveProfile}
-                disabled={saving}
-                className="btn-navy min-h-[44px] disabled:opacity-60"
-              >
-                {saving ? 'Saving…' : 'Save Preferences'}
-              </button>
-            </>
-          )}
-
-          {activeTab === 'reminders' && (
-            <>
-              <section className={panelClass}>
-                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
-                  <h3 className="card-title">Email reminders</h3>
-                  <p className="mt-1 font-sans text-sm text-taupe">
-                    Nudges for daily targets, inactivity, deadlines, and goal completions.
-                  </p>
-                </div>
-                <div className="space-y-5 px-5 py-5">
-                  <label className="flex cursor-pointer items-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4 accent-primary-dark"
-                      checked={emailNotifications}
-                      onChange={(e) => setEmailNotifications(e.target.checked)}
-                    />
-                    <span>
-                      <span className="block font-sans text-[15px] font-light text-primary-dark">
-                        Send email notifications
-                      </span>
-                      <span className="mt-0.5 block font-sans text-xs text-taupe">
-                        Master switch for scheduled reminders and goal-complete emails.
-                      </span>
-                    </span>
-                  </label>
-
-                  <div className={`grid gap-4 sm:grid-cols-2 ${emailNotifications ? '' : 'opacity-50'}`}>
-                    <div>
-                      <label className="field-label" htmlFor="reminder-frequency">
-                        Cadence
-                      </label>
-                      <select
-                        id="reminder-frequency"
-                        className="field"
-                        disabled={!emailNotifications}
-                        value={reminderFrequency}
-                        onChange={(e) => setReminderFrequency(e.target.value)}
-                      >
-                        <option value="daily">Daily nudge</option>
-                        <option value="weekly">Weekly summary</option>
-                        <option value="off">Scheduled off (completions only)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="field-label" htmlFor="reminder-time">
-                        Preferred hour
-                      </label>
-                      <select
-                        id="reminder-time"
-                        className="field"
-                        disabled={!emailNotifications}
-                        value={reminderTime?.slice(0, 5) || '09:00'}
-                        onChange={(e) => setReminderTime(e.target.value)}
-                      >
-                        {REMINDER_HOURS.map((item) => (
-                          <option key={item.value} value={item.value}>
-                            {item.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="field-label" htmlFor="reminder-timezone">
-                        Timezone
-                      </label>
-                      <select
-                        id="reminder-timezone"
-                        className="field"
-                        disabled={!emailNotifications}
-                        value={
-                          REMINDER_TIMEZONES.some((item) => item.value === timezone)
-                            ? timezone
-                            : 'UTC'
-                        }
-                        onChange={(e) => setTimezone(e.target.value)}
-                      >
-                        {!REMINDER_TIMEZONES.some((item) => item.value === timezone) && (
-                          <option value={timezone}>{timezone}</option>
-                        )}
-                        {REMINDER_TIMEZONES.map((item) => (
-                          <option key={item.value} value={item.value}>
-                            {item.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <ul className="space-y-2 border-t border-primary-dark/[0.06] pt-4 font-sans text-sm text-taupe">
-                    <li>After 7 days with no deposit on a goal, you get an inactivity nudge.</li>
-                    <li>If you still have not deposited, reminders continue every 2 days, then weekly.</li>
-                    <li>Deadline and at-risk alerts still apply when a goal is close and behind.</li>
-                  </ul>
-                </div>
-              </section>
-
-              <section className={panelClass}>
-                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
-                  <h3 className="card-title">Browser push</h3>
-                  <p className="mt-1 font-sans text-sm text-taupe">
-                    Same reminder content as email, delivered as a device notification when the cron runs.
-                  </p>
-                </div>
-                <div className="space-y-4 px-5 py-5">
-                  {!pushSupported ? (
-                    <p className="font-sans text-sm text-taupe">
-                      This browser does not support web push. Try Chrome or Edge on desktop/Android.
-                      On iPhone, install QUANT to the Home Screen first (PWA).
-                    </p>
-                  ) : (
-                    <>
-                      <p className="font-sans text-sm text-taupe">
-                        Status:{' '}
-                        <span className="text-primary-dark">
-                          {pushEnabled ? 'Enabled on this account' : 'Off'}
-                        </span>
-                      </p>
-                      <div className="flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          disabled={pushBusy}
-                          onClick={handleEnablePush}
-                          className="btn-navy min-h-[44px] disabled:opacity-60"
-                        >
-                          {pushBusy ? 'Working…' : pushEnabled ? 'Refresh this device' : 'Enable on this device'}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={pushBusy || !pushEnabled}
-                          onClick={handleDisablePush}
-                          className="btn-ghost min-h-[44px] px-4 disabled:opacity-60"
-                        >
-                          {pushBusy && pushEnabled ? 'Disabling…' : 'Disable push'}
-                        </button>
-                      </div>
-                      <p className="font-sans text-xs text-taupe">
-                        Uses your reminder hour and timezone above. iOS only works after Add to Home Screen.
-                      </p>
-                    </>
-                  )}
-                </div>
-              </section>
-
-              <button
-                type="button"
-                onClick={handleSaveReminders}
-                disabled={saving}
-                className="btn-navy min-h-[44px] disabled:opacity-60"
-              >
-                {saving ? 'Saving…' : 'Save Reminders'}
-              </button>
-            </>
-          )}
-
-          {activeTab === 'financial' && (
-            <>
-              <EarnerModeToggle
-                userId={user.user_id}
-                isEarner={isEarnerMode}
-                hasBudget={hasBudget}
-                onModeChange={onEarnerModeChange}
-              />
-
               <BudgetSetup
                 userId={user.user_id}
                 currentBudget={monthlyBudget}
@@ -823,125 +1337,76 @@ function SettingsPage({
                 currencySymbol={currencySymbol}
               />
 
-              <section className={panelClass}>
-                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
-                  <h3 className="card-title">Fiscal Year</h3>
-                  <p className="mt-1 font-sans text-sm text-taupe">
-                    When your reporting cycle begins.
-                  </p>
-                </div>
-                <div className="px-5 py-5">
-                  <label className="field-label" htmlFor="settings-fiscal">
-                    Start Month
-                  </label>
-                  <select
-                    id="settings-fiscal"
-                    value={fiscalStartMonth}
-                    onChange={(e) => setFiscalStartMonth(Number(e.target.value))}
-                    className="field max-w-xs"
-                  >
-                    {FISCAL_MONTHS.map((month, index) => (
-                      <option key={month} value={index + 1}>{month}</option>
-                    ))}
-                  </select>
-                </div>
-              </section>
-
-              <section className={panelClass}>
-                <div className="border-b border-primary-dark/[0.06] px-5 py-4 md:flex md:items-start md:justify-between md:gap-4">
-                  <div>
-                    <h3 className="card-title">Category Ledger</h3>
-                    <p className="mt-1 font-sans text-sm text-taupe">
-                      Expense categories and their colours.
-                    </p>
-                  </div>
-                  <Icon name="category" className="mt-2 hidden text-2xl text-gold md:mt-0 md:block" />
-                </div>
-
-                <div className="px-5 py-5">
-                  {categoriesLoading ? (
-                    <p className="font-sans text-sm text-taupe">Loading categories…</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {categories.map((cat) => (
-                        <div
-                          key={cat.category_id}
-                          className="flex flex-wrap items-center gap-3 rounded-lg border border-primary-dark/[0.08] bg-cream/30 px-3 py-2.5"
-                        >
-                          <input
-                            type="color"
-                            value={cat.colour || '#D4B16D'}
-                            onChange={(e) => handleUpdateCategory(cat.category_id, { color: e.target.value })}
-                            className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent"
-                            aria-label={`Colour for ${cat.name}`}
-                          />
-                          <input
-                            type="text"
-                            defaultValue={cat.name}
-                            onBlur={(e) => {
-                              if (e.target.value.trim() && e.target.value !== cat.name) {
-                                handleUpdateCategory(cat.category_id, { name: e.target.value.trim() });
-                              }
-                            }}
-                            className="min-w-[120px] flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 font-sans text-sm font-normal text-primary-dark focus:border-gold focus:outline-none"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <form
-                    onSubmit={handleCreateCategory}
-                    className="mt-5 flex flex-wrap items-end gap-3 border-t border-primary-dark/[0.06] pt-5"
-                  >
-                    <div className="min-w-[140px] flex-1">
-                      <label className="field-label" htmlFor="new-category-name">
-                        New Category
-                      </label>
-                      <input
-                        id="new-category-name"
-                        type="text"
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        placeholder="e.g. Angel Investing"
-                        className="field"
-                      />
-                    </div>
-                    <input
-                      type="color"
-                      value={newCategoryColor}
-                      onChange={(e) => setNewCategoryColor(e.target.value)}
-                      className="h-11 w-12 cursor-pointer rounded-lg border border-primary-dark/12"
-                      aria-label="Category colour"
-                    />
-                    <button type="submit" className="btn-ghost min-h-[44px]">
-                      Add
-                    </button>
-                  </form>
-                </div>
-              </section>
+              <SettingsDisclosure
+                label="Advanced — fiscal year"
+                open={showFiscalAdvanced}
+                onToggle={() => setShowFiscalAdvanced((prev) => !prev)}
+              >
+                <p className="mb-3 font-sans text-sm text-taupe">
+                  When your reporting cycle begins.
+                </p>
+                <label className="field-label" htmlFor="settings-fiscal">
+                  Start Month
+                </label>
+                <select
+                  id="settings-fiscal"
+                  value={fiscalStartMonth}
+                  onChange={(e) => setFiscalStartMonth(Number(e.target.value))}
+                  className="field max-w-xs"
+                >
+                  {FISCAL_MONTHS.map((month, index) => (
+                    <option key={month} value={index + 1}>{month}</option>
+                  ))}
+                </select>
+              </SettingsDisclosure>
 
               <button
                 type="button"
-                onClick={() => persistPreferences({ fiscal_start_month: fiscalStartMonth })}
+                onClick={handleSaveFinancialPreferences}
                 disabled={saving}
                 className="btn-navy min-h-[44px] disabled:opacity-60"
               >
-                {saving ? 'Saving…' : 'Save Fiscal Settings'}
+                {saving ? 'Saving…' : 'Save Financial Preferences'}
               </button>
+
+              <section className={panelClass}>
+                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
+                  <h3 className="card-title">More</h3>
+                  <p className="mt-1 font-sans text-sm text-taupe">
+                    Funding and what-if planning — open when you need them.
+                  </p>
+                </div>
+                <div className="space-y-2 px-5 py-5">
+                  <SettingsSectionLink
+                    icon="account_balance_wallet"
+                    label="Funding"
+                    hint="Transfer account, wallet, and cash out"
+                    onClick={() => selectTab('wallet')}
+                  />
+                  <SettingsSectionLink
+                    icon="query_stats"
+                    label="What-if simulator"
+                    hint="Test a goal before committing it to the ledger"
+                    onClick={() => selectTab('simulator')}
+                  />
+                </div>
+              </section>
             </>
           )}
 
           {activeTab === 'simulator' && (
-            <GoalSimulatorPage
-              embedded
-              user={user}
-              isEarnerMode={isEarnerMode}
-              currencyCode={currency}
-              currencySymbol={currencySymbol}
-              onGoalCreated={onGoalCreated}
-              onOpenLedger={() => onNavigate?.('savings')}
-            />
+            <>
+              <SettingsBackLink label="Financial" onClick={() => selectTab('financial')} />
+              <GoalSimulatorPage
+                embedded
+                user={user}
+                isEarnerMode={isEarnerMode}
+                currencyCode={currency}
+                currencySymbol={currencySymbol}
+                onGoalCreated={onGoalCreated}
+                onOpenLedger={() => onNavigate?.('savings')}
+              />
+            </>
           )}
 
           {activeTab === 'security' && (
@@ -1038,6 +1503,7 @@ function SettingsPage({
 
           {activeTab === 'data' && (
             <>
+              <SettingsBackLink label="Profile" onClick={() => selectTab('profile')} />
               <section className={panelClass}>
                 <div className="border-b border-primary-dark/[0.06] px-5 py-4">
                   <h3 className="card-title">Export Statement</h3>
@@ -1067,27 +1533,28 @@ function SettingsPage({
                 </div>
               </section>
 
-              <section className={panelClass}>
-                <div className="border-b border-primary-dark/[0.06] px-5 py-4">
-                  <h3 className="card-title">Soft Reset</h3>
-                  <p className="mt-1 font-sans text-sm text-taupe">
-                    Archive the current cycle and begin fresh. Export first — available in a future release.
-                  </p>
-                </div>
-                <div className="px-5 py-5">
-                  <button
-                    type="button"
-                    disabled
-                    className="btn-ghost min-h-[44px] cursor-not-allowed opacity-50"
-                  >
-                    Soft Reset (Coming Soon)
-                  </button>
-                </div>
-              </section>
+              <SettingsDisclosure
+                label="Danger zone — soft reset"
+                open={showSoftReset}
+                onToggle={() => setShowSoftReset((prev) => !prev)}
+              >
+                <p className="mb-3 font-sans text-sm text-taupe">
+                  Archive the current cycle and begin fresh. Export first — available in a future release.
+                </p>
+                <button
+                  type="button"
+                  disabled
+                  className="btn-ghost min-h-[44px] cursor-not-allowed opacity-50"
+                >
+                  Soft Reset (Coming Soon)
+                </button>
+              </SettingsDisclosure>
             </>
           )}
 
           {activeTab === 'trash' && (
+            <>
+            <SettingsBackLink label="Profile" onClick={() => selectTab('profile')} />
             <section className={panelClass}>
               <div className="flex flex-col gap-3 border-b border-primary-dark/[0.06] px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -1170,6 +1637,7 @@ function SettingsPage({
                 )}
               </div>
             </section>
+            </>
           )}
 
           {activeTab === 'help' && (

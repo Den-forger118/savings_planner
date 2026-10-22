@@ -48,6 +48,7 @@ function AdminUserDetail({ userId, onBack }) {
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [statusError, setStatusError] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const [actionBusy, setActionBusy] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     setLoading(true);
@@ -71,6 +72,7 @@ function AdminUserDetail({ userId, onBack }) {
     if (!data?.user) return;
 
     setConfirmDialog({
+      type: 'status',
       nextActive,
       title: nextActive
         ? `Reactivate ${data.user.full_name}?`
@@ -83,8 +85,39 @@ function AdminUserDetail({ userId, onBack }) {
     });
   };
 
-  const executeStatusChange = async () => {
+  const handleDeleteRequest = () => {
+    if (!data?.user) return;
+
+    setConfirmDialog({
+      type: 'delete',
+      title: `Delete ${data.user.full_name} permanently?`,
+      message:
+        'This removes their account, goals, transactions, and expenses from QUANT. Ledger audit lines may remain detached. This cannot be undone.',
+      confirmLabel: 'Delete permanently',
+      tone: 'danger',
+    });
+  };
+
+  const executeConfirmAction = async () => {
     if (!confirmDialog) return;
+
+    if (confirmDialog.type === 'delete') {
+      setActionBusy(true);
+      setStatusError(null);
+      try {
+        await api.delete(`/admin/users/${userId}`);
+        setConfirmDialog(null);
+        onBack();
+      } catch (err) {
+        setStatusError(
+          getFriendlyError(err, 'We couldn’t delete that account. Please try again.')
+        );
+        setConfirmDialog(null);
+      } finally {
+        setActionBusy(false);
+      }
+      return;
+    }
 
     const { nextActive } = confirmDialog;
     const action = nextActive ? 'reactivate' : 'deactivate';
@@ -170,26 +203,37 @@ function AdminUserDetail({ userId, onBack }) {
             {user.is_admin ? ' · Admin' : ''}
           </span>
           {!user.is_admin && (
-            <button
-              type="button"
-              disabled={statusUpdating}
-              onClick={() => handleStatusChange(user.is_active === false)}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-colors disabled:opacity-50 ${
-                user.is_active === false
-                  ? 'border-emerald-300 text-emerald-800 hover:bg-emerald-50'
-                  : 'border-red-300 text-red-700 hover:bg-red-50'
-              }`}
-            >
-              <Icon
-                name={user.is_active === false ? 'person_add' : 'person_off'}
-                className="text-sm"
-              />
-              {statusUpdating
-                ? 'Saving…'
-                : user.is_active === false
-                  ? 'Reactivate account'
-                  : 'Deactivate account'}
-            </button>
+            <div className="flex flex-col gap-2 sm:items-end">
+              <button
+                type="button"
+                disabled={statusUpdating || actionBusy}
+                onClick={() => handleStatusChange(user.is_active === false)}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] transition-colors disabled:opacity-50 ${
+                  user.is_active === false
+                    ? 'border-emerald-300 text-emerald-800 hover:bg-emerald-50'
+                    : 'border-red-300 text-red-700 hover:bg-red-50'
+                }`}
+              >
+                <Icon
+                  name={user.is_active === false ? 'person_add' : 'person_off'}
+                  className="text-sm"
+                />
+                {statusUpdating
+                  ? 'Saving…'
+                  : user.is_active === false
+                    ? 'Reactivate account'
+                    : 'Deactivate account'}
+              </button>
+              <button
+                type="button"
+                disabled={statusUpdating || actionBusy}
+                onClick={handleDeleteRequest}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-400 bg-red-50 px-3 py-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-red-800 transition-colors hover:bg-red-100 disabled:opacity-50"
+              >
+                <Icon name="delete_forever" className="text-sm" />
+                {actionBusy ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -423,10 +467,10 @@ function AdminUserDetail({ userId, onBack }) {
         message={confirmDialog?.message || ''}
         confirmLabel={confirmDialog?.confirmLabel || 'Confirm'}
         tone={confirmDialog?.tone || 'danger'}
-        loading={statusUpdating}
-        onConfirm={executeStatusChange}
+        loading={statusUpdating || actionBusy}
+        onConfirm={executeConfirmAction}
         onCancel={() => {
-          if (!statusUpdating) setConfirmDialog(null);
+          if (!statusUpdating && !actionBusy) setConfirmDialog(null);
         }}
       />
     </div>

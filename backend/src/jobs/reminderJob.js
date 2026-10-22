@@ -46,8 +46,30 @@ function money(user, amount) {
   return formatMoney(amount, user.currency || 'USD', user.currency_symbol || null);
 }
 
-function buildItemsForGoal(user, goal) {
-  const breakdown = calculationModel.getGoalBreakdown(goal, 0);
+/**
+ * Noon on the member's local calendar date so days_remaining matches reminder scheduling.
+ */
+function localReferenceDate(local) {
+  if (!local?.dateStr) return new Date();
+  return new Date(`${local.dateStr}T12:00:00`);
+}
+
+/**
+ * Prefer the most useful live cadence for copy (daily always available when remaining > 0).
+ */
+function formatCadenceHint(user, ctx) {
+  if (!ctx || ctx.remaining <= 0) return null;
+  const weekly = ctx.breakdown?.savings_needed?.weekly || 0;
+  const daily = ctx.daily || 0;
+  if (daily <= 0) return null;
+  if (ctx.daysRemaining >= 14 && weekly > 0) {
+    return `about ${money(user, daily)}/day or ${money(user, weekly)}/week`;
+  }
+  return `about ${money(user, daily)}/day`;
+}
+
+function buildItemsForGoal(user, goal, currentDate = new Date()) {
+  const breakdown = calculationModel.getGoalBreakdown(goal, 0, currentDate);
   const daysRemaining = breakdown.days_remaining;
   const remaining = breakdown.remaining_amount;
   const daily = breakdown.savings_needed.daily;
@@ -69,6 +91,7 @@ function buildItemsForGoal(user, goal) {
 async function collectDigestLines(user, goals, local, frequency) {
   const lines = [];
   const claimKinds = [];
+  const asOf = localReferenceDate(local);
 
   const primary = goals[0];
   const isDigestDay = frequency === 'daily' || (frequency === 'weekly' && local.isMonday);
@@ -85,15 +108,18 @@ async function collectDigestLines(user, goals, local, frequency) {
       if (frequency === 'weekly') {
         const behindGoals = goals
           .map((goal) => {
-            const ctx = buildItemsForGoal(user, goal);
+            const ctx = buildItemsForGoal(user, goal, asOf);
             return ctx.behind > 0 ? ctx : null;
           })
           .filter(Boolean);
 
         if (behindGoals.length > 0) {
           behindGoals.forEach((ctx) => {
+            const cadence = formatCadenceHint(user, ctx);
             lines.push(
-              `You're ${money(user, ctx.behind)} behind on ${ctx.goal.name}`
+              cadence
+                ? `You're ${money(user, ctx.behind)} behind on ${ctx.goal.name} — ${cadence} to catch the deadline`
+                : `You're ${money(user, ctx.behind)} behind on ${ctx.goal.name}`
             );
           });
         } else {
@@ -101,15 +127,27 @@ async function collectDigestLines(user, goals, local, frequency) {
         }
         claimKinds.push({ kind: 'weekly_summary', goalId: null });
       } else {
-        const ctx = buildItemsForGoal(user, primary);
-        if (ctx.daily > 0 && ctx.remaining > 0) {
-          lines.push(
-            `Save ${money(user, ctx.daily)} today for ${primary.name}`
-          );
-        } else if (ctx.remaining <= 0) {
-          lines.push(`${primary.name} is ready to mark complete — open QUANT to finish it.`);
+        // Daily: live amount for every active goal still needing deposits (priority order).
+        const activeCtx = goals
+          .map((goal) => buildItemsForGoal(user, goal, asOf))
+          .filter((ctx) => ctx.remaining > 0 && ctx.daily > 0);
+
+        if (activeCtx.length === 0) {
+          const ctx = buildItemsForGoal(user, primary, asOf);
+          if (ctx.remaining <= 0) {
+            lines.push(`${primary.name} is ready to mark complete — open QUANT to finish it.`);
+          } else {
+            lines.push(`A quick check-in on ${primary.name} keeps your plan on track.`);
+          }
         } else {
-          lines.push(`A quick check-in on ${primary.name} keeps your plan on track.`);
+          activeCtx.slice(0, 4).forEach((ctx) => {
+            lines.push(
+              `Save ${money(user, ctx.daily)} today for ${ctx.goal.name} (${ctx.daysRemaining} day${ctx.daysRemaining === 1 ? '' : 's'} left)`
+            );
+          });
+          if (activeCtx.length > 4) {
+            lines.push(`Plus ${activeCtx.length - 4} more goal${activeCtx.length - 4 === 1 ? '' : 's'} still need deposits.`);
+          }
         }
         claimKinds.push({ kind: 'daily_nudge', goalId: null });
       }
@@ -117,8 +155,9 @@ async function collectDigestLines(user, goals, local, frequency) {
   }
 
   for (const goal of goals) {
-    const ctx = buildItemsForGoal(user, goal);
+    const ctx = buildItemsForGoal(user, goal, asOf);
     const daysIdle = daysBetweenDates(goal.last_deposit_at || goal.created_at, local.dateStr);
+    const cadence = formatCadenceHint(user, ctx);
 
     const lastInactivity = await reminderModel.getLastSendDate({
       userId: user.user_id,
@@ -136,11 +175,15 @@ async function collectDigestLines(user, goals, local, frequency) {
       if (!alreadyToday) {
         if (daysIdle >= 7 && !lastInactivity) {
           lines.push(
-            `It's been ${daysIdle} days with no deposit toward ${goal.name}. A small start counts.`
+            cadence
+              ? `It's been ${daysIdle} days with no deposit toward ${goal.name}. You're now looking at ${cadence} to stay on track.`
+              : `It's been ${daysIdle} days with no deposit toward ${goal.name}. A small start counts.`
           );
         } else {
           lines.push(
-            `Still no deposit on ${goal.name} (${daysIdle} days). QUANT is waiting when you're ready.`
+            cadence
+              ? `Still no deposit on ${goal.name} (${daysIdle} days). Catch up with ${cadence}.`
+              : `Still no deposit on ${goal.name} (${daysIdle} days). QUANT is waiting when you're ready.`
           );
         }
         claimKinds.push({ kind: 'inactivity', goalId: goal.goal_id });
@@ -164,11 +207,19 @@ async function collectDigestLines(user, goals, local, frequency) {
       });
       if (already || ever) continue;
 
-      lines.push(
-        milestone === 1
-          ? `Tomorrow is the deadline for ${goal.name}`
-          : `${milestone} days until your ${goal.name} deadline`
-      );
+      if (milestone === 1) {
+        lines.push(
+          cadence
+            ? `Tomorrow is the deadline for ${goal.name} — ${cadence} if you still need ${money(user, ctx.remaining)}`
+            : `Tomorrow is the deadline for ${goal.name}`
+        );
+      } else {
+        lines.push(
+          cadence
+            ? `${milestone} days until your ${goal.name} deadline — ${cadence} to finish`
+            : `${milestone} days until your ${goal.name} deadline`
+        );
+      }
       claimKinds.push({ kind, goalId: goal.goal_id });
     }
 
@@ -187,7 +238,7 @@ async function collectDigestLines(user, goals, local, frequency) {
       });
       if (!already) {
         lines.push(
-          `Critical — you need ${money(user, ctx.remaining)} in ${ctx.daysRemaining} day${ctx.daysRemaining === 1 ? '' : 's'} for ${goal.name}`
+          `Critical — you need ${money(user, ctx.remaining)} in ${ctx.daysRemaining} day${ctx.daysRemaining === 1 ? '' : 's'} for ${goal.name} (${money(user, ctx.daily)}/day)`
         );
         claimKinds.push({ kind, goalId: goal.goal_id });
       }
@@ -322,4 +373,8 @@ module.exports = {
   startReminderCron,
   processUser,
   shouldSendInactivity,
+  buildItemsForGoal,
+  formatCadenceHint,
+  localReferenceDate,
+  collectDigestLines,
 };

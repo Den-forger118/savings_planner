@@ -1,6 +1,11 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { shouldSendInactivity } = require('../src/jobs/reminderJob');
+const {
+  shouldSendInactivity,
+  buildItemsForGoal,
+  formatCadenceHint,
+  localReferenceDate,
+} = require('../src/jobs/reminderJob');
 const { getLocalParts, parseReminderTime, isReminderHour } = require('../src/utils/localTime');
 const { formatMoney } = require('../src/utils/moneyFormat');
 
@@ -21,6 +26,46 @@ describe('shouldSendInactivity', () => {
   it('spaces to weekly after 21 idle days', () => {
     assert.equal(shouldSendInactivity(25, '2026-10-11', '2026-10-18'), true);
     assert.equal(shouldSendInactivity(25, '2026-10-14', '2026-10-18'), false);
+  });
+});
+
+describe('live cadence as days pass', () => {
+  const baseGoal = {
+    goal_id: 1,
+    name: 'Phone',
+    target_amount: 300,
+    saved_amount: 0,
+    deadline: '2026-11-17',
+    created_at: '2026-10-01',
+    is_complete: false,
+    is_paused: false,
+  };
+
+  it('raises daily needed when fewer days remain with no new deposits', () => {
+    const early = buildItemsForGoal({}, baseGoal, new Date('2026-10-18T12:00:00'));
+    const later = buildItemsForGoal({}, baseGoal, new Date('2026-11-01T12:00:00'));
+    assert.ok(later.daysRemaining < early.daysRemaining);
+    assert.ok(later.daily > early.daily);
+    assert.equal(early.remaining, later.remaining);
+  });
+
+  it('formats cadence hints from the live breakdown', () => {
+    const ctx = buildItemsForGoal(
+      { currency: 'GHS', currency_symbol: '₵' },
+      baseGoal,
+      new Date('2026-10-18T12:00:00')
+    );
+    const hint = formatCadenceHint({ currency: 'GHS', currency_symbol: '₵' }, ctx);
+    assert.match(hint, /₵/);
+    assert.match(hint, /day/);
+  });
+
+  it('builds a local reference date from reminder local parts', () => {
+    const ref = localReferenceDate({ dateStr: '2026-10-18' });
+    assert.ok(ref instanceof Date);
+    assert.equal(Number.isNaN(ref.getTime()), false);
+    // Local noon on that calendar day (string form may shift TZ in ISO)
+    assert.match(ref.toString(), /Oct 18 2026|2026/);
   });
 });
 

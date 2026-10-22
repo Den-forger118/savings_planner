@@ -14,7 +14,6 @@ import ExpenseSummary from './components/ExpenseSummary';
 import SettingsPage from './components/SettingsPage';
 import PaymentCallbackPage from './components/PaymentCallbackPage';
 import CoachPage from './components/CoachPage';
-import { openPaystackPopup } from './utils/paystackPopup';
 import OnboardingPage from './pages/OnboardingPage';
 import LandingPage from './pages/LandingPage';
 import AdminPage from './pages/AdminPage';
@@ -180,6 +179,7 @@ function GoalPortfolioCard({
   onGoalUpdated,
   onGoalDeleted,
   onTransactionRecorded,
+  onWalletBalanceChange,
 }) {
   const goalActionsRef = useRef(null);
   const menuRef = useRef(null);
@@ -197,8 +197,10 @@ function GoalPortfolioCard({
   const [txNote, setTxNote] = useState('');
   const [txLoading, setTxLoading] = useState(false);
   const [txError, setTxError] = useState(null);
-  const [paystackConfig, setPaystackConfig] = useState(null);
-  const [paystackLoading, setPaystackLoading] = useState(false);
+  const [allocateLoading, setAllocateLoading] = useState(false);
+  const [showCardBudgetAllocation, setShowCardBudgetAllocation] = useState(false);
+  const [showTxFundingHelp, setShowTxFundingHelp] = useState(false);
+  const navigate = useNavigate();
   const [pauseConfirmOpen, setPauseConfirmOpen] = useState(false);
   const [pauseLoading, setPauseLoading] = useState(false);
   const [statusAlert, setStatusAlert] = useState(null);
@@ -302,6 +304,7 @@ function GoalPortfolioCard({
 
   const closeTransactionModal = () => {
     setShowTransactionModal(false);
+    setShowTxFundingHelp(false);
     resetTransactionForm();
   };
 
@@ -371,85 +374,48 @@ function GoalPortfolioCard({
   const openTransactionModal = () => {
     resetTransactionForm();
     setShowTransactionModal(true);
-    if (!paystackConfig) {
-      api.get('/payments/config')
-        .then((response) => setPaystackConfig(response.data))
-        .catch(() => setPaystackConfig({ enabled: false }));
-    }
   };
 
-  const handlePaystackDeposit = async () => {
+  const walletBalance = Number.parseFloat(user?.wallet_balance) || 0;
+  const hasTransferAccount = Boolean(user?.virtual_account_number);
+
+  const handleAllocateFromWallet = async () => {
     setTxError(null);
 
     if (txType !== 'deposit') {
-      setTxError('Paystack is only available for deposits.');
+      setTxError('Allocate from wallet is only available for deposits.');
       return;
     }
 
-    if (!txAmount || parseFloat(txAmount) < 1) {
-      setTxError('Enter at least 1.00 to pay with Paystack.');
+    const amount = parseFloat(txAmount);
+    if (!amount || amount < 0.01) {
+      setTxError('Enter a valid amount to allocate from your wallet.');
       return;
     }
 
-    setPaystackLoading(true);
+    if (amount > walletBalance + 0.00001) {
+      setTxError(`Wallet only has ${money(walletBalance)} available.`);
+      return;
+    }
+
+    setAllocateLoading(true);
     try {
-      const response = await api.post('/payments/initialize', {
+      const response = await api.post('/wallet/allocate', {
         goalId: goal.goal_id,
-        amount: parseFloat(txAmount),
+        amount,
       });
-      const accessCode = response.data.access_code;
-      const reference = response.data.reference;
-      if (!accessCode) {
-        setTxError('Paystack did not return an access code for checkout.');
-        return;
-      }
-
-      // Popup stays on QUANT. Credit happens via /payments/verify (webhooks cannot reach localhost).
-      await openPaystackPopup({
-        accessCode,
-        onSuccess: async (transaction) => {
-          const ref = transaction?.reference || reference;
-          try {
-            const verified = await api.get(`/payments/verify/${encodeURIComponent(ref)}`);
-            if (verified.data?.status !== 'success') {
-              setPaystackLoading(false);
-              setTxError(
-                'Paystack took the payment, but QUANT is still confirming it. Open Activity in a minute or use the callback page.'
-              );
-              window.location.assign(
-                `${PATHS.paymentsCallback}?reference=${encodeURIComponent(ref)}`
-              );
-              return;
-            }
-
-            const goalsResponse = await api.get(`/goals?userId=${user.user_id}`);
-            closeTransactionModal();
-            window.requestAnimationFrame(() => {
-              setGoals(goalsResponse.data.goals || []);
-              onTransactionRecorded?.(verified.data);
-            });
-          } catch (err) {
-            setPaystackLoading(false);
-            setTxError(
-              getFriendlyError(
-                err,
-                'Payment may have succeeded on Paystack, but QUANT could not record it yet. Try the activity page shortly.'
-              )
-            );
-          }
-        },
-        onCancel: () => {
-          setPaystackLoading(false);
-          setTxError('Payment cancelled. No deposit was recorded.');
-        },
-        onError: (error) => {
-          setPaystackLoading(false);
-          setTxError(error?.message || 'Paystack checkout failed. Please try again.');
-        },
+      const nextWallet = Number.parseFloat(response.data.wallet_balance);
+      onWalletBalanceChange?.(Number.isFinite(nextWallet) ? nextWallet : 0);
+      const goalsResponse = await api.get(`/goals?userId=${user.user_id}`);
+      closeTransactionModal();
+      window.requestAnimationFrame(() => {
+        setGoals(goalsResponse.data.goals || []);
+        onTransactionRecorded?.(response.data);
       });
     } catch (err) {
-      setTxError(getFriendlyError(err, 'We couldn’t start Paystack checkout. Please try again.'));
-      setPaystackLoading(false);
+      setTxError(getFriendlyError(err, 'Could not allocate from wallet. Please try again.'));
+    } finally {
+      setAllocateLoading(false);
     }
   };
 
@@ -823,78 +789,103 @@ function GoalPortfolioCard({
             </div>
           </div>
         ) : isEarnerMode ? (
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] grid-rows-[auto_auto] gap-x-3">
-              <p className="border-r border-cream/15 pr-3 font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-cream/60">
-                Monthly Allocation
-              </p>
-              <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-cream/60">
-                Budget Share
-              </p>
-              <div aria-hidden="true" />
-
-              <div className="mt-0.5 flex items-center gap-1 border-r border-cream/15 pr-3">
-                <p className="font-money text-base font-light leading-none tracking-[0.02em]">
-                  <OdometerNumber
-                    value={allocated}
-                    prefix={user.currency_symbol || '$'}
-                  />
-                </p>
-                <div className="relative flex items-center" ref={infoRef}>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-cream/60">
+                    Pace Check
+                  </p>
+                  <p className="mt-0.5 font-serif text-lg font-light leading-tight tracking-[-0.02em]">
+                    {isBehindSchedule || !goal.on_track
+                      ? 'Needs attention'
+                      : isAhead
+                        ? 'Ahead of pace'
+                        : 'On track'}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
-                    onClick={fetchSuggestions}
-                    aria-label="View improvement suggestions"
-                    className="flex items-center justify-center p-0.5 text-cream/70 transition-colors hover:text-cream"
+                    onClick={() => setShowCardBudgetAllocation((prev) => !prev)}
+                    className="rounded-md px-2 py-1 font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-cream/80 transition-colors hover:bg-cream/10 hover:text-cream"
                   >
-                    <Icon name="info" className="text-base leading-none" />
+                    {showCardBudgetAllocation ? 'Hide budget' : 'Budget'}
                   </button>
-                  {suggestionsOpen && (
-                    <div className="absolute bottom-full left-0 z-[60] mb-2 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-xl">
-                      <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
-                        Suggestions
-                      </p>
-                      {suggestionsLoading ? (
-                        <p className="font-sans text-xs text-taupe">Loading...</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {goalSuggestions?.issues?.length > 0 && (
-                            <ul className="space-y-1">
-                              {goalSuggestions.issues.map((issue, index) => (
-                                <li key={index} className="font-sans text-xs text-red-700">
-                                  {issue}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          {goalSuggestions?.recommendations?.map((tip, index) => (
-                            <p key={index} className="font-sans text-xs leading-relaxed text-primary-dark">
-                              {tip}
-                            </p>
-                          ))}
-                          {!goalSuggestions?.issues?.length && !goalSuggestions?.recommendations?.length && (
-                            <p className="font-sans text-xs text-taupe">No suggestions available.</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={openTransactionModal}
+                    aria-label="Log transaction"
+                    className="flex items-center justify-center rounded-md p-0.5 opacity-90 transition-opacity hover:opacity-100"
+                  >
+                    <TransactionIcon className="h-6 w-6" />
+                  </button>
                 </div>
               </div>
-              <div className="mt-0.5 flex items-center">
-                <p className="font-money text-base font-light leading-none tracking-[0.02em]">
-                  {budgetShare.toFixed(0)}%
-                </p>
-              </div>
-              <div className="mt-0.5 flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={openTransactionModal}
-                  aria-label="Log transaction"
-                  className="flex items-center justify-center rounded-md p-0.5 opacity-90 transition-opacity hover:opacity-100"
-                >
-                  <TransactionIcon className="h-6 w-6" />
-                </button>
-              </div>
+              {showCardBudgetAllocation && (
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-3 border-t border-cream/15 pt-2">
+                  <div>
+                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-cream/60">
+                      Monthly Allocation
+                    </p>
+                    <div className="mt-0.5 flex items-center gap-1">
+                      <p className="font-money text-base font-light leading-none tracking-[0.02em]">
+                        <OdometerNumber
+                          value={allocated}
+                          prefix={user.currency_symbol || '$'}
+                        />
+                      </p>
+                      <div className="relative flex items-center" ref={infoRef}>
+                        <button
+                          type="button"
+                          onClick={fetchSuggestions}
+                          aria-label="View improvement suggestions"
+                          className="flex items-center justify-center p-0.5 text-cream/70 transition-colors hover:text-cream"
+                        >
+                          <Icon name="info" className="text-base leading-none" />
+                        </button>
+                        {suggestionsOpen && (
+                          <div className="absolute bottom-full left-0 z-[60] mb-2 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-xl">
+                            <p className="mb-2 font-sans text-xs font-normal uppercase tracking-[0.12em] text-taupe">
+                              Suggestions
+                            </p>
+                            {suggestionsLoading ? (
+                              <p className="font-sans text-xs text-taupe">Loading...</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {goalSuggestions?.issues?.length > 0 && (
+                                  <ul className="space-y-1">
+                                    {goalSuggestions.issues.map((issue, index) => (
+                                      <li key={index} className="font-sans text-xs text-red-700">
+                                        {issue}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                {goalSuggestions?.recommendations?.map((tip, index) => (
+                                  <p key={index} className="font-sans text-xs leading-relaxed text-primary-dark">
+                                    {tip}
+                                  </p>
+                                ))}
+                                {!goalSuggestions?.issues?.length && !goalSuggestions?.recommendations?.length && (
+                                  <p className="font-sans text-xs text-taupe">No suggestions available.</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-sans text-[10px] font-normal uppercase tracking-[0.12em] text-cream/60">
+                      Budget Share
+                    </p>
+                    <p className="mt-0.5 font-money text-base font-light leading-none tracking-[0.02em]">
+                      {budgetShare.toFixed(0)}%
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-between gap-3">
@@ -982,9 +973,28 @@ function GoalPortfolioCard({
             <div className="modal-header">
               <div className="min-w-0">
                 <h2 id="record-transaction-title" className="modal-title">
-                  Record Transaction
+                  {txType === 'deposit' ? 'Add to goal' : 'Reduce goal'}
                 </h2>
                 <p className="mt-1 truncate font-sans text-sm font-light text-taupe">{goal.name}</p>
+                <p className="mt-2 font-sans text-xs leading-relaxed text-taupe">
+                  {txType === 'deposit'
+                    ? 'Allocate from wallet, or record on the ledger only.'
+                    : 'Lowers saved amount on the ledger only.'}
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 font-sans text-xs text-primary-dark underline underline-offset-2"
+                  onClick={() => setShowTxFundingHelp((prev) => !prev)}
+                >
+                  {showTxFundingHelp ? 'Hide how this works' : 'How this works'}
+                </button>
+                {showTxFundingHelp && (
+                  <p className="mt-2 font-sans text-xs leading-relaxed text-taupe">
+                    {txType === 'deposit'
+                      ? 'Real money enters via Settings → Funding (transfer account → wallet). Allocate moves wallet onto this goal. Manual entry updates the ledger only — no MoMo/bank move.'
+                      : 'This does not send money to MoMo or bank. Cash out from Settings → Funding → wallet withdraw.'}
+                  </p>
+                )}
               </div>
               <button
                 type="button"
@@ -1008,7 +1018,7 @@ function GoalPortfolioCard({
                       : 'text-taupe hover:text-primary-dark'
                   }`}
                 >
-                  Deposit
+                  Add
                 </button>
                 <button
                   type="button"
@@ -1019,7 +1029,7 @@ function GoalPortfolioCard({
                       : 'text-taupe hover:text-primary-dark'
                   }`}
                 >
-                  Withdrawal
+                  Reduce
                 </button>
               </div>
 
@@ -1062,49 +1072,62 @@ function GoalPortfolioCard({
 
               {txError && <ErrorBanner message={txError} />}
 
+              {txType === 'deposit' && walletBalance > 0 && !isComplete && !isPaused && (
+                <>
+                  <button
+                    type="button"
+                    disabled={txLoading || allocateLoading}
+                    onClick={handleAllocateFromWallet}
+                    className="modal-submit"
+                  >
+                    {allocateLoading
+                      ? 'Allocating…'
+                      : `Allocate from wallet (${money(walletBalance)} available)`}
+                  </button>
+                  <p className="mt-1 text-center font-sans text-xs text-taupe">
+                    Moves money already in QUANT onto this goal — no new transfer.
+                  </p>
+                </>
+              )}
+
+              {txType === 'deposit' && walletBalance <= 0 && !isComplete && !isPaused && (
+                <div className="mb-3 rounded-lg border border-primary-dark/10 bg-cream/50 px-3 py-3">
+                  <p className="font-sans text-xs leading-relaxed text-taupe">
+                    {hasTransferAccount
+                      ? 'Wallet is empty. Transfer into your QUANT account (Settings → Funding), then allocate here — or leave auto-apply on.'
+                      : 'Set up your transfer account in Settings → Funding, send money there, then allocate to goals.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-2 font-sans text-xs font-normal text-primary-dark underline underline-offset-2"
+                    onClick={() => {
+                      closeTransactionModal();
+                      navigate(`${PATHS.settings}?tab=wallet`);
+                    }}
+                  >
+                    Open Wallet
+                  </button>
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={txLoading || paystackLoading}
-                className="modal-submit"
+                disabled={txLoading || allocateLoading}
+                className={
+                  txType === 'deposit' && walletBalance > 0 && !isComplete && !isPaused
+                    ? 'mt-2 w-full rounded-lg border border-primary-dark/15 bg-cream/70 px-4 py-3 font-sans text-sm font-normal text-primary-dark transition-colors hover:bg-cream disabled:opacity-60'
+                    : 'modal-submit'
+                }
               >
-                {txLoading ? 'Recording…' : 'Confirm manual entry'}
+                {txLoading
+                  ? 'Recording…'
+                  : txType === 'deposit'
+                    ? 'Confirm manual entry'
+                    : 'Confirm withdrawal'}
               </button>
-
-              {txType === 'deposit'
-                && paystackConfig?.enabled
-                && (paystackConfig.supportedCurrencies || [paystackConfig.currency || 'GHS'])
-                  .map((code) => String(code).toUpperCase())
-                  .includes(String(user.currency || '').toUpperCase())
-                && !isComplete
-                && !isPaused && (
-                <button
-                  type="button"
-                  disabled={txLoading || paystackLoading}
-                  onClick={handlePaystackDeposit}
-                  className="mt-2 w-full rounded-lg border border-primary-dark/15 bg-cream/70 px-4 py-3 font-sans text-sm font-normal text-primary-dark transition-colors hover:bg-cream disabled:opacity-60"
-                >
-                  {paystackLoading
-                    ? 'Opening Paystack…'
-                    : String(user.currency || '').toUpperCase()
-                        === String(paystackConfig.settlementCurrency || paystackConfig.currency || 'GHS').toUpperCase()
-                      ? `Pay with Paystack (${user.currency})`
-                      : `Pay with Paystack (${user.currency} → ${paystackConfig.settlementCurrency || paystackConfig.currency || 'GHS'})`}
-                </button>
-              )}
-
-              {txType === 'deposit' && paystackConfig?.enabled
-                && !(paystackConfig.supportedCurrencies || [paystackConfig.currency || 'GHS'])
-                  .map((code) => String(code).toUpperCase())
-                  .includes(String(user.currency || '').toUpperCase()) && (
-                <p className="mt-2 text-center font-sans text-xs text-taupe">
-                  Paystack supports {(paystackConfig.supportedCurrencies || ['GHS']).join(', ')}.
-                  Switch display currency in Settings to use checkout.
-                </p>
-              )}
-
-              {txType === 'deposit' && paystackConfig && !paystackConfig.enabled && (
-                <p className="mt-2 text-center font-sans text-xs text-taupe">
-                  Paystack checkout will appear here once API keys are configured on the server.
+              {txType === 'deposit' && (
+                <p className="mt-1 text-center font-sans text-xs text-taupe">
+                  Manual entry does not move money from MoMo, bank, or your wallet.
                 </p>
               )}
             </form>
@@ -1258,6 +1281,67 @@ function App() {
     }
     fetchData();
   }, [user, fetchData]);
+
+  // Recalculate cadence (days left → daily/weekly needed) when the calendar day
+  // rolls over or the user returns to the tab after being away.
+  useEffect(() => {
+    if (!user?.user_id || user.onboarding_complete === false) return undefined;
+
+    let lastLocalDate = new Date().toDateString();
+
+    const refreshIfDayChanged = () => {
+      const today = new Date().toDateString();
+      if (today !== lastLocalDate) {
+        lastLocalDate = today;
+        fetchData();
+      }
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        lastLocalDate = new Date().toDateString();
+        fetchData();
+      }
+    };
+
+    const intervalId = window.setInterval(refreshIfDayChanged, 60 * 60 * 1000);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [user?.user_id, user?.onboarding_complete, fetchData]);
+
+  useEffect(() => {
+    if (!user?.user_id || user.onboarding_complete === false) return undefined;
+    let cancelled = false;
+    api.get('/wallet')
+      .then((response) => {
+        if (cancelled) return;
+        const nextBalance = Number.parseFloat(response.data?.wallet_balance);
+        if (!Number.isFinite(nextBalance)) return;
+        setUser((prev) => {
+          if (!prev || Number(prev.wallet_balance) === nextBalance) return prev;
+          const next = {
+            ...prev,
+            wallet_balance: nextBalance,
+            phone: response.data.phone ?? prev.phone,
+            virtual_account_number:
+              response.data.virtual_account_number ?? prev.virtual_account_number,
+            virtual_account_bank:
+              response.data.virtual_account_bank ?? prev.virtual_account_bank,
+            virtual_account_name:
+              response.data.virtual_account_name ?? prev.virtual_account_name,
+          };
+          localStorage.setItem('user', JSON.stringify(next));
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.user_id, user?.onboarding_complete, transactionRefresh]);
 
   const handleOnboardingComplete = (updatedUser) => {
     localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -1624,23 +1708,14 @@ function App() {
           <p className="eyebrow">Operations</p>
           <h2 className="page-title">Goal &amp; Savings</h2>
           <p className="page-lede">
-            Allocation, goal health, spending movement, and recent ledger activity.
+            Funding vs budget, allocation, goal health, and recent ledger activity.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="surface min-w-0 px-4 py-3">
-            <p className="field-label mb-0">Portfolio Target</p>
-            <p className="mt-1 break-words font-money text-xl font-light tracking-[0.02em] text-primary-dark sm:text-2xl">
-              {formatMoney(totalTarget, userCurrency, userCurrencySymbol)}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate(PATHS.savings)}
-            className="btn-navy"
-          >
-            + New Goal
-          </button>
+        <div className="surface min-w-0 px-5 py-3.5 sm:min-w-[12rem]">
+          <p className="field-label mb-0">Portfolio Target</p>
+          <p className="mt-1 break-words font-money text-xl font-light tracking-[0.02em] text-primary-dark sm:text-2xl">
+            {formatMoney(totalTarget, userCurrency, userCurrencySymbol)}
+          </p>
         </div>
       </section>
 
@@ -1662,11 +1737,11 @@ function App() {
         goals={goals}
         currencyCode={userCurrency}
         currencySymbol={userCurrencySymbol}
-        expenseRefresh={expenseRefresh}
         transactionRefresh={transactionRefresh}
         onViewAllActivity={() => openActivityPage('all')}
         onAddGoal={() => navigate(PATHS.savings)}
         onEditBudget={() => setBudgetEditRequest((n) => n + 1)}
+        onOpenFunding={() => navigate(`${PATHS.settings}?tab=wallet`)}
       />
     </div>
   );
@@ -1687,15 +1762,75 @@ function App() {
     goalsPage * GOALS_PER_PAGE
   );
 
-  const renderSavingsGoals = () => (
+  const walletBalance = Number.parseFloat(user?.wallet_balance) || 0;
+
+  const handleWalletBalanceChange = (nextBalance) => {
+    setUser((prev) => (prev ? { ...prev, wallet_balance: nextBalance } : prev));
+    try {
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        parsed.wallet_balance = nextBalance;
+        localStorage.setItem('user', JSON.stringify(parsed));
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const renderSavingsGoals = () => {
+    const hasTransferAccount = Boolean(user?.virtual_account_number);
+    const autoApplyOn = user?.auto_allocate_wallet !== false;
+
+    return (
     <div className="space-y-6">
       <section className="space-y-6">
+        {walletBalance > 0 ? (
+          <div className="surface flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="eyebrow">Funding</p>
+              <p className="mt-1 font-sans text-sm text-taupe">
+                Unallocated wallet — open a goal and Allocate from wallet
+                {autoApplyOn
+                  ? '. New transfers also auto-apply by folio priority.'
+                  : '. Auto-apply is off until you allocate.'}
+              </p>
+              <p className="mt-2 font-money text-xl font-light text-primary-dark">
+                {formatMoney(walletBalance, userCurrency, userCurrencySymbol)}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn-ghost h-10 shrink-0"
+              onClick={() => navigate(`${PATHS.settings}?tab=wallet`)}
+            >
+              Open Funding
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-sans text-sm text-taupe">
+              {hasTransferAccount
+                ? 'Wallet empty — transfer in via Funding, then allocate.'
+                : 'No transfer account yet.'}
+            </p>
+            <button
+              type="button"
+              className="btn-ghost h-10 shrink-0"
+              onClick={() => navigate(`${PATHS.settings}?tab=wallet`)}
+            >
+              {hasTransferAccount ? 'Open Funding' : 'Set up Funding'}
+            </button>
+          </div>
+        )}
+
         <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <p className="eyebrow">Savings Goals</p>
             <h2 className="page-title">Objective Ledger</h2>
             <p className="page-lede">
-              First in the folio is highest intent. Drag a card from its navy heading to set order.
+              First in the folio is highest intent — that order also drives auto-apply. Drag a card
+              from its navy heading to set order. Progress bars are goal saved amounts, not wallet.
             </p>
           </div>
 
@@ -1753,7 +1888,7 @@ function App() {
         ) : (
           <>
             <div
-              className={`grid grid-cols-1 items-stretch gap-8 md:grid-cols-2 lg:gap-10 xl:grid-cols-3 ${
+              className={`grid grid-cols-1 items-start gap-8 md:grid-cols-2 lg:gap-10 xl:grid-cols-3 ${
                 paginatedGoals.length === 1 ? 'py-2 sm:py-4' : ''
               } ${draggingGoalId ? 'touch-none' : ''}`}
               onPointerDown={handleGoalsGridPointerDown}
@@ -1777,6 +1912,7 @@ function App() {
                   onGoalUpdated={handleGoalUpdated}
                   onGoalDeleted={handleGoalDeleted}
                   onTransactionRecorded={handleTransactionRecorded}
+                  onWalletBalanceChange={handleWalletBalanceChange}
                 />
               ))}
             </div>
@@ -1795,7 +1931,8 @@ function App() {
         )}
       </section>
     </div>
-  );
+    );
+  };
 
   const renderExpenses = () => (
     <div className="space-y-6">

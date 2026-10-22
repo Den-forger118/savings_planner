@@ -34,12 +34,17 @@ const getGoalTransactionBalance = async (client, goalId) => {
 /**
  * Atomically record a transaction and sync goal.saved_amount.
  * Rejects withdrawals that would take the goal balance below zero.
+ * Pass `{ client }` to join an outer DB transaction (caller owns BEGIN/COMMIT).
  */
-const recordTransaction = async (userId, goalId, amount, type, note = '') => {
-  const client = await pool.connect();
+const recordTransaction = async (userId, goalId, amount, type, note = '', options = {}) => {
+  const externalClient = options.client || null;
+  const ownsTransaction = !externalClient;
+  const client = externalClient || (await pool.connect());
 
   try {
-    await client.query('BEGIN');
+    if (ownsTransaction) {
+      await client.query('BEGIN');
+    }
 
     // Lock the goal row so concurrent withdrawals cannot overdraft.
     const goalLock = await client.query(
@@ -95,21 +100,27 @@ const recordTransaction = async (userId, goalId, amount, type, note = '') => {
       [goalId]
     );
 
-    await client.query('COMMIT');
+    if (ownsTransaction) {
+      await client.query('COMMIT');
+    }
 
     return {
       transaction: insertResult.rows[0],
       savedAmount: updateResult.rows[0],
     };
   } catch (err) {
-    try {
-      await client.query('ROLLBACK');
-    } catch {
-      /* ignore rollback errors */
+    if (ownsTransaction) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        /* ignore rollback errors */
+      }
     }
     throw err;
   } finally {
-    client.release();
+    if (ownsTransaction) {
+      client.release();
+    }
   }
 };
 

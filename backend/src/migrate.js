@@ -190,13 +190,140 @@ const migrations = [
    )`,
   `CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
      ON push_subscriptions (user_id)`,
+  `DO $$ BEGIN
+     CREATE TYPE account_type AS ENUM ('ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE');
+   EXCEPTION WHEN duplicate_object THEN NULL;
+   END $$`,
+  `DO $$ BEGIN
+     CREATE TYPE posting_direction AS ENUM ('DEBIT', 'CREDIT');
+   EXCEPTION WHEN duplicate_object THEN NULL;
+   END $$`,
+  `CREATE TABLE IF NOT EXISTS accounts (
+     account_id SERIAL PRIMARY KEY,
+     user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+     name VARCHAR(255) NOT NULL,
+     type account_type NOT NULL,
+     currency VARCHAR(3) NOT NULL DEFAULT 'GHS',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_name_unique
+     ON accounts (name)`,
+  `CREATE INDEX IF NOT EXISTS idx_accounts_user_id
+     ON accounts (user_id)`,
+  `CREATE TABLE IF NOT EXISTS journal_entries (
+     journal_entry_id SERIAL PRIMARY KEY,
+     idempotency_key VARCHAR(255) NOT NULL UNIQUE,
+     description TEXT,
+     status VARCHAR(50) NOT NULL DEFAULT 'posted',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_journal_idempotency
+     ON journal_entries (idempotency_key)`,
+  `CREATE TABLE IF NOT EXISTS postings (
+     posting_id SERIAL PRIMARY KEY,
+     journal_entry_id INTEGER NOT NULL REFERENCES journal_entries(journal_entry_id) ON DELETE CASCADE,
+     account_id INTEGER NOT NULL REFERENCES accounts(account_id) ON DELETE RESTRICT,
+     amount NUMERIC(18, 4) NOT NULL CHECK (amount > 0),
+     direction posting_direction NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_postings_account
+     ON postings (account_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_postings_journal
+     ON postings (journal_entry_id)`,
+  `ALTER TABLE payment_references
+     ADD COLUMN IF NOT EXISTS journal_entry_id INTEGER REFERENCES journal_entries(journal_entry_id) ON DELETE SET NULL`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS wallet_balance NUMERIC(12, 2) DEFAULT 0`,
+  `UPDATE users SET wallet_balance = 0 WHERE wallet_balance IS NULL`,
+  `ALTER TABLE users
+     ALTER COLUMN wallet_balance SET DEFAULT 0`,
+  `ALTER TABLE users
+     ALTER COLUMN wallet_balance SET NOT NULL`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS phone VARCHAR(32)`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS paystack_customer_code VARCHAR(100)`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS virtual_account_number VARCHAR(20)`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS virtual_account_bank VARCHAR(100)`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS virtual_account_name VARCHAR(255)`,
+  `ALTER TABLE payment_references
+     ADD COLUMN IF NOT EXISTS kind VARCHAR(20) DEFAULT 'goal_deposit'`,
+  `UPDATE payment_references SET kind = 'goal_deposit' WHERE kind IS NULL`,
+  `ALTER TABLE payment_references
+     ALTER COLUMN kind SET DEFAULT 'goal_deposit'`,
+  `ALTER TABLE payment_references
+     ALTER COLUMN kind SET NOT NULL`,
+  `ALTER TABLE payment_references
+     ALTER COLUMN goal_id DROP NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS payouts (
+     payout_id SERIAL PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+     amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
+     currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+     status VARCHAR(20) NOT NULL DEFAULT 'pending',
+     paystack_ref VARCHAR(100) NOT NULL UNIQUE,
+     recipient_code VARCHAR(100),
+     recipient_type VARCHAR(40) NOT NULL DEFAULT 'mobile_money',
+     account_number VARCHAR(40),
+     bank_code VARCHAR(20),
+     account_name VARCHAR(255),
+     transfer_code VARCHAR(100),
+     failure_reason TEXT,
+     journal_entry_id INTEGER REFERENCES journal_entries(journal_entry_id) ON DELETE SET NULL,
+     finalize_journal_entry_id INTEGER REFERENCES journal_entries(journal_entry_id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+     completed_at TIMESTAMPTZ
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_payouts_user
+     ON payouts (user_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_payouts_status
+     ON payouts (status)`,
+  `ALTER TABLE users
+     ADD COLUMN IF NOT EXISTS auto_allocate_wallet BOOLEAN DEFAULT true`,
+  `UPDATE users SET auto_allocate_wallet = true WHERE auto_allocate_wallet IS NULL`,
+  `ALTER TABLE users
+     ALTER COLUMN auto_allocate_wallet SET DEFAULT true`,
+  `ALTER TABLE users
+     ALTER COLUMN auto_allocate_wallet SET NOT NULL`,
+  // Theme-aligned default expense category colours (name match only)
+  `UPDATE categories SET colour = '#C4A882' WHERE name = 'Food & Dining'`,
+  `UPDATE categories SET colour = '#4A5D7A' WHERE name = 'Transport'`,
+  `UPDATE categories SET colour = '#D4B16D' WHERE name = 'Entertainment'`,
+  `UPDATE categories SET colour = '#8B7355' WHERE name = 'Shopping'`,
+  `UPDATE categories SET colour = '#6B8578' WHERE name = 'Healthcare'`,
+  `UPDATE categories SET colour = '#7D8A9A' WHERE name = 'Utilities'`,
+  `UPDATE categories SET colour = '#9A9186' WHERE name = 'Other'`,
 ];
+
+const SYSTEM_ACCOUNTS = [
+  { name: 'Paystack Clearing', type: 'ASSET' },
+  { name: 'Gateway Fee Expense', type: 'EXPENSE' },
+  { name: 'Pending Disbursal', type: 'LIABILITY' },
+];
+
+const seedSystemAccounts = async () => {
+  const currency = (process.env.PAYSTACK_CURRENCY || 'GHS').toUpperCase().slice(0, 3);
+  for (const account of SYSTEM_ACCOUNTS) {
+    await pool.query(
+      `
+        INSERT INTO accounts (user_id, name, type, currency)
+        VALUES (NULL, $1, $2::account_type, $3)
+        ON CONFLICT (name) DO NOTHING
+      `,
+      [account.name, account.type, currency]
+    );
+  }
+};
 
 const runMigrations = async () => {
   for (const sql of migrations) {
     await pool.query(sql);
   }
 
+  await seedSystemAccounts();
   await repairOverdraftedGoalTransactions();
   await backfillGoalPriorities();
 

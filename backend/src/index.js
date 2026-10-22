@@ -112,6 +112,7 @@ app.use('/api/expenses', authMiddleware, expenseRoutes);
 app.use('/api/reports', authMiddleware, reportRoutes);
 app.use('/api/admin', authMiddleware, adminMiddleware, adminRoutes);
 app.use('/api/payments', authMiddleware, paymentRoutes);
+app.use('/api/wallet', authMiddleware, require('./routes/walletRoutes'));
 app.use('/api/push', authMiddleware, require('./routes/pushRoutes'));
 app.use('/api/ai', authMiddleware, require('./routes/aiRoutes'));
 

@@ -71,7 +71,7 @@
   }
 
   .ledger-card {
-    @apply relative flex h-full w-full min-w-0 flex-col overflow-hidden rounded-md bg-white;
+    @apply relative flex w-full min-w-0 flex-col overflow-hidden rounded-md bg-white;
     border: 1px solid rgba(10, 15, 26, 0.08);
     box-shadow: 0 1px 1px rgba(10, 15, 26, 0.03), 0 10px 28px rgba(10, 15, 26, 0.04);
   }

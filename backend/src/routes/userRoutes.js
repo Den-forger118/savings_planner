@@ -8,6 +8,7 @@ const transactionModel = require('../models/transactionModel');
 const expenseModel = require('../models/expenseModel');
 const { getUserBudgetContext } = require('../utils/budgetContext');
 const { formatAuthUser } = require('../utils/authUser');
+const { getBudgetFundingProgress } = require('../services/budgetFundingService');
 const pool = require('../dbcon');
 // Get user details by ID
 router.get('/:userId', async (req, res) => {
@@ -26,6 +27,23 @@ router.get('/:userId', async (req, res) => {
 });
 
 
+
+/** Month-to-date inbound funding vs monthly budget target. */
+router.get('/:userId/budget-funding', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (Number(req.user.userId) !== Number(userId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    const progress = await getBudgetFundingProgress(userId);
+    return res.json(progress);
+  } catch (err) {
+    console.error('[users] budget-funding failed:', err.message);
+    return res.status(err.statusCode || 500).json({
+      error: err.message || 'Could not load budget funding progress',
+    });
+  }
+});
 
 router.get('/:userId/budget-allocation', async (req, res) => {
   try {

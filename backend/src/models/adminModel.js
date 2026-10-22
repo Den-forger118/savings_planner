@@ -161,6 +161,54 @@ const setUserActiveStatus = async (targetUserId, isActive, actingAdminId) => {
   }
 };
 
+/**
+ * Permanently delete a member and cascaded app data.
+ * Ledger accounts for the user are detached (user_id SET NULL) so postings remain auditable.
+ */
+const deleteUser = async (targetUserId, actingAdminId) => {
+  const target = await userModel.getUserById(targetUserId);
+
+  if (!target) {
+    const error = new Error('User not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (target.is_admin === true) {
+    const error = new Error('Cannot delete an admin account');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (Number(targetUserId) === Number(actingAdminId)) {
+    const error = new Error('Cannot delete your own account');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+      DELETE FROM users
+      WHERE user_id = $1
+      RETURNING user_id, first_name, last_name, email
+    `,
+    [targetUserId]
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    const error = new Error('User not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return {
+    user_id: row.user_id,
+    full_name: `${row.first_name} ${row.last_name}`.trim(),
+    email: row.email,
+  };
+};
+
 const getPlatformStats = async () => {
   const summaryQuery = `
     SELECT
@@ -276,5 +324,6 @@ module.exports = {
   listUsers,
   getUserDetail,
   setUserActiveStatus,
+  deleteUser,
   getPlatformStats,
 };

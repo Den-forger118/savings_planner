@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "node --test test/calculationModel.test.js test/goalOrder.test.js test/goalSimulator.test.js test/reminderJob.test.js test/paystack.test.js"
+    "test": "node --test test/calculationModel.test.js test/goalOrder.test.js test/goalSimulator.test.js test/reminderJob.test.js test/paystack.test.js test/ledgerService.test.js test/walletService.test.js test/payoutService.test.js test/walletAutoAllocate.test.js"
   },
   "keywords": [],
   "author": "",

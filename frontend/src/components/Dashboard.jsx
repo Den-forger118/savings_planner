@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import ExpenseHistogram from './ExpenseHistogram';
 import GoalsLineGraph from './GoalsLineGraph';
 import CurrencyConverter from './CurrencyConverter';
+import BudgetFundingMeter from './BudgetFundingMeter';
 import { formatMoney } from '../utils/currency';
 import OdometerNumber from './OdometerNumber';
 import ProgressBar from './ProgressBar';
+import api from '../services/api';
 
 function Dashboard({
   userId,
@@ -13,18 +14,46 @@ function Dashboard({
   goals,
   currencyCode = 'USD',
   currencySymbol = '$',
-  expenseRefresh = 0,
   transactionRefresh = 0,
   onViewAllActivity,
   onAddGoal,
   onEditBudget,
+  onOpenFunding,
 }) {
   const fmt = (value) => formatMoney(value, currencyCode, currencySymbol);
   const [budgetBreakdown, setBudgetBreakdown] = useState([]);
   const [summary, setSummary] = useState(null);
   const [allocationLoading, setAllocationLoading] = useState(true);
+  const [budgetFunding, setBudgetFunding] = useState(null);
+  const [showAllocationDetails, setShowAllocationDetails] = useState(false);
   const budgetAmount = parseFloat(monthlyBudget);
   const hasBudget = Number.isFinite(budgetAmount) && budgetAmount > 0;
+  const showFundingMeter = Boolean(
+    budgetFunding
+    && (
+      (Number(budgetFunding.monthly_budget) || 0) > 0
+      || (Number(budgetFunding.funded_mtd) || 0) > 0
+      || budgetFunding.status === 'behind'
+      || budgetFunding.status === 'on_track'
+      || budgetFunding.status === 'ahead'
+    )
+  );
+
+  useEffect(() => {
+    if (!userId) return undefined;
+    let cancelled = false;
+    api
+      .get(`/users/${userId}/budget-funding`)
+      .then((response) => {
+        if (!cancelled) setBudgetFunding(response.data);
+      })
+      .catch(() => {
+        if (!cancelled) setBudgetFunding(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, monthlyBudget, isEarnerMode, transactionRefresh]);
   const hasGoals = goals.length > 0;
   const activeGoals = useMemo(
     () => goals.filter((goal) => !goal.is_complete && !goal.is_paused),
@@ -90,6 +119,12 @@ function Dashboard({
         body: 'Add a monthly savings budget to unlock allocation analytics and goal feasibility.',
       };
     }
+    if (budgetFunding?.status === 'behind') {
+      return {
+        title: 'Transfers behind budget',
+        body: `${money(budgetFunding.funded_mtd)} of ${money(budgetFunding.monthly_budget)} transferred in this month — ${money(budgetFunding.remaining)} left to meet your plan. (Separate from whether goals are feasible on paper.)`,
+      };
+    }
     if (summary?.underfunded_goals > 0) {
       return {
         title: 'Funding attention needed',
@@ -118,7 +153,7 @@ function Dashboard({
       title: 'On track',
       body: 'Your active goals look achievable with the current budget and timelines.',
     };
-  }, [
+  }, [budgetFunding,
     isEarnerMode,
     hasBudget,
     summary,
@@ -130,6 +165,16 @@ function Dashboard({
 
   return (
     <div className="mb-10 space-y-5">
+      {showFundingMeter && (
+        <BudgetFundingMeter
+          progress={budgetFunding}
+          currencyCode={currencyCode}
+          currencySymbol={currencySymbol}
+          onOpenFunding={onOpenFunding}
+          onEditBudget={onEditBudget}
+        />
+      )}
+
       {/* Top metrics + insight + actions */}
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="surface-navy flex min-h-[140px] flex-col justify-between p-5 text-cream lg:col-span-2">
@@ -147,7 +192,7 @@ function Dashboard({
             <p className="mt-2 font-sans text-xs text-cream/55">
               {isEarnerMode && hasBudget
                 ? `${summary?.budget_utilization || 0}% allocated`
-                : `${completionRate}% of portfolio target`}
+                : `${completionRate}% of portfolio target · goal saved, not wallet`}
             </p>
           </div>
         </div>
@@ -205,44 +250,32 @@ function Dashboard({
         </div>
       </section>
 
-      {/* Charts row — spending (not pie) + goal performance */}
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="min-w-0 lg:col-span-5">
-          <ExpenseHistogram
+      <section>
+        {hasGoals ? (
+          <GoalsLineGraph
             userId={userId}
-            refreshTrigger={expenseRefresh}
-            currencyCode={currencyCode}
-            currencySymbol={currencySymbol}
+            goals={goals}
+            refreshKey={transactionRefresh}
           />
-        </div>
-
-        <div className="min-w-0 lg:col-span-7">
-          {hasGoals ? (
-            <GoalsLineGraph
-              userId={userId}
-              goals={goals}
-              refreshKey={transactionRefresh}
-            />
-          ) : (
-            <div className="surface flex min-h-[280px] flex-col items-center justify-center p-5 text-center">
-              <p className="eyebrow">Savings Analytics</p>
-              <h3 className="mt-1 card-title">Goal Performance</h3>
-              <p className="mt-3 max-w-sm font-sans text-sm text-taupe">
-                Goal performance appears once you create a savings objective.
-              </p>
-              {onAddGoal && (
-                <button type="button" onClick={onAddGoal} className="btn-navy mt-5 min-h-[44px]">
-                  + New Goal
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        ) : (
+          <div className="surface flex min-h-[280px] flex-col items-center justify-center p-5 text-center">
+            <p className="eyebrow">Savings Analytics</p>
+            <h3 className="mt-1 card-title">Goal Performance</h3>
+            <p className="mt-3 max-w-sm font-sans text-sm text-taupe">
+              Goal performance appears once you create a savings objective.
+            </p>
+            {onAddGoal && (
+              <button type="button" onClick={onAddGoal} className="btn-navy mt-5 min-h-[44px]">
+                + New Goal
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Activity + goals overview */}
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="min-w-0 lg:col-span-7">
+        <div className="min-w-0 space-y-3 lg:col-span-7">
           <CurrencyConverter currencyCode={currencyCode} />
         </div>
 
@@ -293,9 +326,8 @@ function Dashboard({
         </div>
       </section>
 
-      {/* Earner allocation detail (kept, secondary) */}
       {showAllocation && !allocationLoading && summary && (
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <section className="space-y-4">
           <div className="surface p-5 md:p-6">
             <p className="eyebrow">Allocation</p>
             <h3 className="mt-1 mb-5 card-title">Monthly Allocation</h3>
@@ -321,58 +353,67 @@ function Dashboard({
                 </div>
               ))}
             </div>
+            <button
+              type="button"
+              className="mt-5 font-sans text-xs font-normal text-primary-dark underline underline-offset-2"
+              onClick={() => setShowAllocationDetails((prev) => !prev)}
+            >
+              {showAllocationDetails ? 'Hide feasibility breakdown' : 'See feasibility breakdown'}
+            </button>
           </div>
 
-          <div className="surface p-5 md:p-6">
-            <p className="eyebrow">Feasibility</p>
-            <h3 className="mt-1 mb-5 card-title">Allocation Details</h3>
-            <div className="space-y-3">
-              {budgetBreakdown.map((goal) => (
-                <div
-                  key={goal.goal_id}
-                  className={`rounded-lg border p-4 ${
-                    goal.feasible
-                      ? 'border-primary-dark/10 bg-cream/60'
-                      : 'border-gold/40 bg-gold/10'
-                  }`}
-                >
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <p className="font-sans font-normal text-primary-dark">{goal.name}</p>
-                    <span
-                      className={`rounded-md px-2 py-1 font-sans text-xs font-normal uppercase tracking-[0.12em] ${
-                        goal.feasible
-                          ? 'bg-primary-dark/10 text-primary-dark'
-                          : 'bg-gold/25 text-primary-dark'
-                      }`}
-                    >
-                      {goal.feasible ? 'Achievable' : 'Underfunded'}
-                    </span>
+          {showAllocationDetails && (
+            <div className="surface p-5 md:p-6">
+              <p className="eyebrow">Feasibility</p>
+              <h3 className="mt-1 mb-5 card-title">Allocation Details</h3>
+              <div className="space-y-3">
+                {budgetBreakdown.map((goal) => (
+                  <div
+                    key={goal.goal_id}
+                    className={`rounded-lg border p-4 ${
+                      goal.feasible
+                        ? 'border-primary-dark/10 bg-cream/60'
+                        : 'border-gold/40 bg-gold/10'
+                    }`}
+                  >
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <p className="font-sans font-normal text-primary-dark">{goal.name}</p>
+                      <span
+                        className={`rounded-md px-2 py-1 font-sans text-xs font-normal uppercase tracking-[0.12em] ${
+                          goal.feasible
+                            ? 'bg-primary-dark/10 text-primary-dark'
+                            : 'bg-gold/25 text-primary-dark'
+                        }`}
+                      >
+                        {goal.feasible ? 'Achievable' : 'Underfunded'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="font-sans text-xs text-taupe">Allocated</p>
+                        <p className="font-money font-light text-primary-dark">{fmt(goal.allocated)}</p>
+                      </div>
+                      <div>
+                        <p className="font-sans text-xs text-taupe">Needed</p>
+                        <p className="font-money font-light text-primary-dark">{fmt(goal.needed)}</p>
+                      </div>
+                    </div>
+                    {goal.shortfall > 0 && (
+                      <div className="mt-3 border-t border-gold/25 pt-3">
+                        <p className="font-sans text-xs text-taupe">
+                          Shortfall:{' '}
+                          <span className="font-money text-primary-dark">
+                            {fmt(goal.shortfall)}
+                          </span>
+                          /month
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="font-sans text-xs text-taupe">Allocated</p>
-                      <p className="font-money font-light text-primary-dark">{fmt(goal.allocated)}</p>
-                    </div>
-                    <div>
-                      <p className="font-sans text-xs text-taupe">Needed</p>
-                      <p className="font-money font-light text-primary-dark">{fmt(goal.needed)}</p>
-                    </div>
-                  </div>
-                  {goal.shortfall > 0 && (
-                    <div className="mt-3 border-t border-gold/25 pt-3">
-                      <p className="font-sans text-xs text-taupe">
-                        Shortfall:{' '}
-                        <span className="font-money text-primary-dark">
-                          {fmt(goal.shortfall)}
-                        </span>
-                        /month
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </section>
       )}
     </div>

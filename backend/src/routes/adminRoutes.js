@@ -69,4 +69,18 @@ router.patch('/users/:userId/status', async (req, res) => {
   }
 });
 
+router.delete('/users/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const deleted = await adminModel.deleteUser(userId, req.user.userId);
+
+    res.json({
+      message: 'Account deleted permanently',
+      user: deleted,
+    });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

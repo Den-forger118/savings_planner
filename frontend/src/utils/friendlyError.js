@@ -72,6 +72,11 @@ const KNOWN_PATTERNS = [
     message: 'Please enter an amount greater than zero.',
   },
   {
+    test: /dedicated nuban is not available|dva is enabled|virtual account/i,
+    message:
+      'Bank transfer accounts aren’t enabled on this Paystack business yet. Ask your admin to enable Dedicated NUBAN / virtual accounts with Paystack support.',
+  },
+  {
     test: /please provide|required/i,
     message: 'Please fill in all required fields and try again.',
   },
@@ -116,13 +121,14 @@ export function getFriendlyError(error, fallback = 'Something didn’t go throug
     return data?.error || 'For your security, sign-in is paused for a few minutes.';
   }
 
-  if (status >= 500) {
-    return 'Our servers need a moment. Your ledger is safe — please try again shortly.';
-  }
-
-  // Prefer known copy before generic session messaging (login uses 401 too)
+  // Prefer known copy before generic session / 5xx messaging (login uses 401 too)
   for (const rule of KNOWN_PATTERNS) {
     if (rule.test.test(raw)) return rule.message;
+  }
+
+  if (status >= 500) {
+    if (raw && !isTechnical(raw)) return raw;
+    return 'Our servers need a moment. Your ledger is safe — please try again shortly.';
   }
 
   if (code === 'INVALID_CREDENTIALS') {

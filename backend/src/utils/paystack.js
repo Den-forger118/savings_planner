@@ -56,7 +56,13 @@ async function paystackRequest(path, { method = 'GET', body } = {}) {
 
   if (!response.ok || payload.status === false) {
     const error = new Error(payload.message || `Paystack request failed (${response.status})`);
-    error.statusCode = response.status >= 400 && response.status < 600 ? response.status : 502;
+    // Never forward Paystack 401/403 — those are key/business gates, not the member's QUANT session.
+    // (The frontend clears the session on session-like 403s.)
+    let statusCode = response.status >= 400 && response.status < 600 ? response.status : 502;
+    if (statusCode === 401 || statusCode === 403) {
+      statusCode = 502;
+    }
+    error.statusCode = statusCode;
     error.paystack = payload;
     throw error;
   }
@@ -109,6 +115,102 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
   return hash === signatureHeader;
 }
 
+async function createCustomer({ email, firstName, lastName, phone, metadata }) {
+  return paystackRequest('/customer', {
+    method: 'POST',
+    body: {
+      email,
+      first_name: firstName,
+      last_name: lastName,
+      phone,
+      metadata,
+    },
+  });
+}
+
+async function fetchCustomer(emailOrCode) {
+  return paystackRequest(`/customer/${encodeURIComponent(emailOrCode)}`);
+}
+
+/**
+ * Create a Dedicated Virtual Account for a Paystack customer.
+ * Optional PAYSTACK_DVA_BANK (e.g. wema-bank, test-bank) sets preferred_bank.
+ */
+async function createDedicatedAccount({ customerCode, preferredBank }) {
+  const body = {
+    customer: customerCode,
+    preferred_bank: preferredBank || process.env.PAYSTACK_DVA_BANK || undefined,
+  };
+  if (!body.preferred_bank) {
+    delete body.preferred_bank;
+  }
+  return paystackRequest('/dedicated_account', {
+    method: 'POST',
+    body,
+  });
+}
+
+async function listDedicatedAccounts({ customerCode } = {}) {
+  const params = new URLSearchParams();
+  if (customerCode) params.set('customer', customerCode);
+  const qs = params.toString();
+  return paystackRequest(`/dedicated_account${qs ? `?${qs}` : ''}`);
+}
+
+/** List banks / MoMo providers (e.g. currency=GHS&type=mobile_money). */
+async function listBanks({ currency, type } = {}) {
+  const params = new URLSearchParams();
+  if (currency) params.set('currency', currency);
+  if (type) params.set('type', type);
+  const qs = params.toString();
+  return paystackRequest(`/bank${qs ? `?${qs}` : ''}`);
+}
+
+async function createTransferRecipient({
+  type,
+  name,
+  accountNumber,
+  bankCode,
+  currency,
+  metadata,
+}) {
+  return paystackRequest('/transferrecipient', {
+    method: 'POST',
+    body: {
+      type,
+      name,
+      account_number: accountNumber,
+      bank_code: bankCode,
+      currency: currency || getPaystackCurrency(),
+      metadata,
+    },
+  });
+}
+
+async function initiateTransfer({
+  amount,
+  recipientCode,
+  reference,
+  reason,
+  currency,
+}) {
+  return paystackRequest('/transfer', {
+    method: 'POST',
+    body: {
+      source: 'balance',
+      amount: toMinorUnits(amount),
+      recipient: recipientCode,
+      reference,
+      reason: reason || 'QUANT wallet withdrawal',
+      currency: currency || getPaystackCurrency(),
+    },
+  });
+}
+
+async function verifyTransfer(referenceOrCode) {
+  return paystackRequest(`/transfer/verify/${encodeURIComponent(referenceOrCode)}`);
+}
+
 module.exports = {
   isPaystackConfigured,
   getPaystackPublicKey,
@@ -118,6 +220,14 @@ module.exports = {
   initializeTransaction,
   verifyTransaction,
   verifyWebhookSignature,
+  createCustomer,
+  fetchCustomer,
+  createDedicatedAccount,
+  listDedicatedAccounts,
+  listBanks,
+  createTransferRecipient,
+  initiateTransfer,
+  verifyTransfer,
   toMinorUnits,
   fromMinorUnits,
 };

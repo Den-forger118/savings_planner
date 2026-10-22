@@ -27,20 +27,23 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 403) {
-      const message = error.response?.data?.error || '';
-      const isAuthAttempt = /\/auth\/(login|register)/.test(error.config?.url || '');
+    const status = error.response?.status;
+    const message = String(error.response?.data?.error || '');
+    const url = error.config?.url || '';
+    const isAuthAttempt = /\/auth\/(login|register)/.test(url);
+    // Settings “change password” uses 401 for wrong current password — keep the session.
+    const isPasswordCheck = /password/i.test(url) && /current password|password is incorrect/i.test(message);
 
-      if (message.includes('Admin access') || isAuthAttempt) {
-        return Promise.reject(error);
-      }
+    const sessionExpired =
+      status === 401
+      || /invalid or expired token|please log in|account deactivated/i.test(message);
 
-      if (localStorage.getItem('token')) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-      }
+    if (sessionExpired && !isAuthAttempt && !isPasswordCheck && localStorage.getItem('token')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
     }
+
     return Promise.reject(error);
   }
 );

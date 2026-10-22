@@ -18,7 +18,7 @@ const GUIDE_SECTIONS = [
     title: 'Overview',
     icon: 'home',
     intro:
-      'QUANT is a private savings ledger: name goals, record deposits, run what-if scenarios, and track spending — with or without a fixed monthly budget.',
+      'QUANT is a private savings ledger: name goals, fund via your QUANT transfer account → wallet → allocate, run what-if scenarios, and track spending — with or without a fixed monthly budget. It does not sync or read your Mobile Money or bank balances.',
     features: [
       {
         id: 'earner-modes',
@@ -28,12 +28,11 @@ const GUIDE_SECTIONS = [
         page: 'settings-financial',
         what: 'Two savings modes that change how QUANT plans money across your goals.',
         why: 'Not everyone has a predictable monthly income. Non-Earner focuses on how much you still need to save; Earner adds monthly budget splitting and feasibility checks.',
-        where: 'Settings → Financial → Savings Mode, plus the monthly budget panel on the same tab and on Dashboard.',
+        where: 'Settings → Profile → Savings Mode. Monthly budget lives under Settings → Financial (and on Dashboard).',
         who: 'Anyone. Stay on Non-Earner while cash flow is uncertain. Switch to Earner once you can commit a monthly savings amount.',
         how: [
-          'Open Settings and choose Financial.',
-          'Set a monthly budget if you have not already (required before Earner mode).',
-          'Toggle Savings Mode to Earner or Non-Earner.',
+          'Set a monthly budget in Settings → Financial if you have not already (required before Earner mode).',
+          'Open Settings → Profile and toggle Savings Mode to Earner or Non-Earner.',
           'Return to Dashboard or Savings Goals — allocation panels and labels update immediately.',
         ],
       },
@@ -45,13 +44,14 @@ const GUIDE_SECTIONS = [
         page: 'settings',
         what: 'Display currency for amounts across the app, export your statement, and manage password and session from Settings.',
         why: 'Keep the ledger formatted for your currency, backed up when you need it, and secure on shared devices.',
-        where: 'Settings → Profile (currency), Data (export), Security (password & session). Trash lives under Settings → Trash.',
+        where: 'Settings → Financial (currency). Export and Trash open from Profile → More. Funding and Simulator open from Financial → More.',
         who: 'All members.',
         how: [
-          'Settings → Profile → pick Display Currency and save preferences.',
-          'Settings → Data → Export JSON or Export CSV for a full statement.',
+          'Settings → Financial → pick Display Currency and save financial preferences.',
+          'Settings → Profile → More → Data & export for JSON/CSV.',
           'Settings → Security to change your password or end the session.',
-          'Deleted goals are restored or permanently removed from Settings → Trash.',
+          'Settings → Financial → More → Funding for transfer account, wallet, and cash out.',
+          'Deleted goals: Settings → Profile → More → Trash.',
         ],
       },
     ],
@@ -60,7 +60,7 @@ const GUIDE_SECTIONS = [
     id: 'dashboard',
     title: 'Dashboard',
     icon: 'dashboard',
-    intro: 'Your home screen for goals, allocation health, spending trends, and a quick currency check.',
+    intro: 'Your home screen for goals, allocation health, funding vs budget, and a quick currency check.',
     features: [
       {
         id: 'dashboard-overview',
@@ -76,7 +76,7 @@ const GUIDE_SECTIONS = [
           'Sign in — Dashboard is the default home.',
           'Read the top tiles: budget or total saved, active goals, and the insight line.',
           'Use + New Goal or budget actions when you need to adjust the plan.',
-          'Scroll for the performance chart, currency check, goals overview, spending trend, and (in Earner mode) allocation sections.',
+          'Scroll for the performance chart, currency check, goals overview, and (in Earner mode) allocation sections.',
         ],
       },
       {
@@ -133,30 +133,15 @@ const GUIDE_SECTIONS = [
         icon: 'account_balance_wallet',
         badge: 'Earner only',
         page: 'dashboard',
-        what: 'How your monthly budget is split across goals, what remains unallocated, and which goals look underfunded.',
-        why: 'Shows whether the plan fits your budget and where deadlines or targets need adjusting.',
-        where: 'Dashboard → Monthly Allocation and Allocation Details (Earner mode with a budget and active goals).',
+        what: 'How your monthly budget is split across goals on paper, plus a separate meter of transfers received this month vs that budget (behind / on track / ahead).',
+        why: 'Plan shares show feasibility; the funding meter shows whether real VA/Paystack money matched what you said you could save.',
+        where: 'Dashboard (funding meter + Monthly Allocation). Also Settings → Funding.',
         who: 'Members in Earner mode with a monthly budget set.',
         how: [
           'Enable Earner mode and set a monthly budget in Settings → Financial.',
+          'Transfer into your QUANT account — Dashboard updates funded vs budget for the month.',
           'Create at least one active savings goal.',
           'Open Dashboard and review Monthly Allocation, then Allocation Details for feasibility notes.',
-        ],
-      },
-      {
-        id: 'spending-analytics',
-        title: 'Monthly Spending Trend',
-        icon: 'bar_chart',
-        badge: 'Dashboard',
-        page: 'dashboard',
-        what: 'A year view of total spending by month (Jan–Dec), with a year selector.',
-        why: 'See how spending moves across the year. Category breakdown lives on Expense Tracker.',
-        where: 'Dashboard → Monthly Spending Trend.',
-        who: 'Anyone logging expenses.',
-        how: [
-          'Log expenses from Expense Tracker (Capital Outflow).',
-          'Return to Dashboard and pick a year on Monthly Spending Trend.',
-          'Open Expense Tracker for category totals and the expense list.',
         ],
       },
     ],
@@ -285,18 +270,35 @@ const GUIDE_SECTIONS = [
       },
       {
         id: 'record-transaction',
-        title: 'Record a Transaction',
+        title: 'Record on the ledger',
         icon: 'swap_horiz',
         badge: 'Savings Goals',
         page: 'savings',
-        what: 'Log a deposit or withdrawal against a specific goal.',
-        why: 'Updates saved balance, progress, charts, and completion status.',
+        what: 'Manually log a deposit or withdrawal against a goal. This updates QUANT’s books only — it does not move money from MoMo, your bank, or your QUANT wallet.',
+        why: 'Track progress when you already saved outside the app, without touching the transfer account.',
         where: 'Goal card footer → transaction control on the ledger band.',
         who: 'Anyone actively saving toward goals.',
         how: [
           'Open the goal card and click the transaction control on the bottom band.',
           'Enter amount, choose deposit or withdrawal, add an optional note.',
-          'Submit — the card, Dashboard charts, and Activity ledger refresh.',
+          'Confirm manual entry — no bank or MoMo transfer is started.',
+        ],
+      },
+      {
+        id: 'wallet-dva-allocate',
+        title: 'Wallet, transfer account & allocate',
+        icon: 'account_balance_wallet',
+        badge: 'Settings',
+        page: 'settings',
+        what: 'Primary funding path: one QUANT transfer account (virtual account via Paystack) → wallet → allocate to goals (auto-apply by priority, or Allocate from wallet on a goal). Withdraw from wallet sends funds out via Paystack Transfer.',
+        why: 'One inbound account for all goals. Goal forms do not open Paystack checkout — money is applied from the wallet.',
+        where: 'Settings → Funding. Allocate from a goal’s Add to goal form when wallet has balance.',
+        who: 'Anyone who consents to a transfer account and funds it.',
+        how: [
+          'Settings → Funding → consent and create your transfer account.',
+          'Copy the account details and send money from your bank or MoMo app.',
+          'When the credit arrives, leave auto-apply on (fills goals by priority) or open a goal → Allocate from wallet.',
+          'Cash out from Settings → Funding → wallet withdraw. Goal “Reduce” only lowers the ledger bar.',
         ],
       },
       {
@@ -310,7 +312,7 @@ const GUIDE_SECTIONS = [
         where: 'Automatically on the goal card when fully funded.',
         who: 'Any member who reaches a target through deposits.',
         how: [
-          'Keep recording deposits until saved equals the target.',
+          'Keep funding or recording deposits until saved equals the target.',
           'A completion notice appears and the card shows a Complete badge.',
           'New transactions are blocked; use Edit in the ⋮ menu if you need to correct the goal details.',
         ],
@@ -412,14 +414,13 @@ const GUIDE_SECTIONS = [
         badge: 'Expense Tracker',
         page: 'expenses',
         what: 'Record spending amount, category, date, and optional note.',
-        why: 'Builds the spending picture used in monthly totals and the Dashboard spending trend.',
-        where: 'Expense Tracker (page title: Capital Outflow) → Log Expense. Categories are managed in Settings → Financial → Category Ledger.',
+        why: 'Builds the spending picture used in monthly totals and the Expense Tracker year trend.',
+        where: 'Expense Tracker (page title: Capital Outflow) → Log Expense. New categories can be added from that form.',
         who: 'All members tracking personal spending.',
         how: [
           'Go to Expense Tracker.',
           'Click Log Expense.',
-          'Pick a category, enter amount and date, add a note if helpful, then submit.',
-          'To add or rename categories, open Settings → Financial → Category Ledger.',
+          'Pick a category (or New category + colour), enter amount and date, add a note if helpful, then submit.',
         ],
       },
       {
@@ -434,8 +435,7 @@ const GUIDE_SECTIONS = [
         who: 'Everyone tracking personal spending.',
         how: [
           'Open Expense Tracker.',
-          'Review month totals, category breakdown, and the expense list.',
-          'Check Dashboard → Monthly Spending Trend for the year-by-month view.',
+          'Review month totals, category breakdown, the year trend, and the expense list.',
         ],
       },
     ],
@@ -570,7 +570,7 @@ function FeatureGuide({ isEarnerMode = false, onNavigate, embedded = false }) {
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-medium text-gold">2</span>
             <span>
-              <strong>Record a deposit</strong> — use the transaction control on a goal card’s bottom band when you save money.
+              <strong>Fund or record progress</strong> — transfer into your QUANT wallet, allocate (or auto-apply), or manually record on the ledger (manual does not move money outside QUANT).
             </span>
           </li>
           <li className="flex gap-3">
@@ -588,7 +588,7 @@ function FeatureGuide({ isEarnerMode = false, onNavigate, embedded = false }) {
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-dark font-sans text-xs font-medium text-gold">5</span>
             <span>
-              <strong>Choose your mode</strong> — Settings → Financial → set a monthly budget, then toggle Earner if you want allocation.
+              <strong>Choose your mode</strong> — set a monthly budget in Settings → Financial, then toggle Earner under Settings → Profile.
             </span>
           </li>
           <li className="flex gap-3">

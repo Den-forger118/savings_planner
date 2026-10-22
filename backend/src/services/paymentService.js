@@ -1,8 +1,10 @@
+const pool = require('../dbcon');
 const paymentModel = require('../models/paymentModel');
 const transactionModel = require('../models/transactionModel');
 const userModel = require('../models/userModel');
 const goalModel = require('../models/goalModel');
 const reminderModel = require('../models/reminderModel');
+const ledgerService = require('./ledgerService');
 const { fromMinorUnits } = require('../utils/paystack');
 const { sendGoalCompleteCelebration } = require('../utils/mailer');
 const { getLocalParts } = require('../utils/localTime');
@@ -29,13 +31,35 @@ async function maybeSendCelebration(userId, completedGoal) {
 }
 
 /**
+ * Resolve gateway fee in ledger currency.
+ * Only post fee lines when settlement currency matches the payment ledger currency.
+ */
+function resolveLedgerFee({ feesMinor, feeCurrency, ledgerCurrency }) {
+  const fee = fromMinorUnits(feesMinor);
+  if (!Number.isFinite(fee) || fee <= 0) {
+    return 0;
+  }
+  const settlement = String(feeCurrency || '').toUpperCase();
+  const ledger = String(ledgerCurrency || '').toUpperCase();
+  if (settlement && ledger && settlement !== ledger) {
+    console.warn(
+      `[payments] Skipping fee posting (fee currency ${settlement} ≠ ledger ${ledger})`
+    );
+    return 0;
+  }
+  return fee;
+}
+
+/**
  * Credit a goal from a successful Paystack charge (idempotent by paystack_ref).
+ * Also posts a balanced double-entry journal (Paystack clearing ↔ user wallet ± fees).
  */
 async function applySuccessfulPayment({
   reference,
   amountMinor,
   currency,
   metadata = {},
+  feesMinor = null,
 }) {
   const existing = await paymentModel.getByReference(reference);
 
@@ -118,6 +142,11 @@ async function applySuccessfulPayment({
   const creditAmount = Number.parseFloat(payment.amount);
   const userId = payment.user_id;
   const goalId = payment.goal_id;
+  const feeAmount = resolveLedgerFee({
+    feesMinor,
+    feeCurrency: currency,
+    ledgerCurrency: payment.currency,
+  });
 
   const goal = await goalModel.getGoalById(goalId);
   if (!goal || Number(goal.user_id) !== Number(userId)) {
@@ -134,23 +163,64 @@ async function applySuccessfulPayment({
     throw error;
   }
 
+  const client = await pool.connect();
   let transaction;
+  let journalEntry;
   try {
-    ({ transaction } = await transactionModel.recordTransaction(
+    await client.query('BEGIN');
+
+    const journalResult = await ledgerService.postDepositJournal({
       userId,
-      goalId,
-      creditAmount,
-      'deposit',
-      'Paystack deposit'
-    ));
+      grossAmount: creditAmount,
+      feeAmount,
+      idempotencyKey: reference,
+      currency: payment.currency,
+      description: `Paystack deposit goal ${goalId}`,
+      client,
+    });
+    journalEntry = journalResult.journalEntry;
+
+    if (journalResult.alreadyProcessed && payment.transaction_id) {
+      // Journal + goal credit already done for this reference; avoid double deposit.
+      transaction = { transaction_id: payment.transaction_id };
+    } else if (journalResult.alreadyProcessed) {
+      // Recovery: journal exists but goal row was never linked — credit once.
+      ({ transaction } = await transactionModel.recordTransaction(
+        userId,
+        goalId,
+        creditAmount,
+        'deposit',
+        'Paystack deposit',
+        { client }
+      ));
+    } else {
+      ({ transaction } = await transactionModel.recordTransaction(
+        userId,
+        goalId,
+        creditAmount,
+        'deposit',
+        'Paystack deposit',
+        { client }
+      ));
+    }
+
+    await client.query('COMMIT');
   } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      /* ignore */
+    }
     await paymentModel.resetToPending(reference);
     throw err;
+  } finally {
+    client.release();
   }
 
   const marked = await paymentModel.markSuccess({
     paystackRef: reference,
     transactionId: transaction.transaction_id,
+    journalEntryId: journalEntry?.journal_entry_id || null,
   });
 
   if (!marked) {
@@ -165,6 +235,7 @@ async function applySuccessfulPayment({
     alreadyProcessed: false,
     payment: marked,
     transaction,
+    journalEntry,
     goalCompleted: Boolean(completedGoal),
     completedGoalName: completedGoal?.name || null,
   };
@@ -172,4 +243,5 @@ async function applySuccessfulPayment({
 
 module.exports = {
   applySuccessfulPayment,
+  resolveLedgerFee,
 };

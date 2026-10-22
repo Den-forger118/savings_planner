@@ -1,4 +1,5 @@
 const pool = require('../dbcon');
+const ledgerService = require('../services/ledgerService');
 
 // creating a new user
 const createUser = async (firstname, lastname, email, passwordHash) => {
@@ -8,7 +9,13 @@ const createUser = async (firstname, lastname, email, passwordHash) => {
 
   try {
     const result = await pool.query(query, [firstname, lastname, email, passwordHash]);
-    return result.rows[0];
+    const user = result.rows[0];
+    try {
+      await ledgerService.ensureUserWalletAccount(user.user_id);
+    } catch (ledgerErr) {
+      console.error('[users] Wallet account provision failed:', ledgerErr.message);
+    }
+    return user;
   } catch (error) {
     console.error('Error creating user:', error);
     throw error;
@@ -20,7 +27,9 @@ const USER_PUBLIC_FIELDS = `
   user_id, first_name, last_name, email, monthly_budget, monthly_income, is_earner,
   is_admin, is_active, currency, currency_symbol, theme, fiscal_start_month,
   onboarding_complete, email_notifications, push_notifications, reminder_frequency,
-  reminder_time, timezone, created_at
+  reminder_time, timezone, wallet_balance, auto_allocate_wallet, phone,
+  paystack_customer_code, virtual_account_number, virtual_account_bank,
+  virtual_account_name, created_at
 `;
 
 const getUserById = async (userId) => {
@@ -107,6 +116,7 @@ const updatePreferences = async (userId, prefs) => {
     reminder_frequency: reminderFrequency,
     reminder_time: reminderTime,
     timezone,
+    auto_allocate_wallet: autoAllocateWallet,
   } = prefs;
 
   let nextFrequency = null;
@@ -136,6 +146,16 @@ const updatePreferences = async (userId, prefs) => {
     nextEmailNotifications = emailNotifications;
   }
 
+  let nextAutoAllocate = null;
+  if (autoAllocateWallet !== undefined && autoAllocateWallet !== null && autoAllocateWallet !== '') {
+    if (typeof autoAllocateWallet !== 'boolean') {
+      const error = new Error('auto_allocate_wallet must be a boolean');
+      error.statusCode = 400;
+      throw error;
+    }
+    nextAutoAllocate = autoAllocateWallet;
+  }
+
   const query = `
     UPDATE users
     SET
@@ -146,7 +166,8 @@ const updatePreferences = async (userId, prefs) => {
       email_notifications = COALESCE($6, email_notifications),
       reminder_frequency = COALESCE($7, reminder_frequency),
       reminder_time = COALESCE($8::time, reminder_time),
-      timezone = COALESCE($9, timezone)
+      timezone = COALESCE($9, timezone),
+      auto_allocate_wallet = COALESCE($10, auto_allocate_wallet)
     WHERE user_id = $1
     RETURNING ${USER_PUBLIC_FIELDS}
   `;
@@ -162,6 +183,7 @@ const updatePreferences = async (userId, prefs) => {
       nextFrequency,
       nextReminderTime,
       nextTimezone,
+      nextAutoAllocate,
     ]);
     return result.rows[0];
   } catch (err) {
@@ -227,14 +249,66 @@ const completeOnboarding = async (userId, data) => {
   }
 };
 
+const getUserByPaystackCustomerCode = async (customerCode) => {
+  if (!customerCode) return null;
+  const result = await pool.query(
+    `SELECT ${USER_PUBLIC_FIELDS} FROM users WHERE paystack_customer_code = $1`,
+    [customerCode]
+  );
+  return result.rows[0] || null;
+};
+
+const getUserByVirtualAccountNumber = async (accountNumber) => {
+  if (!accountNumber) return null;
+  const result = await pool.query(
+    `SELECT ${USER_PUBLIC_FIELDS} FROM users WHERE virtual_account_number = $1`,
+    [String(accountNumber)]
+  );
+  return result.rows[0] || null;
+};
+
+const updateDvaFields = async (userId, {
+  phone,
+  paystackCustomerCode,
+  virtualAccountNumber,
+  virtualAccountBank,
+  virtualAccountName,
+}) => {
+  const result = await pool.query(
+    `
+      UPDATE users
+      SET
+        phone = COALESCE($2, phone),
+        paystack_customer_code = COALESCE($3, paystack_customer_code),
+        virtual_account_number = COALESCE($4, virtual_account_number),
+        virtual_account_bank = COALESCE($5, virtual_account_bank),
+        virtual_account_name = COALESCE($6, virtual_account_name)
+      WHERE user_id = $1
+      RETURNING ${USER_PUBLIC_FIELDS}
+    `,
+    [
+      userId,
+      phone ?? null,
+      paystackCustomerCode ?? null,
+      virtualAccountNumber ?? null,
+      virtualAccountBank ?? null,
+      virtualAccountName ?? null,
+    ]
+  );
+  return result.rows[0] || null;
+};
+
 module.exports = {
   createUser,
   getUserById,
   getUserMonthlyBudgetById,
   getUserByEmail,
+  getUserByPaystackCustomerCode,
+  getUserByVirtualAccountNumber,
   updateEarnerMode,
   updatePreferences,
   updatePassword,
   completeOnboarding,
+  updateDvaFields,
   USER_PUBLIC_FIELDS,
 };

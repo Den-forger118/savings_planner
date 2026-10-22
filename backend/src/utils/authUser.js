@@ -34,6 +34,13 @@ const formatAuthUser = (user) => ({
   reminder_frequency: user.reminder_frequency || 'daily',
   reminder_time: formatReminderTime(user.reminder_time),
   timezone: user.timezone || 'UTC',
+  wallet_balance: Number.parseFloat(user.wallet_balance) || 0,
+  auto_allocate_wallet: user.auto_allocate_wallet !== false,
+  phone: user.phone || null,
+  paystack_customer_code: user.paystack_customer_code || null,
+  virtual_account_number: user.virtual_account_number || null,
+  virtual_account_bank: user.virtual_account_bank || null,
+  virtual_account_name: user.virtual_account_name || null,
 });
 
 module.exports = { formatAuthUser };

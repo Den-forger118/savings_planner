@@ -13,6 +13,7 @@ const {
   sendPasswordResetEmail,
 } = require('../utils/mailer');
 const { syncAdminPromoteEmail } = require('../utils/adminPromote');
+const ledgerService = require('../services/ledgerService');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
@@ -89,18 +90,24 @@ router.post('/register', async (req, res) => {
 
     let user = result.rows[0];
 
-    // Create default categories for new user
+    // Create default categories for new user (theme-aligned palette)
     await pool.query(
       `INSERT INTO categories (user_id, name, colour) VALUES
-       ($1, 'Food & Dining', '#D4A574'),
-       ($1, 'Transport', '#243054'),
-       ($1, 'Entertainment', '#E8C77A'),
-       ($1, 'Shopping', '#4E4B46'),
-       ($1, 'Healthcare', '#1A2340'),
-       ($1, 'Utilities', '#D4A574'),
-       ($1, 'Other', '#4E4B46')`,
+       ($1, 'Food & Dining', '#C4A882'),
+       ($1, 'Transport', '#4A5D7A'),
+       ($1, 'Entertainment', '#D4B16D'),
+       ($1, 'Shopping', '#8B7355'),
+       ($1, 'Healthcare', '#6B8578'),
+       ($1, 'Utilities', '#7D8A9A'),
+       ($1, 'Other', '#9A9186')`,
       [user.user_id]
     );
+
+    try {
+      await ledgerService.ensureUserWalletAccount(user.user_id);
+    } catch (ledgerErr) {
+      console.error('[auth] Wallet account provision failed:', ledgerErr.message);
+    }
 
     const promoted = await syncAdminPromoteEmail(user.email);
     if (promoted) user = promoted;

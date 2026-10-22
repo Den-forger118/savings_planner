@@ -244,6 +244,47 @@ function sendGoalCompleteCelebration(user, goalName) {
   });
 }
 
+function sendWalletCreditNotice(user, amount, currency, allocations = []) {
+  const cur = String(currency || 'GHS').toUpperCase();
+  const amt = Number.parseFloat(amount).toFixed(2);
+  const safeAllocations = Array.isArray(allocations) ? allocations.filter((row) => row?.amount > 0) : [];
+
+  if (safeAllocations.length > 0) {
+    const summary = safeAllocations
+      .map((row) => `• ${row.goalName}: ${cur} ${Number(row.amount).toFixed(2)}`)
+      .join('\n');
+    const htmlList = safeAllocations
+      .map(
+        (row) =>
+          `<li><strong style="color:#FDFBF7;">${escapeHtml(row.goalName)}</strong> — ${escapeHtml(cur)} ${escapeHtml(Number(row.amount).toFixed(2))}</li>`
+      )
+      .join('');
+    return sendMail({
+      to: user.email,
+      subject: `${cur} ${amt} received and applied to your goals`,
+      heading: 'Deposit applied',
+      text: `Hello ${user.first_name},\n\n${cur} ${amt} arrived in your QUANT transfer account and was automatically allocated:\n${summary}\n\n${FRONTEND_URL}`,
+      body: `<p>Hello ${escapeHtml(user.first_name)},</p>
+        <p><strong style="color:#FDFBF7;">${escapeHtml(cur)} ${escapeHtml(amt)}</strong> arrived in your QUANT transfer account and was automatically allocated to your goals (highest priority first):</p>
+        <ul>${htmlList}</ul>`,
+      buttonLabel: 'Open QUANT',
+      buttonHref: FRONTEND_URL,
+    });
+  }
+
+  return sendMail({
+    to: user.email,
+    subject: `${cur} ${amt} is in your QUANT wallet`,
+    heading: 'Wallet funded',
+    text: `Hello ${user.first_name},\n\n${cur} ${amt} arrived in your QUANT wallet via your transfer account. Open QUANT and allocate it to a savings goal.\n\n${FRONTEND_URL}`,
+    body: `<p>Hello ${escapeHtml(user.first_name)},</p>
+      <p><strong style="color:#FDFBF7;">${escapeHtml(cur)} ${escapeHtml(amt)}</strong> arrived in your QUANT wallet via your transfer account.</p>
+      <p>Allocate it to a savings goal when you are ready — no extra Paystack fee on allocation. QUANT does not sync your personal MoMo or bank balance.</p>`,
+    buttonLabel: 'Allocate in QUANT',
+    buttonHref: FRONTEND_URL,
+  });
+}
+
 module.exports = {
   FRONTEND_URL,
   isMailConfigured,
@@ -252,4 +293,5 @@ module.exports = {
   sendPasswordResetEmail,
   sendReminderDigest,
   sendGoalCompleteCelebration,
+  sendWalletCreditNotice,
 };

@@ -2,20 +2,21 @@ const pool = require('../dbcon');
 
 async function createPendingPayment({
   userId,
-  goalId,
+  goalId = null,
   paystackRef,
   amount,
   currency,
+  kind = 'goal_deposit',
 }) {
   const result = await pool.query(
     `
       INSERT INTO payment_references (
-        user_id, goal_id, paystack_ref, amount, currency, status
+        user_id, goal_id, paystack_ref, amount, currency, kind, status
       )
-      VALUES ($1, $2, $3, $4, $5, 'pending')
+      VALUES ($1, $2, $3, $4, $5, $6, 'pending')
       RETURNING *
     `,
-    [userId, goalId, paystackRef, amount, currency]
+    [userId, goalId, paystackRef, amount, currency, kind]
   );
   return result.rows[0];
 }
@@ -43,18 +44,19 @@ async function claimForProcessing(paystackRef) {
   return result.rows[0] || null;
 }
 
-async function markSuccess({ paystackRef, transactionId }) {
+async function markSuccess({ paystackRef, transactionId = null, journalEntryId = null }) {
   const result = await pool.query(
     `
       UPDATE payment_references
       SET status = 'success',
-          transaction_id = $2,
+          transaction_id = COALESCE($2, transaction_id),
+          journal_entry_id = COALESCE($3, journal_entry_id),
           completed_at = NOW()
       WHERE paystack_ref = $1
         AND status IN ('pending', 'processing')
       RETURNING *
     `,
-    [paystackRef, transactionId]
+    [paystackRef, transactionId, journalEntryId]
   );
   return result.rows[0] || null;
 }

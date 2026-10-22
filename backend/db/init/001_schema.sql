@@ -23,6 +23,13 @@ CREATE TABLE IF NOT EXISTS users (
   reminder_frequency VARCHAR(20) NOT NULL DEFAULT 'daily',
   reminder_time TIME NOT NULL DEFAULT '09:00',
   timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+  wallet_balance NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  auto_allocate_wallet BOOLEAN NOT NULL DEFAULT true,
+  phone VARCHAR(32),
+  paystack_customer_code VARCHAR(100),
+  virtual_account_number VARCHAR(20),
+  virtual_account_bank VARCHAR(100),
+  virtual_account_name VARCHAR(255),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -122,10 +129,11 @@ CREATE INDEX IF NOT EXISTS idx_reminder_email_sends_user
 CREATE TABLE IF NOT EXISTS payment_references (
   reference_id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-  goal_id INTEGER NOT NULL REFERENCES saving_goals(goal_id) ON DELETE CASCADE,
+  goal_id INTEGER REFERENCES saving_goals(goal_id) ON DELETE CASCADE,
   paystack_ref VARCHAR(100) NOT NULL UNIQUE,
   amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
   currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+  kind VARCHAR(20) NOT NULL DEFAULT 'goal_deposit',
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   transaction_id INTEGER REFERENCES transactions(transaction_id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -148,3 +156,89 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
   ON push_subscriptions (user_id);
+
+DO $$ BEGIN
+  CREATE TYPE account_type AS ENUM ('ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE posting_direction AS ENUM ('DEBIT', 'CREDIT');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS accounts (
+  account_id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+  name VARCHAR(255) NOT NULL,
+  type account_type NOT NULL,
+  currency VARCHAR(3) NOT NULL DEFAULT 'GHS',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_name_unique
+  ON accounts (name);
+
+CREATE INDEX IF NOT EXISTS idx_accounts_user_id
+  ON accounts (user_id);
+
+CREATE TABLE IF NOT EXISTS journal_entries (
+  journal_entry_id SERIAL PRIMARY KEY,
+  idempotency_key VARCHAR(255) NOT NULL UNIQUE,
+  description TEXT,
+  status VARCHAR(50) NOT NULL DEFAULT 'posted',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_journal_idempotency
+  ON journal_entries (idempotency_key);
+
+CREATE TABLE IF NOT EXISTS postings (
+  posting_id SERIAL PRIMARY KEY,
+  journal_entry_id INTEGER NOT NULL REFERENCES journal_entries(journal_entry_id) ON DELETE CASCADE,
+  account_id INTEGER NOT NULL REFERENCES accounts(account_id) ON DELETE RESTRICT,
+  amount NUMERIC(18, 4) NOT NULL CHECK (amount > 0),
+  direction posting_direction NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_postings_account
+  ON postings (account_id);
+
+CREATE INDEX IF NOT EXISTS idx_postings_journal
+  ON postings (journal_entry_id);
+
+ALTER TABLE payment_references
+  ADD COLUMN IF NOT EXISTS journal_entry_id INTEGER REFERENCES journal_entries(journal_entry_id) ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS payouts (
+  payout_id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
+  currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  paystack_ref VARCHAR(100) NOT NULL UNIQUE,
+  recipient_code VARCHAR(100),
+  recipient_type VARCHAR(40) NOT NULL DEFAULT 'mobile_money',
+  account_number VARCHAR(40),
+  bank_code VARCHAR(20),
+  account_name VARCHAR(255),
+  transfer_code VARCHAR(100),
+  failure_reason TEXT,
+  journal_entry_id INTEGER REFERENCES journal_entries(journal_entry_id) ON DELETE SET NULL,
+  finalize_journal_entry_id INTEGER REFERENCES journal_entries(journal_entry_id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_payouts_user
+  ON payouts (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_payouts_status
+  ON payouts (status);
+
+INSERT INTO accounts (user_id, name, type, currency)
+VALUES
+  (NULL, 'Paystack Clearing', 'ASSET', 'GHS'),
+  (NULL, 'Gateway Fee Expense', 'EXPENSE', 'GHS'),
+  (NULL, 'Pending Disbursal', 'LIABILITY', 'GHS')
+ON CONFLICT (name) DO NOTHING;

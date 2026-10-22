@@ -56,13 +56,15 @@ function MemberActionsMenu({
   open,
   onOpenChange,
   statusUpdatingId,
+  deletingId,
   onView,
   onStatusChange,
+  onDelete,
 }) {
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
-  const isUpdating = statusUpdatingId === member.user_id;
+  const isUpdating = statusUpdatingId === member.user_id || deletingId === member.user_id;
   const isDeactivated = member.is_active === false;
 
   useLayoutEffect(() => {
@@ -151,27 +153,43 @@ function MemberActionsMenu({
               </button>
 
               {!member.is_admin && (
-                <button
-                  type="button"
-                  role="menuitem"
-                  disabled={isUpdating}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onOpenChange(false);
-                    onStatusChange(member, isDeactivated, event);
-                  }}
-                  className={`flex w-full items-center gap-2 px-3 py-2.5 text-left font-sans text-sm transition-colors disabled:opacity-50 ${
-                    isDeactivated
-                      ? 'text-primary-dark hover:bg-cream'
-                      : 'text-red-800 hover:bg-red-50'
-                  }`}
-                >
-                  <Icon
-                    name={isDeactivated ? 'person_add' : 'person_off'}
-                    className="text-base"
-                  />
-                  {isUpdating ? 'Saving…' : isDeactivated ? 'Reactivate' : 'Deactivate'}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={isUpdating}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOpenChange(false);
+                      onStatusChange(member, isDeactivated, event);
+                    }}
+                    className={`flex w-full items-center gap-2 px-3 py-2.5 text-left font-sans text-sm transition-colors disabled:opacity-50 ${
+                      isDeactivated
+                        ? 'text-primary-dark hover:bg-cream'
+                        : 'text-red-800 hover:bg-red-50'
+                    }`}
+                  >
+                    <Icon
+                      name={isDeactivated ? 'person_add' : 'person_off'}
+                      className="text-base"
+                    />
+                    {isUpdating ? 'Saving…' : isDeactivated ? 'Reactivate' : 'Deactivate'}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={isUpdating}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOpenChange(false);
+                      onDelete(member);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left font-sans text-sm text-red-800 transition-colors hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Icon name="delete_forever" className="text-base" />
+                    Delete permanently
+                  </button>
+                </>
               )}
             </div>,
             document.body
@@ -314,6 +332,7 @@ function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [statusError, setStatusError] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [openActionsUserId, setOpenActionsUserId] = useState(null);
@@ -367,6 +386,7 @@ function AdminUsersPage() {
     event?.stopPropagation?.();
 
     setConfirmDialog({
+      type: 'status',
       member,
       nextActive,
       title: nextActive
@@ -380,8 +400,42 @@ function AdminUsersPage() {
     });
   };
 
-  const executeStatusChange = async () => {
+  const handleDeleteRequest = (member) => {
+    setConfirmDialog({
+      type: 'delete',
+      member,
+      title: `Delete ${member.full_name} permanently?`,
+      message:
+        'This removes their account, goals, transactions, and expenses from QUANT. This cannot be undone.',
+      confirmLabel: 'Delete permanently',
+      tone: 'danger',
+    });
+  };
+
+  const executeConfirmAction = async () => {
     if (!confirmDialog) return;
+
+    if (confirmDialog.type === 'delete') {
+      const { member } = confirmDialog;
+      setDeletingId(member.user_id);
+      setStatusError(null);
+      try {
+        await api.delete(`/admin/users/${member.user_id}`);
+        setConfirmDialog(null);
+        if (Number(selectedUserId) === Number(member.user_id)) {
+          setSelectedUserId(null);
+        }
+        await fetchUsers();
+      } catch (err) {
+        setStatusError(
+          getFriendlyError(err, 'We couldn’t delete that account. Please try again.')
+        );
+        setConfirmDialog(null);
+      } finally {
+        setDeletingId(null);
+      }
+      return;
+    }
 
     const { member, nextActive } = confirmDialog;
     const action = nextActive ? 'reactivate' : 'deactivate';
@@ -559,8 +613,10 @@ function AdminUsersPage() {
                         setOpenActionsUserId(nextOpen ? member.user_id : null);
                       }}
                       statusUpdatingId={statusUpdatingId}
+                      deletingId={deletingId}
                       onView={setSelectedUserId}
                       onStatusChange={handleStatusChange}
+                      onDelete={handleDeleteRequest}
                     />
                   </td>
                 </tr>
@@ -576,10 +632,10 @@ function AdminUsersPage() {
         message={confirmDialog?.message || ''}
         confirmLabel={confirmDialog?.confirmLabel || 'Confirm'}
         tone={confirmDialog?.tone || 'danger'}
-        loading={Boolean(statusUpdatingId)}
-        onConfirm={executeStatusChange}
+        loading={Boolean(statusUpdatingId || deletingId)}
+        onConfirm={executeConfirmAction}
         onCancel={() => {
-          if (!statusUpdatingId) setConfirmDialog(null);
+          if (!statusUpdatingId && !deletingId) setConfirmDialog(null);
         }}
       />
     </div>

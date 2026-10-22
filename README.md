@@ -347,12 +347,17 @@ If mail is not configured, login still works; the server logs that no provider i
 - `GET /api/admin/users/:userId` — read-only profile with goals, transactions, and expenses
 - Requires a valid JWT for an admin user
 
-## Paystack (goal deposits)
+## Paystack (deposits, wallet, cash-out)
 
-**Option 1** (MoMo/card → specific goal via metadata + popup) is implemented.  
-**Option 2** (dedicated virtual account → wallet → allocate later) is deferred.
+Recommended path: **one DVA per user → wallet → auto-allocate to goals by priority**, plus **Option 1 metadata checkout** when funding a specific goal in-app.
 
-Full architecture, env vars, webhook notes, and the Option 2 build checklist: **[docs/PAYSTACK.md](docs/PAYSTACK.md)**.
+| Rail | Status |
+|------|--------|
+| Option 1 — MoMo/card → metadata → goal | Done |
+| Option 2 — DVA → wallet → auto/manual allocate | Done |
+| Cash-out — wallet → Paystack Transfer | Done |
+
+Architecture, why not per-goal DVAs, metadata vs blind transfers, env vars, webhooks: **[docs/PAYSTACK.md](docs/PAYSTACK.md)**.
 
 ## PWA + Web Push
 

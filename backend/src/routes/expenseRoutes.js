@@ -138,7 +138,7 @@ router.post('/categories', async (req, res) => {
     const category = await expenseModel.createCategory(
       userId,
       name,
-      color || '#4E4B46'
+      color || '#D4B16D'
     );
 
     res.status(201).json({
