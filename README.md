@@ -253,16 +253,17 @@ https://your-app.vercel.app/reset-password?token=...
 
 Redeploy the backend after saving. You can remove old `GMAIL_*` vars; Gmail remains an optional fallback only if Resend is unset.
 
-### 4. Railway backend + Postgres (restore checklist)
+### 4. Railway backend + Supabase Postgres (restore checklist)
 
-Keep **frontend on Vercel** and **API + Postgres on Railway**.
+Keep **frontend on Vercel**, **API on Railway**, and **Postgres on Supabase**.
 
-**A. Postgres service (Railway)**  
-- Add a PostgreSQL plugin/service in the same Railway project.  
-- Link it to the backend service so Railway injects `DATABASE_URL` (preferred).  
-- The API also still accepts manual `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` if you set those instead.
+**A. Supabase Postgres**  
+- Create a project at [supabase.com](https://supabase.com).  
+- Project Settings → Database → copy the **Session pooler** URI (port `5432`) or the **Direct** URI.  
+- Do **not** use the Transaction pooler (`:6543`) with this Express `pg` Pool.  
+- [`backend/src/dbcon.js`](backend/src/dbcon.js) enables SSL for `supabase.co` / `pooler.supabase` hosts automatically.
 
-**B. Backend service → Variables** (set these on the API service):
+**B. Backend service → Variables** (set these on the Railway API service):
 
 ```env
 NODE_ENV=production
@@ -270,7 +271,7 @@ PORT=5001
 JWT_SECRET=replace_with_a_long_random_secret
 JWT_EXPIRES_IN=24h
 FRONTEND_URL=https://your-app.vercel.app
-DATABASE_URL=${{Postgres.DATABASE_URL}}
+DATABASE_URL=postgresql://postgres.[ref]:[PASSWORD]@aws-0-[region].pooler.supabase.com:5432/postgres
 RESEND_API_KEY=re_xxxxxxxx
 MAIL_FROM=QUANT <onboarding@resend.dev>
 ADMIN_PROMOTE_EMAIL=you@example.com
@@ -282,8 +283,9 @@ Notes:
 - Vercel preview URLs change every deploy. The API allows `https://*.vercel.app` by default (`ALLOW_VERCEL_PREVIEWS=false` to turn that off).
 - Still set `FRONTEND_URL` to your main Vercel URL (no trailing slash) so password-reset emails link to the right place.
 - Optional: `FRONTEND_URLS=https://url1.vercel.app,https://url2.vercel.app` for extra exact origins.
-- `DATABASE_URL` is normally auto-filled when Postgres is linked; do not invent host pieces if the URL is already there.
+- Set `DATABASE_URL` to the Supabase URI only — remove any `${{Postgres.DATABASE_URL}}` Railway plugin reference so it cannot override.
 - Start command / root: service root directory = `backend`, start = `npm start` (or Docker `backend/Dockerfile`).
+- Local Docker still uses `DB_HOST` / `DB_*` from `docker-compose.yml` (no `DATABASE_URL` required).
 
 **C. Vercel frontend → Environment Variables**
 
